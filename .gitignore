@@ -68,6 +68,7 @@ instance/
 # Scrapy stuff:
 .scrapy
 
+
 # Sphinx documentation
 docs/_build/
 
@@ -137,7 +138,7 @@ dmypy.json
 *.swp
 *.swo
 *~
-
+info.txt
 # OS
 .DS_Store
 .DS_Store?
