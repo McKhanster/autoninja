@@ -1,0 +1,43 @@
+# Core LangChain and LangGraph dependencies
+langchain>=0.1.0
+langchain-aws>=0.1.0
+langgraph>=0.0.40
+langchain-community>=0.0.20
+
+# AWS SDK and Bedrock
+boto3>=1.34.0
+botocore>=1.34.0
+
+# FastAPI for API layer
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+
+# Data processing and validation
+typing-extensions>=4.8.0
+pydantic-settings>=2.1.0
+
+# Async support
+aiofiles>=23.2.0
+httpx>=0.25.0
+
+# Monitoring and observability
+aws-xray-sdk>=2.12.0
+
+# Development dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+black>=23.9.0
+pylint>=3.0.0
+mypy>=1.6.0
+pre-commit>=3.5.0
+
+# Infrastructure validation
+cfn-lint>=0.83.0
+
+# Caching
+redis>=5.0.0
+
+# Environment management
+python-dotenv>=1.0.0
