@@ -20,8 +20,12 @@ from .solution_architecture import (
 
 from .code_generation import (
     BedrockAgentConfigTool,
-    ActionGroupGeneratorTool,
-    DeploymentTemplateGeneratorTool
+)
+
+from .quality_validation import (
+    CodeQualityAnalysisTool,
+    CloudFormationValidationTool,
+    SecurityScanTool
 )
 
 __all__ = [
@@ -34,5 +38,8 @@ __all__ = [
     "CostEstimationTool",
     "BedrockAgentConfigTool",
     "ActionGroupGeneratorTool",
-    "DeploymentTemplateGeneratorTool"
+    "DeploymentTemplateGeneratorTool",
+    "CodeQualityAnalysisTool",
+    "CloudFormationValidationTool",
+    "SecurityScanTool"
 ]
