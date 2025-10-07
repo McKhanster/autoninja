@@ -161,7 +161,7 @@ class DynamoDBStateStore:
         """
         try:
             # Serialize the session state for DynamoDB
-            item = serialize_for_dynamodb(session_state.dict())
+            item = serialize_for_dynamodb(session_state.model_dump())
             
             # Add DynamoDB-specific fields
             item['ttl'] = int((datetime.utcnow().timestamp() + 86400 * 30))  # 30 days TTL
@@ -243,7 +243,7 @@ class DynamoDBStateStore:
             session_state.update_timestamp()
             
             # Serialize for DynamoDB
-            item = serialize_for_dynamodb(session_state.dict())
+            item = serialize_for_dynamodb(session_state.model_dump())
             
             # Increment version for optimistic locking
             new_version = (expected_version or 1) + 1

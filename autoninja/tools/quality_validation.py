@@ -36,6 +36,27 @@ class SecurityScanInput(BaseModel):
     scan_type: str = Field(description="Type of security scan (code, infrastructure)", default="code")
 
 
+class AWSBestPracticesInput(BaseModel):
+    """Input schema for AWS best practices validation tool."""
+    template_content: str = Field(description="AWS CloudFormation template or code content")
+    resource_type: str = Field(description="Type of AWS resource or service", default="general")
+    validation_level: str = Field(description="Validation level (basic, comprehensive)", default="comprehensive")
+
+
+class PerformanceAssessmentInput(BaseModel):
+    """Input schema for performance assessment tool."""
+    code_content: str = Field(description="Code content to assess for performance")
+    language: str = Field(description="Programming language", default="python")
+    assessment_type: str = Field(description="Type of assessment (code, architecture)", default="code")
+
+
+class ComplianceValidationInput(BaseModel):
+    """Input schema for compliance framework validation tool."""
+    content: str = Field(description="Content to validate for compliance")
+    framework: str = Field(description="Compliance framework (SOC2, HIPAA, PCI-DSS, GDPR)", default="SOC2")
+    content_type: str = Field(description="Type of content (code, infrastructure, documentation)", default="code")
+
+
 class CodeQualityAnalysisTool(BaseTool):
     """Tool for analyzing Python code quality using pylint, black, and mypy."""
     
@@ -833,6 +854,1072 @@ class SecurityScanTool(BaseTool):
         return recommendations
 
 
+class AWSBestPracticesValidationTool(BaseTool):
+    """Tool for validating AWS best practices in CloudFormation templates and code."""
+    
+    name: str = "aws_best_practices_validator"
+    description: str = """Validate AWS best practices in CloudFormation templates,
+    code, and architecture configurations following AWS Well-Architected Framework."""
+    
+    args_schema: Type[BaseModel] = AWSBestPracticesInput
+    
+    def _run(self, template_content: str, resource_type: str = "general", validation_level: str = "comprehensive") -> str:
+        """Validate AWS best practices."""
+        try:
+            # Run different validations based on content type
+            well_architected_results = self._validate_well_architected_principles(template_content)
+            security_best_practices = self._validate_security_best_practices(template_content)
+            cost_optimization = self._validate_cost_optimization(template_content)
+            reliability_practices = self._validate_reliability_practices(template_content)
+            performance_practices = self._validate_performance_practices(template_content)
+            
+            # Calculate overall best practices score
+            best_practices_score = self._calculate_best_practices_score(
+                well_architected_results, security_best_practices, cost_optimization,
+                reliability_practices, performance_practices
+            )
+            
+            # Generate recommendations
+            recommendations = self._generate_best_practices_recommendations(
+                well_architected_results, security_best_practices, cost_optimization,
+                reliability_practices, performance_practices
+            )
+            
+            result = {
+                "resource_type": resource_type,
+                "validation_level": validation_level,
+                "best_practices_score": best_practices_score,
+                "well_architected_framework": well_architected_results,
+                "security_best_practices": security_best_practices,
+                "cost_optimization": cost_optimization,
+                "reliability_practices": reliability_practices,
+                "performance_practices": performance_practices,
+                "recommendations": recommendations,
+                "overall_status": "PASS" if best_practices_score >= 7.5 else "FAIL"
+            }
+            
+            return json.dumps(result, indent=2)
+            
+        except Exception as e:
+            return json.dumps({
+                "error": f"Error validating AWS best practices: {str(e)}",
+                "best_practices_score": 0
+            })
+    
+    def _validate_well_architected_principles(self, content: str) -> Dict[str, Any]:
+        """Validate against AWS Well-Architected Framework principles."""
+        issues = []
+        score = 10.0
+        
+        # Security pillar checks
+        security_patterns = [
+            {
+                "pattern": r'"MasterUsername"\s*:\s*"[^"]*"',
+                "message": "Database master username should be stored in Secrets Manager",
+                "severity": "MEDIUM",
+                "pillar": "Security",
+                "score_deduction": 0.5
+            },
+            {
+                "pattern": r'"MasterUserPassword"\s*:\s*"[^"]*"',
+                "message": "Database password should be stored in Secrets Manager",
+                "severity": "HIGH",
+                "pillar": "Security",
+                "score_deduction": 1.5
+            },
+            {
+                "pattern": r'"VpcSecurityGroupIds"\s*:\s*\[\s*\]',
+                "message": "Resources should be placed in security groups",
+                "severity": "MEDIUM",
+                "pillar": "Security",
+                "score_deduction": 0.8
+            }
+        ]
+        
+        # Reliability pillar checks
+        reliability_patterns = [
+            {
+                "pattern": r'"MultiAZ"\s*:\s*false',
+                "message": "Enable Multi-AZ for high availability",
+                "severity": "MEDIUM",
+                "pillar": "Reliability",
+                "score_deduction": 1.0
+            },
+            {
+                "pattern": r'"BackupRetentionPeriod"\s*:\s*0',
+                "message": "Enable backup retention for data durability",
+                "severity": "HIGH",
+                "pillar": "Reliability",
+                "score_deduction": 1.5
+            }
+        ]
+        
+        # Performance pillar checks
+        performance_patterns = [
+            {
+                "pattern": r'"InstanceType"\s*:\s*"t2\.micro"',
+                "message": "Consider using newer generation instance types (t3, t4g)",
+                "severity": "LOW",
+                "pillar": "Performance",
+                "score_deduction": 0.3
+            }
+        ]
+        
+        # Cost optimization pillar checks
+        cost_patterns = [
+            {
+                "pattern": r'"StorageType"\s*:\s*"io1"',
+                "message": "Consider gp3 storage for better cost-performance ratio",
+                "severity": "LOW",
+                "pillar": "Cost Optimization",
+                "score_deduction": 0.3
+            }
+        ]
+        
+        all_patterns = security_patterns + reliability_patterns + performance_patterns + cost_patterns
+        
+        for pattern_info in all_patterns:
+            matches = re.finditer(pattern_info["pattern"], content, re.IGNORECASE)
+            for match in matches:
+                line_num = content[:match.start()].count('\n') + 1
+                issues.append({
+                    "pillar": pattern_info["pillar"],
+                    "severity": pattern_info["severity"],
+                    "message": pattern_info["message"],
+                    "line": line_num,
+                    "code_snippet": match.group(0)
+                })
+                score -= pattern_info["score_deduction"]
+        
+        score = max(0.0, score)
+        
+        return {
+            "score": round(score, 1),
+            "total_issues": len(issues),
+            "issues_by_pillar": {
+                "Security": len([i for i in issues if i["pillar"] == "Security"]),
+                "Reliability": len([i for i in issues if i["pillar"] == "Reliability"]),
+                "Performance": len([i for i in issues if i["pillar"] == "Performance"]),
+                "Cost Optimization": len([i for i in issues if i["pillar"] == "Cost Optimization"]),
+                "Operational Excellence": 0  # Could be extended
+            },
+            "issues": issues,
+            "status": "PASS" if score >= 7.5 else "FAIL"
+        }
+    
+    def _validate_security_best_practices(self, content: str) -> Dict[str, Any]:
+        """Validate security best practices."""
+        issues = []
+        score = 10.0
+        
+        security_checks = [
+            {
+                "pattern": r'"Encrypted"\s*:\s*false',
+                "message": "Enable encryption at rest for data protection",
+                "severity": "HIGH",
+                "score_deduction": 1.5
+            },
+            {
+                "pattern": r'"SSLEnabled"\s*:\s*false',
+                "message": "Enable SSL/TLS for data in transit",
+                "severity": "HIGH",
+                "score_deduction": 1.5
+            },
+            {
+                "pattern": r'"PubliclyAccessible"\s*:\s*true',
+                "message": "Avoid making resources publicly accessible",
+                "severity": "HIGH",
+                "score_deduction": 2.0
+            },
+            {
+                "pattern": r'"LoggingEnabled"\s*:\s*false',
+                "message": "Enable logging for audit and monitoring",
+                "severity": "MEDIUM",
+                "score_deduction": 0.8
+            }
+        ]
+        
+        for check in security_checks:
+            matches = re.finditer(check["pattern"], content, re.IGNORECASE)
+            for match in matches:
+                line_num = content[:match.start()].count('\n') + 1
+                issues.append({
+                    "severity": check["severity"],
+                    "message": check["message"],
+                    "line": line_num,
+                    "code_snippet": match.group(0)
+                })
+                score -= check["score_deduction"]
+        
+        score = max(0.0, score)
+        
+        return {
+            "score": round(score, 1),
+            "total_issues": len(issues),
+            "high_severity": len([i for i in issues if i["severity"] == "HIGH"]),
+            "medium_severity": len([i for i in issues if i["severity"] == "MEDIUM"]),
+            "low_severity": len([i for i in issues if i["severity"] == "LOW"]),
+            "issues": issues,
+            "status": "PASS" if score >= 8.0 else "FAIL"
+        }
+    
+    def _validate_cost_optimization(self, content: str) -> Dict[str, Any]:
+        """Validate cost optimization practices."""
+        issues = []
+        score = 10.0
+        
+        cost_checks = [
+            {
+                "pattern": r'"DeletionPolicy"\s*:\s*"Retain"',
+                "message": "Review retention policies to avoid unnecessary costs",
+                "severity": "LOW",
+                "score_deduction": 0.3
+            },
+            {
+                "pattern": r'"AllocatedStorage"\s*:\s*[5-9]\d{3,}',
+                "message": "Large storage allocation detected, consider if necessary",
+                "severity": "MEDIUM",
+                "score_deduction": 0.5
+            }
+        ]
+        
+        for check in cost_checks:
+            matches = re.finditer(check["pattern"], content, re.IGNORECASE)
+            for match in matches:
+                line_num = content[:match.start()].count('\n') + 1
+                issues.append({
+                    "severity": check["severity"],
+                    "message": check["message"],
+                    "line": line_num,
+                    "code_snippet": match.group(0)
+                })
+                score -= check["score_deduction"]
+        
+        score = max(0.0, score)
+        
+        return {
+            "score": round(score, 1),
+            "total_issues": len(issues),
+            "issues": issues,
+            "status": "PASS" if score >= 8.0 else "FAIL"
+        }
+    
+    def _validate_reliability_practices(self, content: str) -> Dict[str, Any]:
+        """Validate reliability practices."""
+        issues = []
+        score = 10.0
+        
+        reliability_checks = [
+            {
+                "pattern": r'"AvailabilityZone"\s*:\s*"[^"]*[ab]"',
+                "message": "Consider using multiple AZs for high availability",
+                "severity": "MEDIUM",
+                "score_deduction": 1.0
+            },
+            {
+                "pattern": r'"AutoScalingGroupName"',
+                "message": "Good: Using Auto Scaling for reliability",
+                "severity": "POSITIVE",
+                "score_deduction": -0.5  # Bonus points
+            }
+        ]
+        
+        for check in reliability_checks:
+            matches = re.finditer(check["pattern"], content, re.IGNORECASE)
+            for match in matches:
+                line_num = content[:match.start()].count('\n') + 1
+                issues.append({
+                    "severity": check["severity"],
+                    "message": check["message"],
+                    "line": line_num,
+                    "code_snippet": match.group(0)
+                })
+                score -= check["score_deduction"]
+        
+        score = min(10.0, max(0.0, score))
+        
+        return {
+            "score": round(score, 1),
+            "total_issues": len([i for i in issues if i["severity"] != "POSITIVE"]),
+            "positive_practices": len([i for i in issues if i["severity"] == "POSITIVE"]),
+            "issues": issues,
+            "status": "PASS" if score >= 8.0 else "FAIL"
+        }
+    
+    def _validate_performance_practices(self, content: str) -> Dict[str, Any]:
+        """Validate performance practices."""
+        issues = []
+        score = 10.0
+        
+        performance_checks = [
+            {
+                "pattern": r'"CachingEnabled"\s*:\s*false',
+                "message": "Consider enabling caching for better performance",
+                "severity": "MEDIUM",
+                "score_deduction": 0.8
+            },
+            {
+                "pattern": r'"ReadReplicaDBInstanceIdentifier"',
+                "message": "Good: Using read replicas for performance",
+                "severity": "POSITIVE",
+                "score_deduction": -0.5  # Bonus points
+            }
+        ]
+        
+        for check in performance_checks:
+            matches = re.finditer(check["pattern"], content, re.IGNORECASE)
+            for match in matches:
+                line_num = content[:match.start()].count('\n') + 1
+                issues.append({
+                    "severity": check["severity"],
+                    "message": check["message"],
+                    "line": line_num,
+                    "code_snippet": match.group(0)
+                })
+                score -= check["score_deduction"]
+        
+        score = min(10.0, max(0.0, score))
+        
+        return {
+            "score": round(score, 1),
+            "total_issues": len([i for i in issues if i["severity"] != "POSITIVE"]),
+            "positive_practices": len([i for i in issues if i["severity"] == "POSITIVE"]),
+            "issues": issues,
+            "status": "PASS" if score >= 8.0 else "FAIL"
+        }
+    
+    def _calculate_best_practices_score(self, well_architected: Dict, security: Dict, 
+                                      cost: Dict, reliability: Dict, performance: Dict) -> float:
+        """Calculate overall best practices score."""
+        scores = [
+            well_architected.get("score", 0) * 0.3,  # 30% weight
+            security.get("score", 0) * 0.25,         # 25% weight
+            cost.get("score", 0) * 0.15,             # 15% weight
+            reliability.get("score", 0) * 0.15,      # 15% weight
+            performance.get("score", 0) * 0.15       # 15% weight
+        ]
+        
+        return round(sum(scores), 1)
+    
+    def _generate_best_practices_recommendations(self, well_architected: Dict, security: Dict,
+                                               cost: Dict, reliability: Dict, performance: Dict) -> List[str]:
+        """Generate AWS best practices recommendations."""
+        recommendations = []
+        
+        # Well-Architected Framework recommendations
+        if well_architected.get("score", 0) < 7.5:
+            recommendations.append("Review AWS Well-Architected Framework principles")
+            
+        # Security recommendations
+        if security.get("score", 0) < 8.0:
+            recommendations.append("Implement additional security best practices")
+            recommendations.append("Enable encryption at rest and in transit")
+            recommendations.append("Review IAM permissions and apply least privilege")
+            
+        # Cost optimization recommendations
+        if cost.get("score", 0) < 8.0:
+            recommendations.append("Review resource sizing and utilization")
+            recommendations.append("Consider reserved instances for predictable workloads")
+            
+        # Reliability recommendations
+        if reliability.get("score", 0) < 8.0:
+            recommendations.append("Implement multi-AZ deployment for high availability")
+            recommendations.append("Enable automated backups and disaster recovery")
+            
+        # Performance recommendations
+        if performance.get("score", 0) < 8.0:
+            recommendations.append("Consider caching strategies for better performance")
+            recommendations.append("Review instance types and storage configurations")
+        
+        if not recommendations:
+            recommendations.append("Excellent adherence to AWS best practices!")
+            
+        return recommendations
+
+
+class PerformanceAssessmentTool(BaseTool):
+    """Tool for assessing code and architecture performance characteristics."""
+    
+    name: str = "performance_assessor"
+    description: str = """Assess performance characteristics of code and architecture
+    configurations to identify optimization opportunities."""
+    
+    args_schema: Type[BaseModel] = PerformanceAssessmentInput
+    
+    def _run(self, code_content: str, language: str = "python", assessment_type: str = "code") -> str:
+        """Assess performance characteristics."""
+        try:
+            if assessment_type == "code":
+                if language == "python":
+                    results = self._assess_python_performance(code_content)
+                else:
+                    results = {"error": f"Performance assessment for {language} not yet implemented"}
+            elif assessment_type == "architecture":
+                results = self._assess_architecture_performance(code_content)
+            else:
+                results = {"error": f"Unknown assessment type: {assessment_type}"}
+            
+            return json.dumps(results, indent=2)
+            
+        except Exception as e:
+            return json.dumps({
+                "error": f"Error assessing performance: {str(e)}",
+                "performance_score": 0
+            })
+    
+    def _assess_python_performance(self, code_content: str) -> Dict[str, Any]:
+        """Assess Python code performance."""
+        issues = []
+        performance_score = 10.0
+        
+        # Performance anti-patterns
+        performance_patterns = [
+            {
+                "pattern": r"for\s+\w+\s+in\s+range\s*\(\s*len\s*\([^)]+\)\s*\)",
+                "message": "Use direct iteration instead of range(len())",
+                "severity": "MEDIUM",
+                "category": "Iteration",
+                "score_deduction": 0.5
+            },
+            {
+                "pattern": r"\+\s*=.*\[.*\]",
+                "message": "List concatenation in loop can be inefficient, consider list comprehension",
+                "severity": "MEDIUM",
+                "category": "Data Structures",
+                "score_deduction": 0.8
+            },
+            {
+                "pattern": r"\.append\s*\([^)]*\)\s*\n.*\.append",
+                "message": "Multiple appends can be optimized with extend() or list comprehension",
+                "severity": "LOW",
+                "category": "Data Structures",
+                "score_deduction": 0.3
+            },
+            {
+                "pattern": r"time\.sleep\s*\(\s*[1-9]\d*\s*\)",
+                "message": "Long sleep times can impact performance",
+                "severity": "MEDIUM",
+                "category": "Timing",
+                "score_deduction": 1.0
+            },
+            {
+                "pattern": r"global\s+\w+",
+                "message": "Global variables can impact performance and maintainability",
+                "severity": "LOW",
+                "category": "Variables",
+                "score_deduction": 0.3
+            },
+            {
+                "pattern": r"try:\s*\n.*\n.*except.*:\s*\n.*pass",
+                "message": "Broad exception handling can hide performance issues",
+                "severity": "LOW",
+                "category": "Error Handling",
+                "score_deduction": 0.4
+            }
+        ]
+        
+        # Positive performance patterns
+        positive_patterns = [
+            {
+                "pattern": r"@lru_cache|@cache",
+                "message": "Good: Using caching for performance optimization",
+                "category": "Caching",
+                "score_bonus": 0.5
+            },
+            {
+                "pattern": r"list\s*\([^)]*for\s+[^)]*in\s+[^)]*\)",
+                "message": "Good: Using list comprehension",
+                "category": "Data Structures",
+                "score_bonus": 0.3
+            },
+            {
+                "pattern": r"with\s+\w+\s*\([^)]*\)\s+as\s+\w+:",
+                "message": "Good: Using context managers for resource management",
+                "category": "Resource Management",
+                "score_bonus": 0.2
+            }
+        ]
+        
+        # Check for performance issues
+        for pattern_info in performance_patterns:
+            matches = re.finditer(pattern_info["pattern"], code_content, re.IGNORECASE | re.MULTILINE)
+            for match in matches:
+                line_num = code_content[:match.start()].count('\n') + 1
+                issues.append({
+                    "severity": pattern_info["severity"],
+                    "category": pattern_info["category"],
+                    "message": pattern_info["message"],
+                    "line": line_num,
+                    "code_snippet": match.group(0)
+                })
+                performance_score -= pattern_info["score_deduction"]
+        
+        # Check for positive patterns
+        positive_findings = []
+        for pattern_info in positive_patterns:
+            matches = re.finditer(pattern_info["pattern"], code_content, re.IGNORECASE)
+            for match in matches:
+                line_num = code_content[:match.start()].count('\n') + 1
+                positive_findings.append({
+                    "category": pattern_info["category"],
+                    "message": pattern_info["message"],
+                    "line": line_num,
+                    "code_snippet": match.group(0)
+                })
+                performance_score += pattern_info["score_bonus"]
+        
+        performance_score = min(10.0, max(0.0, performance_score))
+        
+        # Generate recommendations
+        recommendations = self._generate_performance_recommendations(issues, positive_findings)
+        
+        return {
+            "assessment_type": "python_code_performance",
+            "performance_score": round(performance_score, 1),
+            "total_issues": len(issues),
+            "issues_by_category": self._categorize_issues(issues),
+            "positive_findings": len(positive_findings),
+            "issues": issues,
+            "positive_practices": positive_findings,
+            "recommendations": recommendations,
+            "status": "PASS" if performance_score >= 7.0 else "FAIL"
+        }
+    
+    def _assess_architecture_performance(self, template_content: str) -> Dict[str, Any]:
+        """Assess architecture performance characteristics."""
+        issues = []
+        performance_score = 10.0
+        
+        # Architecture performance patterns
+        arch_patterns = [
+            {
+                "pattern": r'"InstanceType"\s*:\s*"t2\.nano"',
+                "message": "Very small instance type may cause performance bottlenecks",
+                "severity": "MEDIUM",
+                "category": "Compute",
+                "score_deduction": 1.0
+            },
+            {
+                "pattern": r'"ReadCapacityUnits"\s*:\s*[1-5]',
+                "message": "Low DynamoDB read capacity may cause throttling",
+                "severity": "MEDIUM",
+                "category": "Database",
+                "score_deduction": 0.8
+            },
+            {
+                "pattern": r'"WriteCapacityUnits"\s*:\s*[1-5]',
+                "message": "Low DynamoDB write capacity may cause throttling",
+                "severity": "MEDIUM",
+                "category": "Database",
+                "score_deduction": 0.8
+            },
+            {
+                "pattern": r'"CachingEnabled"\s*:\s*false',
+                "message": "Caching disabled, may impact performance",
+                "severity": "MEDIUM",
+                "category": "Caching",
+                "score_deduction": 1.0
+            }
+        ]
+        
+        # Positive architecture patterns
+        positive_arch_patterns = [
+            {
+                "pattern": r'"AutoScalingGroupName"',
+                "message": "Good: Using Auto Scaling for performance and availability",
+                "category": "Scaling",
+                "score_bonus": 0.5
+            },
+            {
+                "pattern": r'"LoadBalancerName"',
+                "message": "Good: Using load balancing for performance distribution",
+                "category": "Load Balancing",
+                "score_bonus": 0.5
+            },
+            {
+                "pattern": r'"CachingEnabled"\s*:\s*true',
+                "message": "Good: Caching enabled for better performance",
+                "category": "Caching",
+                "score_bonus": 0.5
+            }
+        ]
+        
+        # Check for performance issues
+        for pattern_info in arch_patterns:
+            matches = re.finditer(pattern_info["pattern"], template_content, re.IGNORECASE)
+            for match in matches:
+                line_num = template_content[:match.start()].count('\n') + 1
+                issues.append({
+                    "severity": pattern_info["severity"],
+                    "category": pattern_info["category"],
+                    "message": pattern_info["message"],
+                    "line": line_num,
+                    "code_snippet": match.group(0)
+                })
+                performance_score -= pattern_info["score_deduction"]
+        
+        # Check for positive patterns
+        positive_findings = []
+        for pattern_info in positive_arch_patterns:
+            matches = re.finditer(pattern_info["pattern"], template_content, re.IGNORECASE)
+            for match in matches:
+                line_num = template_content[:match.start()].count('\n') + 1
+                positive_findings.append({
+                    "category": pattern_info["category"],
+                    "message": pattern_info["message"],
+                    "line": line_num,
+                    "code_snippet": match.group(0)
+                })
+                performance_score += pattern_info["score_bonus"]
+        
+        performance_score = min(10.0, max(0.0, performance_score))
+        
+        # Generate recommendations
+        recommendations = self._generate_architecture_performance_recommendations(issues, positive_findings)
+        
+        return {
+            "assessment_type": "architecture_performance",
+            "performance_score": round(performance_score, 1),
+            "total_issues": len(issues),
+            "issues_by_category": self._categorize_issues(issues),
+            "positive_findings": len(positive_findings),
+            "issues": issues,
+            "positive_practices": positive_findings,
+            "recommendations": recommendations,
+            "status": "PASS" if performance_score >= 7.0 else "FAIL"
+        }
+    
+    def _categorize_issues(self, issues: List[Dict]) -> Dict[str, int]:
+        """Categorize issues by category."""
+        categories = {}
+        for issue in issues:
+            category = issue.get("category", "Other")
+            categories[category] = categories.get(category, 0) + 1
+        return categories
+    
+    def _generate_performance_recommendations(self, issues: List[Dict], positive_findings: List[Dict]) -> List[str]:
+        """Generate performance improvement recommendations."""
+        recommendations = []
+        
+        # Category-specific recommendations
+        categories = self._categorize_issues(issues)
+        
+        if categories.get("Iteration", 0) > 0:
+            recommendations.append("Optimize loops and iterations using list comprehensions or built-in functions")
+            
+        if categories.get("Data Structures", 0) > 0:
+            recommendations.append("Review data structure usage and consider more efficient alternatives")
+            
+        if categories.get("Timing", 0) > 0:
+            recommendations.append("Review sleep/wait times and consider asynchronous alternatives")
+            
+        if categories.get("Caching", 0) > 0:
+            recommendations.append("Implement caching strategies for frequently accessed data")
+        
+        # General recommendations
+        if len(issues) == 0:
+            recommendations.append("Code shows good performance practices!")
+        else:
+            recommendations.append("Consider profiling code to identify actual bottlenecks")
+            recommendations.append("Use appropriate data structures for your use case")
+            recommendations.append("Consider algorithmic complexity when processing large datasets")
+        
+        return recommendations
+    
+    def _generate_architecture_performance_recommendations(self, issues: List[Dict], positive_findings: List[Dict]) -> List[str]:
+        """Generate architecture performance recommendations."""
+        recommendations = []
+        
+        categories = self._categorize_issues(issues)
+        
+        if categories.get("Compute", 0) > 0:
+            recommendations.append("Review instance types and sizes for your workload requirements")
+            
+        if categories.get("Database", 0) > 0:
+            recommendations.append("Review database capacity settings and consider auto-scaling")
+            
+        if categories.get("Caching", 0) > 0:
+            recommendations.append("Implement caching layers (ElastiCache, CloudFront) for better performance")
+        
+        # General architecture recommendations
+        if len(issues) == 0:
+            recommendations.append("Architecture shows good performance characteristics!")
+        else:
+            recommendations.append("Consider implementing auto-scaling for variable workloads")
+            recommendations.append("Use content delivery networks (CDN) for global performance")
+            recommendations.append("Implement monitoring and alerting for performance metrics")
+        
+        return recommendations
+
+
+class ComplianceValidationTool(BaseTool):
+    """Tool for validating compliance with various regulatory frameworks."""
+    
+    name: str = "compliance_validator"
+    description: str = """Validate content against compliance frameworks like
+    SOC2, HIPAA, PCI-DSS, and GDPR requirements."""
+    
+    args_schema: Type[BaseModel] = ComplianceValidationInput
+    
+    def _run(self, content: str, framework: str = "SOC2", content_type: str = "code") -> str:
+        """Validate compliance with specified framework."""
+        try:
+            if framework.upper() == "SOC2":
+                results = self._validate_soc2_compliance(content, content_type)
+            elif framework.upper() == "HIPAA":
+                results = self._validate_hipaa_compliance(content, content_type)
+            elif framework.upper() == "PCI-DSS":
+                results = self._validate_pci_compliance(content, content_type)
+            elif framework.upper() == "GDPR":
+                results = self._validate_gdpr_compliance(content, content_type)
+            else:
+                results = {"error": f"Compliance framework '{framework}' not supported"}
+            
+            return json.dumps(results, indent=2)
+            
+        except Exception as e:
+            return json.dumps({
+                "error": f"Error validating compliance: {str(e)}",
+                "compliance_score": 0
+            })
+    
+    def _validate_soc2_compliance(self, content: str, content_type: str) -> Dict[str, Any]:
+        """Validate SOC2 compliance requirements."""
+        issues = []
+        compliance_score = 10.0
+        
+        # SOC2 Trust Service Criteria checks
+        soc2_patterns = [
+            {
+                "pattern": r'"Encrypted"\s*:\s*false',
+                "message": "SOC2 Security: Data should be encrypted at rest",
+                "severity": "HIGH",
+                "criteria": "Security",
+                "score_deduction": 2.0
+            },
+            {
+                "pattern": r'"LoggingEnabled"\s*:\s*false',
+                "message": "SOC2 Availability: Logging should be enabled for monitoring",
+                "severity": "HIGH",
+                "criteria": "Availability",
+                "score_deduction": 1.5
+            },
+            {
+                "pattern": r'"BackupRetentionPeriod"\s*:\s*0',
+                "message": "SOC2 Availability: Backup retention required for data recovery",
+                "severity": "HIGH",
+                "criteria": "Availability",
+                "score_deduction": 2.0
+            },
+            {
+                "pattern": r'"PubliclyAccessible"\s*:\s*true',
+                "message": "SOC2 Security: Resources should not be publicly accessible",
+                "severity": "HIGH",
+                "criteria": "Security",
+                "score_deduction": 2.0
+            },
+            {
+                "pattern": r'"MfaDelete"\s*:\s*false',
+                "message": "SOC2 Security: MFA should be enabled for critical operations",
+                "severity": "MEDIUM",
+                "criteria": "Security",
+                "score_deduction": 1.0
+            }
+        ]
+        
+        # Check for SOC2 compliance issues
+        for pattern_info in soc2_patterns:
+            matches = re.finditer(pattern_info["pattern"], content, re.IGNORECASE)
+            for match in matches:
+                line_num = content[:match.start()].count('\n') + 1
+                issues.append({
+                    "framework": "SOC2",
+                    "criteria": pattern_info["criteria"],
+                    "severity": pattern_info["severity"],
+                    "message": pattern_info["message"],
+                    "line": line_num,
+                    "code_snippet": match.group(0)
+                })
+                compliance_score -= pattern_info["score_deduction"]
+        
+        compliance_score = max(0.0, compliance_score)
+        
+        # Categorize by SOC2 criteria
+        criteria_counts = {}
+        for issue in issues:
+            criteria = issue["criteria"]
+            criteria_counts[criteria] = criteria_counts.get(criteria, 0) + 1
+        
+        return {
+            "framework": "SOC2",
+            "content_type": content_type,
+            "compliance_score": round(compliance_score, 1),
+            "total_issues": len(issues),
+            "issues_by_criteria": criteria_counts,
+            "issues": issues,
+            "recommendations": self._generate_soc2_recommendations(issues),
+            "status": "PASS" if compliance_score >= 8.0 else "FAIL"
+        }
+    
+    def _validate_hipaa_compliance(self, content: str, content_type: str) -> Dict[str, Any]:
+        """Validate HIPAA compliance requirements."""
+        issues = []
+        compliance_score = 10.0
+        
+        # HIPAA Security Rule checks
+        hipaa_patterns = [
+            {
+                "pattern": r'"Encrypted"\s*:\s*false',
+                "message": "HIPAA Security Rule: PHI must be encrypted at rest",
+                "severity": "HIGH",
+                "rule": "Security Rule",
+                "score_deduction": 2.5
+            },
+            {
+                "pattern": r'"SSLEnabled"\s*:\s*false',
+                "message": "HIPAA Security Rule: PHI must be encrypted in transit",
+                "severity": "HIGH",
+                "rule": "Security Rule",
+                "score_deduction": 2.5
+            },
+            {
+                "pattern": r'"LoggingEnabled"\s*:\s*false',
+                "message": "HIPAA Security Rule: Access logging required for audit trails",
+                "severity": "HIGH",
+                "rule": "Security Rule",
+                "score_deduction": 2.0
+            },
+            {
+                "pattern": r'"PubliclyAccessible"\s*:\s*true',
+                "message": "HIPAA Security Rule: PHI systems should not be publicly accessible",
+                "severity": "HIGH",
+                "rule": "Security Rule",
+                "score_deduction": 2.5
+            }
+        ]
+        
+        # Check for HIPAA compliance issues
+        for pattern_info in hipaa_patterns:
+            matches = re.finditer(pattern_info["pattern"], content, re.IGNORECASE)
+            for match in matches:
+                line_num = content[:match.start()].count('\n') + 1
+                issues.append({
+                    "framework": "HIPAA",
+                    "rule": pattern_info["rule"],
+                    "severity": pattern_info["severity"],
+                    "message": pattern_info["message"],
+                    "line": line_num,
+                    "code_snippet": match.group(0)
+                })
+                compliance_score -= pattern_info["score_deduction"]
+        
+        compliance_score = max(0.0, compliance_score)
+        
+        return {
+            "framework": "HIPAA",
+            "content_type": content_type,
+            "compliance_score": round(compliance_score, 1),
+            "total_issues": len(issues),
+            "issues": issues,
+            "recommendations": self._generate_hipaa_recommendations(issues),
+            "status": "PASS" if compliance_score >= 8.5 else "FAIL"
+        }
+    
+    def _validate_pci_compliance(self, content: str, content_type: str) -> Dict[str, Any]:
+        """Validate PCI-DSS compliance requirements."""
+        issues = []
+        compliance_score = 10.0
+        
+        # PCI-DSS requirements checks
+        pci_patterns = [
+            {
+                "pattern": r'"Encrypted"\s*:\s*false',
+                "message": "PCI-DSS Req 3: Cardholder data must be encrypted",
+                "severity": "HIGH",
+                "requirement": "Requirement 3",
+                "score_deduction": 2.5
+            },
+            {
+                "pattern": r'"SSLEnabled"\s*:\s*false',
+                "message": "PCI-DSS Req 4: Encrypt transmission of cardholder data",
+                "severity": "HIGH",
+                "requirement": "Requirement 4",
+                "score_deduction": 2.5
+            },
+            {
+                "pattern": r'"LoggingEnabled"\s*:\s*false',
+                "message": "PCI-DSS Req 10: Track and monitor access to network resources",
+                "severity": "HIGH",
+                "requirement": "Requirement 10",
+                "score_deduction": 2.0
+            }
+        ]
+        
+        # Check for PCI compliance issues
+        for pattern_info in pci_patterns:
+            matches = re.finditer(pattern_info["pattern"], content, re.IGNORECASE)
+            for match in matches:
+                line_num = content[:match.start()].count('\n') + 1
+                issues.append({
+                    "framework": "PCI-DSS",
+                    "requirement": pattern_info["requirement"],
+                    "severity": pattern_info["severity"],
+                    "message": pattern_info["message"],
+                    "line": line_num,
+                    "code_snippet": match.group(0)
+                })
+                compliance_score -= pattern_info["score_deduction"]
+        
+        compliance_score = max(0.0, compliance_score)
+        
+        return {
+            "framework": "PCI-DSS",
+            "content_type": content_type,
+            "compliance_score": round(compliance_score, 1),
+            "total_issues": len(issues),
+            "issues": issues,
+            "recommendations": self._generate_pci_recommendations(issues),
+            "status": "PASS" if compliance_score >= 8.5 else "FAIL"
+        }
+    
+    def _validate_gdpr_compliance(self, content: str, content_type: str) -> Dict[str, Any]:
+        """Validate GDPR compliance requirements."""
+        issues = []
+        compliance_score = 10.0
+        
+        # GDPR requirements checks
+        gdpr_patterns = [
+            {
+                "pattern": r'"Encrypted"\s*:\s*false',
+                "message": "GDPR Art 32: Personal data should be encrypted",
+                "severity": "HIGH",
+                "article": "Article 32",
+                "score_deduction": 2.0
+            },
+            {
+                "pattern": r'"LoggingEnabled"\s*:\s*false',
+                "message": "GDPR Art 30: Records of processing activities required",
+                "severity": "MEDIUM",
+                "article": "Article 30",
+                "score_deduction": 1.5
+            },
+            {
+                "pattern": r'"BackupRetentionPeriod"\s*:\s*[0-9]{4,}',
+                "message": "GDPR Art 5: Data retention should be limited to necessary period",
+                "severity": "MEDIUM",
+                "article": "Article 5",
+                "score_deduction": 1.0
+            }
+        ]
+        
+        # Check for GDPR compliance issues
+        for pattern_info in gdpr_patterns:
+            matches = re.finditer(pattern_info["pattern"], content, re.IGNORECASE)
+            for match in matches:
+                line_num = content[:match.start()].count('\n') + 1
+                issues.append({
+                    "framework": "GDPR",
+                    "article": pattern_info["article"],
+                    "severity": pattern_info["severity"],
+                    "message": pattern_info["message"],
+                    "line": line_num,
+                    "code_snippet": match.group(0)
+                })
+                compliance_score -= pattern_info["score_deduction"]
+        
+        compliance_score = max(0.0, compliance_score)
+        
+        return {
+            "framework": "GDPR",
+            "content_type": content_type,
+            "compliance_score": round(compliance_score, 1),
+            "total_issues": len(issues),
+            "issues": issues,
+            "recommendations": self._generate_gdpr_recommendations(issues),
+            "status": "PASS" if compliance_score >= 8.0 else "FAIL"
+        }
+    
+    def _generate_soc2_recommendations(self, issues: List[Dict]) -> List[str]:
+        """Generate SOC2 compliance recommendations."""
+        recommendations = []
+        
+        criteria_counts = {}
+        for issue in issues:
+            criteria = issue.get("criteria", "Other")
+            criteria_counts[criteria] = criteria_counts.get(criteria, 0) + 1
+        
+        if criteria_counts.get("Security", 0) > 0:
+            recommendations.append("Implement encryption at rest and in transit")
+            recommendations.append("Enable MFA for administrative access")
+            recommendations.append("Restrict public access to resources")
+        
+        if criteria_counts.get("Availability", 0) > 0:
+            recommendations.append("Enable comprehensive logging and monitoring")
+            recommendations.append("Implement backup and disaster recovery procedures")
+        
+        if not issues:
+            recommendations.append("Good SOC2 compliance posture!")
+        
+        recommendations.append("Conduct regular SOC2 compliance assessments")
+        recommendations.append("Document security policies and procedures")
+        
+        return recommendations
+    
+    def _generate_hipaa_recommendations(self, issues: List[Dict]) -> List[str]:
+        """Generate HIPAA compliance recommendations."""
+        recommendations = []
+        
+        if issues:
+            recommendations.append("Implement end-to-end encryption for PHI")
+            recommendations.append("Enable comprehensive audit logging")
+            recommendations.append("Restrict access to PHI on need-to-know basis")
+            recommendations.append("Implement access controls and authentication")
+        else:
+            recommendations.append("Good HIPAA compliance posture!")
+        
+        recommendations.append("Conduct regular HIPAA risk assessments")
+        recommendations.append("Train staff on HIPAA requirements")
+        recommendations.append("Implement Business Associate Agreements (BAAs)")
+        
+        return recommendations
+    
+    def _generate_pci_recommendations(self, issues: List[Dict]) -> List[str]:
+        """Generate PCI-DSS compliance recommendations."""
+        recommendations = []
+        
+        if issues:
+            recommendations.append("Encrypt cardholder data at rest and in transit")
+            recommendations.append("Implement strong access controls")
+            recommendations.append("Enable comprehensive logging and monitoring")
+            recommendations.append("Regularly test security systems and processes")
+        else:
+            recommendations.append("Good PCI-DSS compliance posture!")
+        
+        recommendations.append("Conduct quarterly vulnerability scans")
+        recommendations.append("Maintain secure network architecture")
+        recommendations.append("Implement and maintain firewall configuration")
+        
+        return recommendations
+    
+    def _generate_gdpr_recommendations(self, issues: List[Dict]) -> List[str]:
+        """Generate GDPR compliance recommendations."""
+        recommendations = []
+        
+        if issues:
+            recommendations.append("Implement privacy by design principles")
+            recommendations.append("Enable data encryption and pseudonymization")
+            recommendations.append("Implement data retention policies")
+            recommendations.append("Enable audit logging for data processing")
+        else:
+            recommendations.append("Good GDPR compliance posture!")
+        
+        recommendations.append("Conduct Data Protection Impact Assessments (DPIAs)")
+        recommendations.append("Implement data subject rights procedures")
+        recommendations.append("Maintain records of processing activities")
+        
+        return recommendations
+
+
 # For testing purposes
 if __name__ == "__main__":
     # Test code quality analysis
@@ -875,5 +1962,20 @@ Resources:
     security_tool = SecurityScanTool()
     result = security_tool._run(test_code, "python", "code")
     print("✅ SecurityScanTool test completed")
+    
+    # Test AWS best practices validation
+    aws_tool = AWSBestPracticesValidationTool()
+    result = aws_tool._run(test_template)
+    print("✅ AWSBestPracticesValidationTool test completed")
+    
+    # Test performance assessment
+    performance_tool = PerformanceAssessmentTool()
+    result = performance_tool._run(test_code, "python", "code")
+    print("✅ PerformanceAssessmentTool test completed")
+    
+    # Test compliance validation
+    compliance_tool = ComplianceValidationTool()
+    result = compliance_tool._run(test_template, "SOC2", "infrastructure")
+    print("✅ ComplianceValidationTool test completed")
     
     print("All quality validation tools implemented successfully!")

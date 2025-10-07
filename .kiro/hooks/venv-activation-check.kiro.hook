@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "Virtual Environment Activation Check",
+  "description": "Monitors Python files for changes and ensures the virtual environment is activated before executing any Python code",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.py",
+      "examples/*.py",
+      "tests/**/*.py",
+      "autoninja/**/*.py"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A Python file has been modified. Before executing any Python code, verify that the virtual environment is activated. Check if the venv is active by looking for the virtual environment indicator in the terminal or by running 'which python' to ensure it points to the venv/bin/python path. If the venv is not activated, remind the user to activate it with 'source venv/bin/activate' (on Unix/Mac) or 'venv\\Scripts\\activate' (on Windows) before running any Python scripts."
+  }
+}

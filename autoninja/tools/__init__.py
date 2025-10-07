@@ -28,6 +28,12 @@ from .quality_validation import (
     SecurityScanTool
 )
 
+from .deployment_management import (
+    CloudFormationDeploymentTool,
+    MonitoringConfigurationTool,
+    DeploymentValidationTool
+)
+
 __all__ = [
     "RequirementExtractionTool",
     "ComplianceFrameworkDetectionTool", 
@@ -41,5 +47,8 @@ __all__ = [
     "DeploymentTemplateGeneratorTool",
     "CodeQualityAnalysisTool",
     "CloudFormationValidationTool",
-    "SecurityScanTool"
+    "SecurityScanTool",
+    "CloudFormationDeploymentTool",
+    "MonitoringConfigurationTool",
+    "DeploymentValidationTool"
 ]

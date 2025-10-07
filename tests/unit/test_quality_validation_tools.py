@@ -11,7 +11,10 @@ from unittest.mock import patch, MagicMock
 from autoninja.tools.quality_validation import (
     CodeQualityAnalysisTool,
     CloudFormationValidationTool,
-    SecurityScanTool
+    SecurityScanTool,
+    AWSBestPracticesValidationTool,
+    PerformanceAssessmentTool,
+    ComplianceValidationTool
 )
 
 
@@ -498,6 +501,411 @@ def vulnerable_function():
         
         assert "error" in result_data
         assert "not yet implemented" in result_data["error"]
+
+
+class TestAWSBestPracticesValidationTool:
+    """Test cases for AWSBestPracticesValidationTool."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.tool = AWSBestPracticesValidationTool()
+    
+    def test_tool_initialization(self):
+        """Test tool initialization."""
+        assert self.tool.name == "aws_best_practices_validator"
+        assert "AWS best practices" in self.tool.description
+        assert "Well-Architected Framework" in self.tool.description
+    
+    def test_well_architected_validation_secure_template(self):
+        """Test Well-Architected validation on secure template."""
+        secure_template = '''
+{
+    "Resources": {
+        "SecureDatabase": {
+            "Type": "AWS::RDS::DBInstance",
+            "Properties": {
+                "MultiAZ": true,
+                "BackupRetentionPeriod": 7,
+                "StorageEncrypted": true,
+                "VpcSecurityGroupIds": ["sg-12345"]
+            }
+        }
+    }
+}
+'''
+        
+        result = self.tool._validate_well_architected_principles(secure_template)
+        
+        assert result["score"] >= 7.5
+        assert result["status"] == "PASS"
+        assert result["total_issues"] == 0
+    
+    def test_well_architected_validation_insecure_template(self):
+        """Test Well-Architected validation on insecure template."""
+        insecure_template = '''
+{
+    "Resources": {
+        "InsecureDatabase": {
+            "Type": "AWS::RDS::DBInstance",
+            "Properties": {
+                "MasterUsername": "admin",
+                "MasterUserPassword": "password123",
+                "MultiAZ": false,
+                "BackupRetentionPeriod": 0,
+                "VpcSecurityGroupIds": []
+            }
+        }
+    }
+}
+'''
+        
+        result = self.tool._validate_well_architected_principles(insecure_template)
+        
+        assert result["score"] < 7.5
+        assert result["status"] == "FAIL"
+        assert result["total_issues"] > 0
+        assert result["issues_by_pillar"]["Security"] > 0
+        assert result["issues_by_pillar"]["Reliability"] > 0
+    
+    def test_security_best_practices_validation(self):
+        """Test security best practices validation."""
+        insecure_template = '''
+{
+    "Resources": {
+        "InsecureResource": {
+            "Properties": {
+                "Encrypted": false,
+                "SSLEnabled": false,
+                "PubliclyAccessible": true,
+                "LoggingEnabled": false
+            }
+        }
+    }
+}
+'''
+        
+        result = self.tool._validate_security_best_practices(insecure_template)
+        
+        assert result["score"] < 8.0
+        assert result["status"] == "FAIL"
+        assert result["high_severity"] > 0
+        assert result["total_issues"] > 0
+    
+    def test_best_practices_score_calculation(self):
+        """Test best practices score calculation."""
+        well_architected = {"score": 8.0}
+        security = {"score": 9.0}
+        cost = {"score": 7.0}
+        reliability = {"score": 8.5}
+        performance = {"score": 7.5}
+        
+        score = self.tool._calculate_best_practices_score(
+            well_architected, security, cost, reliability, performance
+        )
+        
+        # Expected: 8.0*0.3 + 9.0*0.25 + 7.0*0.15 + 8.5*0.15 + 7.5*0.15 = 8.075
+        assert 8.0 <= score <= 8.2
+    
+    def test_best_practices_recommendations_generation(self):
+        """Test best practices recommendations generation."""
+        well_architected = {"score": 6.0}
+        security = {"score": 7.0}
+        cost = {"score": 7.5}
+        reliability = {"score": 7.0}
+        performance = {"score": 7.0}
+        
+        recommendations = self.tool._generate_best_practices_recommendations(
+            well_architected, security, cost, reliability, performance
+        )
+        
+        assert len(recommendations) > 0
+        assert any("Well-Architected" in rec for rec in recommendations)
+        assert any("security" in rec for rec in recommendations)
+
+
+class TestPerformanceAssessmentTool:
+    """Test cases for PerformanceAssessmentTool."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.tool = PerformanceAssessmentTool()
+    
+    def test_tool_initialization(self):
+        """Test tool initialization."""
+        assert self.tool.name == "performance_assessor"
+        assert "performance characteristics" in self.tool.description
+    
+    def test_python_performance_assessment_good_code(self):
+        """Test performance assessment on well-optimized Python code."""
+        good_code = '''
+from functools import lru_cache
+
+@lru_cache(maxsize=128)
+def fibonacci(n):
+    if n < 2:
+        return n
+    return fibonacci(n-1) + fibonacci(n-2)
+
+def process_data(items):
+    # Good: Using list comprehension
+    results = [item.upper() for item in items if item]
+    
+    # Good: Using context manager
+    with open('file.txt', 'r') as f:
+        data = f.read()
+    
+    return results
+'''
+        
+        result = self.tool._assess_python_performance(good_code)
+        
+        assert result["performance_score"] >= 7.0
+        assert result["status"] == "PASS"
+        assert result["positive_findings"] > 0
+    
+    def test_python_performance_assessment_poor_code(self):
+        """Test performance assessment on poorly optimized Python code."""
+        poor_code = '''
+import time
+
+global_var = []
+
+def slow_function(items):
+    # Bad: Using range(len())
+    for i in range(len(items)):
+        item = items[i]
+        
+        # Bad: List concatenation in loop
+        global_var += [item.upper()]
+        
+        # Bad: Multiple appends
+        result = []
+        result.append(item)
+        result.append(item.lower())
+        
+        # Bad: Long sleep
+        time.sleep(5)
+    
+    try:
+        risky_operation()
+    except:
+        pass
+    
+    return global_var
+'''
+        
+        result = self.tool._assess_python_performance(poor_code)
+        
+        assert result["performance_score"] <= 7.0
+        assert result["status"] == "FAIL"
+        assert result["total_issues"] > 0
+        assert "Iteration" in result["issues_by_category"]
+        assert "Timing" in result["issues_by_category"]
+    
+    def test_architecture_performance_assessment(self):
+        """Test architecture performance assessment."""
+        poor_arch_template = '''
+{
+    "Resources": {
+        "SlowInstance": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "InstanceType": "t2.nano"
+            }
+        },
+        "SlowDatabase": {
+            "Type": "AWS::DynamoDB::Table",
+            "Properties": {
+                "ProvisionedThroughput": {
+                    "ReadCapacityUnits": 1,
+                    "WriteCapacityUnits": 1
+                }
+            }
+        },
+        "NoCaching": {
+            "Properties": {
+                "CachingEnabled": false
+            }
+        }
+    }
+}
+'''
+        
+        result = self.tool._assess_architecture_performance(poor_arch_template)
+        
+        assert result["performance_score"] < 7.0
+        assert result["status"] == "FAIL"
+        assert result["total_issues"] > 0
+        assert "Compute" in result["issues_by_category"]
+        assert "Database" in result["issues_by_category"]
+    
+    def test_performance_recommendations_generation(self):
+        """Test performance recommendations generation."""
+        issues = [
+            {"category": "Iteration", "message": "Slow iteration"},
+            {"category": "Data Structures", "message": "Inefficient data structure"},
+            {"category": "Timing", "message": "Long wait time"}
+        ]
+        positive_findings = []
+        
+        recommendations = self.tool._generate_performance_recommendations(issues, positive_findings)
+        
+        assert len(recommendations) > 0
+        assert any("loops" in rec for rec in recommendations)
+        assert any("data structure" in rec for rec in recommendations)
+        assert any("asynchronous" in rec for rec in recommendations)
+
+
+class TestComplianceValidationTool:
+    """Test cases for ComplianceValidationTool."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.tool = ComplianceValidationTool()
+    
+    def test_tool_initialization(self):
+        """Test tool initialization."""
+        assert self.tool.name == "compliance_validator"
+        assert "compliance frameworks" in self.tool.description
+        assert "SOC2" in self.tool.description
+    
+    def test_soc2_compliance_validation_compliant(self):
+        """Test SOC2 compliance validation on compliant template."""
+        compliant_template = '''
+{
+    "Resources": {
+        "CompliantResource": {
+            "Properties": {
+                "Encrypted": true,
+                "LoggingEnabled": true,
+                "BackupRetentionPeriod": 30,
+                "PubliclyAccessible": false,
+                "MfaDelete": true
+            }
+        }
+    }
+}
+'''
+        
+        result = self.tool._validate_soc2_compliance(compliant_template, "infrastructure")
+        
+        assert result["compliance_score"] >= 8.0
+        assert result["status"] == "PASS"
+        assert result["total_issues"] == 0
+    
+    def test_soc2_compliance_validation_non_compliant(self):
+        """Test SOC2 compliance validation on non-compliant template."""
+        non_compliant_template = '''
+{
+    "Resources": {
+        "NonCompliantResource": {
+            "Properties": {
+                "Encrypted": false,
+                "LoggingEnabled": false,
+                "BackupRetentionPeriod": 0,
+                "PubliclyAccessible": true,
+                "MfaDelete": false
+            }
+        }
+    }
+}
+'''
+        
+        result = self.tool._validate_soc2_compliance(non_compliant_template, "infrastructure")
+        
+        assert result["compliance_score"] < 8.0
+        assert result["status"] == "FAIL"
+        assert result["total_issues"] > 0
+        assert "Security" in result["issues_by_criteria"]
+        assert "Availability" in result["issues_by_criteria"]
+    
+    def test_hipaa_compliance_validation(self):
+        """Test HIPAA compliance validation."""
+        non_compliant_template = '''
+{
+    "Resources": {
+        "PHIResource": {
+            "Properties": {
+                "Encrypted": false,
+                "SSLEnabled": false,
+                "LoggingEnabled": false,
+                "PubliclyAccessible": true
+            }
+        }
+    }
+}
+'''
+        
+        result = self.tool._validate_hipaa_compliance(non_compliant_template, "infrastructure")
+        
+        assert result["compliance_score"] < 8.5
+        assert result["status"] == "FAIL"
+        assert result["total_issues"] > 0
+    
+    def test_pci_compliance_validation(self):
+        """Test PCI-DSS compliance validation."""
+        non_compliant_template = '''
+{
+    "Resources": {
+        "CardDataResource": {
+            "Properties": {
+                "Encrypted": false,
+                "SSLEnabled": false,
+                "LoggingEnabled": false
+            }
+        }
+    }
+}
+'''
+        
+        result = self.tool._validate_pci_compliance(non_compliant_template, "infrastructure")
+        
+        assert result["compliance_score"] < 8.5
+        assert result["status"] == "FAIL"
+        assert result["total_issues"] > 0
+    
+    def test_gdpr_compliance_validation(self):
+        """Test GDPR compliance validation."""
+        non_compliant_template = '''
+{
+    "Resources": {
+        "PersonalDataResource": {
+            "Properties": {
+                "Encrypted": false,
+                "LoggingEnabled": false,
+                "BackupRetentionPeriod": 9999
+            }
+        }
+    }
+}
+'''
+        
+        result = self.tool._validate_gdpr_compliance(non_compliant_template, "infrastructure")
+        
+        assert result["compliance_score"] < 8.0
+        assert result["status"] == "FAIL"
+        assert result["total_issues"] > 0
+    
+    def test_unsupported_framework(self):
+        """Test handling of unsupported compliance framework."""
+        result = self.tool._run("test content", "UNKNOWN_FRAMEWORK", "code")
+        result_data = json.loads(result)
+        
+        assert "error" in result_data
+        assert "not supported" in result_data["error"]
+    
+    def test_compliance_recommendations_generation(self):
+        """Test compliance recommendations generation."""
+        issues = [
+            {"criteria": "Security", "severity": "HIGH"},
+            {"criteria": "Availability", "severity": "MEDIUM"}
+        ]
+        
+        recommendations = self.tool._generate_soc2_recommendations(issues)
+        
+        assert len(recommendations) > 0
+        assert any("encryption" in rec for rec in recommendations)
+        assert any("logging" in rec for rec in recommendations)
 
 
 if __name__ == "__main__":

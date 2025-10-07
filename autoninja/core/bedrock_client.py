@@ -118,7 +118,8 @@ class BedrockClientManager:
                         model_kwargs={
                             "max_tokens": self.config.max_tokens,
                             "temperature": self.config.temperature,
-                            "top_p": self.config.top_p,
+                            # Note: Claude models don't support both temperature and top_p
+                            # Using only temperature for better compatibility
                         },
                         streaming=False,
                         verbose=False

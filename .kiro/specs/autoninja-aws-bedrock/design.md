@@ -136,6 +136,57 @@ def create_requirements_analyst_agent():
     return create_tool_calling_agent(llm, tools, system_prompt)
 ```
 
+## Logging and Observability Architecture
+
+### Comprehensive Logging System
+
+The system implements a multi-layered logging architecture that provides complete visibility into agent operations, Bedrock interactions, and pipeline execution:
+
+```mermaid
+graph TB
+    subgraph "Agent Logging"
+        RA[Requirements Analyst] --> RAL[requirements_analyst.log]
+        SA[Solution Architect] --> SAL[solution_architect.log]
+        CG[Code Generator] --> CGL[code_generator.log]
+        QV[Quality Validator] --> QVL[quality_validator.log]
+        DM[Deployment Manager] --> DML[deployment_manager.log]
+    end
+    
+    subgraph "System Logging"
+        BR[Bedrock Requests/Responses] --> BRL[bedrock_inference.log]
+        PL[Pipeline Orchestration] --> PLL[pipeline.log]
+        SYS[System Operations] --> SYSL[autoninja.log]
+        ERR[All Errors] --> ERRL[errors.log]
+    end
+    
+    subgraph "Log Management"
+        LR[Log Rotation] --> LF[Log Files]
+        LF --> CW[CloudWatch Logs]
+        LF --> S3[S3 Archive]
+    end
+```
+
+### Logging Configuration
+
+Each agent maintains dedicated log files with structured logging:
+
+- **Agent-Specific Logs**: Each agent writes to `{agent_name}.log` with execution traces, input/output data, and processing steps
+- **Bedrock Inference Logs**: All raw Bedrock API requests and responses logged to `bedrock_inference.log` with execution IDs
+- **Pipeline Logs**: Multi-agent orchestration and workflow state changes logged to `pipeline.log`
+- **Error Logs**: All exceptions and error conditions centralized in `errors.log`
+- **System Logs**: General application logs and cross-cutting concerns in `autoninja.log`
+
+### Log Structure and Format
+
+All logs follow a structured format with:
+- **Timestamp**: ISO 8601 format with timezone
+- **Execution ID**: Unique identifier for tracing requests across agents
+- **Session ID**: Session-level identifier for multi-request workflows
+- **Agent Name**: Source agent for the log entry
+- **Log Level**: DEBUG, INFO, WARNING, ERROR, CRITICAL
+- **Message**: Structured log message with context
+- **Metadata**: Additional context including model IDs, processing times, and performance metrics
+
 ## Components and Interfaces
 
 ### 1. Master Orchestrator Agent

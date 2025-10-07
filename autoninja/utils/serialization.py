@@ -57,8 +57,11 @@ def serialize_for_dynamodb(data: Any) -> Any:
     else:
         # For other objects, try to convert to dict first
         try:
-            if hasattr(data, 'dict'):
-                # Pydantic models
+            if hasattr(data, 'model_dump'):
+                # Pydantic v2 models
+                return serialize_for_dynamodb(data.model_dump())
+            elif hasattr(data, 'dict'):
+                # Pydantic v1 models (fallback)
                 return serialize_for_dynamodb(data.dict())
             elif hasattr(data, '__dict__'):
                 # Regular Python objects
@@ -160,8 +163,11 @@ def serialize_for_json(data: Any) -> Any:
     else:
         # For other objects, try to convert to dict first
         try:
-            if hasattr(data, 'dict'):
-                # Pydantic models
+            if hasattr(data, 'model_dump'):
+                # Pydantic v2 models
+                return serialize_for_json(data.model_dump())
+            elif hasattr(data, 'dict'):
+                # Pydantic v1 models (fallback)
                 return serialize_for_json(data.dict())
             elif hasattr(data, '__dict__'):
                 # Regular Python objects

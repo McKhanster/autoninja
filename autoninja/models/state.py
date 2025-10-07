@@ -7,8 +7,8 @@ output schemas with validation.
 """
 
 from typing import TypedDict, List, Dict, Any, Optional, Literal
-from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from datetime import datetime, UTC
+from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 
 
@@ -147,7 +147,8 @@ class ArtifactsLocation(BaseModel):
     documentation: Optional[str] = None
     deployment_package: Optional[str] = None
     
-    @validator('*', pre=True)
+    @field_validator('*', mode='before')
+    @classmethod
     def validate_s3_path(cls, v):
         if v and not v.startswith('s3://'):
             raise ValueError('Artifact paths must be valid S3 URIs')
@@ -204,19 +205,19 @@ class SessionState(BaseModel):
     retry_count: int = Field(default=0)
     
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     
-    class Config:
-        """Pydantic configuration"""
-        use_enum_values = True
-        json_encoders = {
+    model_config = {
+        "use_enum_values": True,
+        "json_encoders": {
             datetime: lambda v: v.isoformat()
         }
+    }
     
     def update_timestamp(self):
         """Update the updated_at timestamp"""
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(UTC)
     
     def add_agent_output(self, agent_name: str, output: AgentOutput):
         """Add output from a specialist agent"""
@@ -238,7 +239,7 @@ class SessionState(BaseModel):
         self.error_details[error_type] = {
             "message": error_message,
             "details": error_details or {},
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
         self.retry_count += 1
         self.update_timestamp()
@@ -303,15 +304,15 @@ class StateConverter:
         return AutoNinjaState(
             user_request=session.user_request.specifications.description,
             session_id=session.session_id,
-            requirements=session.agent_outputs.get("requirements_analyst", {}).dict() if "requirements_analyst" in session.agent_outputs else {},
-            architecture=session.agent_outputs.get("solution_architect", {}).dict() if "solution_architect" in session.agent_outputs else {},
-            generated_code=session.agent_outputs.get("code_generator", {}).dict() if "code_generator" in session.agent_outputs else {},
-            validation_results=session.validation_results.dict() if session.validation_results else {},
-            deployment_config=session.agent_outputs.get("deployment_manager", {}).dict() if "deployment_manager" in session.agent_outputs else {},
-            final_artifacts=session.artifacts_location.dict(),
+            requirements=session.agent_outputs.get("requirements_analyst", {}).model_dump() if "requirements_analyst" in session.agent_outputs else {},
+            architecture=session.agent_outputs.get("solution_architect", {}).model_dump() if "solution_architect" in session.agent_outputs else {},
+            generated_code=session.agent_outputs.get("code_generator", {}).model_dump() if "code_generator" in session.agent_outputs else {},
+            validation_results=session.validation_results.model_dump() if session.validation_results else {},
+            deployment_config=session.agent_outputs.get("deployment_manager", {}).model_dump() if "deployment_manager" in session.agent_outputs else {},
+            final_artifacts=session.artifacts_location.model_dump(),
             current_step=session.current_stage.value,
             errors=[error["message"] for error in session.error_details.values()],
-            generation_metadata=session.generation_metadata.dict()
+            generation_metadata=session.generation_metadata.model_dump()
         )
     
     @staticmethod
