@@ -1,0 +1,119 @@
+{
+  "report_metadata": {
+    "session_id": "test_session_001",
+    "report_timestamp": "2025-10-08T12:16:37.714906+00:00",
+    "report_version": "1.0",
+    "report_format": "json"
+  },
+  "validation_summary": {
+    "total_agents_validated": 3,
+    "agents_passed": 3,
+    "agents_failed": 0,
+    "total_errors": 0,
+    "total_warnings": 0,
+    "overall_compatibility_score": 1.0,
+    "overall_quality_score": 0.9999999999999999,
+    "validation_timestamp": "2025-10-08T12:16:37.714720+00:00",
+    "recommendations_count": 0
+  },
+  "detailed_errors": {
+    "field_errors_by_agent": {
+      "requirements_analyst": [],
+      "solution_architect": [],
+      "code_generator": []
+    },
+    "error_patterns": {},
+    "severity_breakdown": {
+      "critical": 0,
+      "error": 0,
+      "warning": 0,
+      "info": 0
+    },
+    "total_field_errors": 0,
+    "most_common_errors": []
+  },
+  "compatibility_scoring": {
+    "requirements_to_architecture_score": 1.0,
+    "architecture_to_code_score": 1.0,
+    "overall_pipeline_score": 1.0,
+    "compatibility_level": "excellent",
+    "critical_issues": [],
+    "improvement_areas": []
+  },
+  "remediation_plan": {
+    "priority_fixes": [],
+    "optional_improvements": [],
+    "estimated_effort": "Low (1-2 days)",
+    "implementation_order": [
+      "Fix critical validation errors",
+      "Resolve compatibility issues",
+      "Address semantic inconsistencies",
+      "Implement optional improvements"
+    ],
+    "success_criteria": [
+      "All agents pass schema validation",
+      "Compatibility score > 0.8",
+      "No critical or error-level validation issues",
+      "Semantic data flow is logically consistent"
+    ]
+  },
+  "agent_analysis": {
+    "requirements_analyst": {
+      "validation_status": "passed",
+      "quality_score": 0.9999999999999999,
+      "compatibility_score": 1.0,
+      "error_count": 0,
+      "warning_count": 0,
+      "recommendation_count": 0,
+      "execution_metadata": {
+        "start_time": "2025-10-08 12:16:37.712840+00:00",
+        "end_time": "2025-10-08 12:16:37.712852+00:00",
+        "duration_seconds": 45.2,
+        "model_invocations": 1,
+        "tokens_used": 1250
+      },
+      "key_issues": [],
+      "improvement_suggestions": []
+    },
+    "solution_architect": {
+      "validation_status": "passed",
+      "quality_score": 0.9999999999999999,
+      "compatibility_score": 1.0,
+      "error_count": 0,
+      "warning_count": 0,
+      "recommendation_count": 0,
+      "execution_metadata": {
+        "start_time": "2025-10-08 12:16:37.712936+00:00",
+        "end_time": "2025-10-08 12:16:37.712937+00:00",
+        "duration_seconds": 78.5,
+        "model_invocations": 1,
+        "tokens_used": 2100
+      },
+      "key_issues": [],
+      "improvement_suggestions": []
+    },
+    "code_generator": {
+      "validation_status": "passed",
+      "quality_score": 0.9999999999999999,
+      "compatibility_score": 1.0,
+      "error_count": 0,
+      "warning_count": 0,
+      "recommendation_count": 0,
+      "execution_metadata": {
+        "start_time": "2025-10-08 12:16:37.712973+00:00",
+        "end_time": "2025-10-08 12:16:37.712973+00:00",
+        "duration_seconds": 120.3,
+        "model_invocations": 1,
+        "tokens_used": 3500
+      },
+      "key_issues": [],
+      "improvement_suggestions": []
+    }
+  },
+  "recommendations": [
+    "Implement comprehensive error handling in all agents",
+    "Add validation checkpoints between agent executions",
+    "Consider implementing retry logic for failed validations",
+    "Monitor validation metrics over time to identify trends"
+  ]
+}

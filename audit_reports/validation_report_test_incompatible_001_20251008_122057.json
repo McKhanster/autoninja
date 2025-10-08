@@ -1,0 +1,186 @@
+{
+  "report_metadata": {
+    "session_id": "test_incompatible_001",
+    "report_timestamp": "2025-10-08T12:20:57.789412+00:00",
+    "report_version": "1.0",
+    "report_format": "json"
+  },
+  "validation_summary": {
+    "total_agents_validated": 3,
+    "agents_passed": 3,
+    "agents_failed": 0,
+    "total_errors": 0,
+    "total_warnings": 3,
+    "overall_compatibility_score": 0.75,
+    "overall_quality_score": 0.85,
+    "validation_timestamp": "2025-10-08T12:20:57.789226+00:00",
+    "recommendations_count": 11
+  },
+  "detailed_errors": {
+    "field_errors_by_agent": {
+      "requirements_analyst": [],
+      "solution_architect": [],
+      "code_generator": []
+    },
+    "error_patterns": {},
+    "severity_breakdown": {
+      "critical": 0,
+      "error": 0,
+      "warning": 0,
+      "info": 0
+    },
+    "total_field_errors": 0,
+    "most_common_errors": []
+  },
+  "compatibility_scoring": {
+    "requirements_to_architecture_score": 0.8,
+    "architecture_to_code_score": 0.7,
+    "overall_pipeline_score": 0.75,
+    "compatibility_level": "acceptable",
+    "critical_issues": [
+      "Semantic rule violation: AI agent requirements should result in Bedrock service selection",
+      "Semantic rule violation: API requirements should result in API Gateway selection",
+      "Semantic rule violation: Security architecture should result in IAM implementations",
+      "Semantic rule violation: AI agent requirements should result in Bedrock service selection",
+      "Semantic rule violation: API requirements should result in API Gateway selection",
+      "Semantic rule violation: Security architecture should result in IAM implementations"
+    ],
+    "improvement_areas": [
+      "Improve data flow (current score: 0.70)",
+      "Improve data flow (current score: 0.75)"
+    ]
+  },
+  "remediation_plan": {
+    "priority_fixes": [],
+    "optional_improvements": [
+      {
+        "type": "semantic_fix",
+        "priority": "medium",
+        "agent_pair": "requirements_to_architecture",
+        "issue": "Semantic rule violation: AI agent requirements should result in Bedrock service selection",
+        "remediation": "Review and align semantic meaning between agents",
+        "estimated_effort": "high",
+        "impact": "Logical inconsistency"
+      },
+      {
+        "type": "semantic_fix",
+        "priority": "medium",
+        "agent_pair": "requirements_to_architecture",
+        "issue": "Semantic rule violation: API requirements should result in API Gateway selection",
+        "remediation": "Review and align semantic meaning between agents",
+        "estimated_effort": "high",
+        "impact": "Logical inconsistency"
+      },
+      {
+        "type": "semantic_fix",
+        "priority": "medium",
+        "agent_pair": "architecture_to_code",
+        "issue": "Semantic rule violation: Security architecture should result in IAM implementations",
+        "remediation": "Review and align semantic meaning between agents",
+        "estimated_effort": "high",
+        "impact": "Logical inconsistency"
+      },
+      {
+        "type": "semantic_fix",
+        "priority": "medium",
+        "agent_pair": "overall_semantic_flow",
+        "issue": "Semantic rule violation: AI agent requirements should result in Bedrock service selection",
+        "remediation": "Review and align semantic meaning between agents",
+        "estimated_effort": "high",
+        "impact": "Logical inconsistency"
+      },
+      {
+        "type": "semantic_fix",
+        "priority": "medium",
+        "agent_pair": "overall_semantic_flow",
+        "issue": "Semantic rule violation: API requirements should result in API Gateway selection",
+        "remediation": "Review and align semantic meaning between agents",
+        "estimated_effort": "high",
+        "impact": "Logical inconsistency"
+      },
+      {
+        "type": "semantic_fix",
+        "priority": "medium",
+        "agent_pair": "overall_semantic_flow",
+        "issue": "Semantic rule violation: Security architecture should result in IAM implementations",
+        "remediation": "Review and align semantic meaning between agents",
+        "estimated_effort": "high",
+        "impact": "Logical inconsistency"
+      }
+    ],
+    "estimated_effort": "Low (1-2 days)",
+    "implementation_order": [
+      "Fix critical validation errors",
+      "Resolve compatibility issues",
+      "Address semantic inconsistencies",
+      "Implement optional improvements"
+    ],
+    "success_criteria": [
+      "All agents pass schema validation",
+      "Compatibility score > 0.8",
+      "No critical or error-level validation issues",
+      "Semantic data flow is logically consistent"
+    ]
+  },
+  "agent_analysis": {
+    "requirements_analyst": {
+      "validation_status": "passed",
+      "quality_score": 0.9999999999999999,
+      "compatibility_score": 1.0,
+      "error_count": 0,
+      "warning_count": 0,
+      "recommendation_count": 0,
+      "execution_metadata": {
+        "start_time": "2025-10-08 12:20:57.788031+00:00",
+        "end_time": "2025-10-08 12:20:57.788032+00:00",
+        "duration_seconds": 25.0,
+        "model_invocations": 1,
+        "tokens_used": 800
+      },
+      "key_issues": [],
+      "improvement_suggestions": []
+    },
+    "solution_architect": {
+      "validation_status": "passed",
+      "quality_score": 0.8999999999999999,
+      "compatibility_score": 1.0,
+      "error_count": 0,
+      "warning_count": 2,
+      "recommendation_count": 0,
+      "execution_metadata": {
+        "start_time": "2025-10-08 12:20:57.788069+00:00",
+        "end_time": "2025-10-08 12:20:57.788070+00:00",
+        "duration_seconds": 45.0,
+        "model_invocations": 1,
+        "tokens_used": 1500
+      },
+      "key_issues": [],
+      "improvement_suggestions": []
+    },
+    "code_generator": {
+      "validation_status": "passed",
+      "quality_score": 0.6499999999999999,
+      "compatibility_score": 1.0,
+      "error_count": 0,
+      "warning_count": 1,
+      "recommendation_count": 1,
+      "execution_metadata": {
+        "start_time": "2025-10-08 12:20:57.788089+00:00",
+        "end_time": "2025-10-08 12:20:57.788090+00:00",
+        "duration_seconds": 55.0,
+        "model_invocations": 1,
+        "tokens_used": 1800
+      },
+      "key_issues": [],
+      "improvement_suggestions": [
+        "Define action groups to provide specific capabilities to the agent"
+      ]
+    }
+  },
+  "recommendations": [
+    "Implement comprehensive error handling in all agents",
+    "Add validation checkpoints between agent executions",
+    "Consider implementing retry logic for failed validations",
+    "Monitor validation metrics over time to identify trends"
+  ]
+}

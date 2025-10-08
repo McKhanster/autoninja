@@ -130,6 +130,22 @@ def setup_logging(
         )
         root_logger.addHandler(solution_architect_handler)
         
+        # Code Generator specific log
+        code_generator_log_file = log_dir / "code_generator.log"
+        code_generator_handler = logging.handlers.RotatingFileHandler(
+            code_generator_log_file,
+            maxBytes=max_file_size,
+            backupCount=backup_count
+        )
+        code_generator_handler.setLevel(numeric_level)
+        code_generator_handler.setFormatter(detailed_formatter)
+        
+        # Add filter for code generator logs
+        code_generator_handler.addFilter(
+            lambda record: 'code_generator' in record.name
+        )
+        root_logger.addHandler(code_generator_handler)
+        
         # Bedrock inference log (for raw requests/responses)
         bedrock_log_file = log_dir / "bedrock_inference.log"
         bedrock_handler = logging.handlers.RotatingFileHandler(

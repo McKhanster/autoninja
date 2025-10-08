@@ -56,6 +56,7 @@ black autoninja/ tests/             # Format code
 pylint autoninja/                   # Lint code
 mypy autoninja/                     # Type checking
 pre-commit run --all-files          # Run all hooks
+
 ```
 
 ## Configuration Management

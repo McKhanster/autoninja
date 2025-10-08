@@ -1,0 +1,508 @@
+{
+  "report_metadata": {
+    "session_id": "direct_llm_validation",
+    "report_timestamp": "2025-10-08T16:14:10.238356+00:00",
+    "report_version": "1.0",
+    "report_format": "json"
+  },
+  "validation_summary": {
+    "total_agents_validated": 3,
+    "agents_passed": 2,
+    "agents_failed": 1,
+    "total_errors": 6,
+    "total_warnings": 3,
+    "overall_compatibility_score": 0.6499999999999999,
+    "overall_quality_score": 0.6666666666666666,
+    "validation_timestamp": "2025-10-08T16:14:10.237901+00:00",
+    "recommendations_count": 17
+  },
+  "detailed_errors": {
+    "field_errors_by_agent": {
+      "requirements_analyst": [],
+      "solution_architect": [],
+      "code_generator": [
+        {
+          "field_name": "bedrock_agent_config",
+          "error_type": "schema_violation",
+          "error_message": "Field required",
+          "severity": "error",
+          "remediation_suggestion": "Add the required field 'bedrock_agent_config' to the code_generator output",
+          "context": {
+            "error_type": "missing",
+            "input": {
+              "analysis_text": "```json\n{\n  \"bedrock_agent_config\": {\n    \"agent_name\": \"CustomerServiceEscalationBot\",\n    \"description\": \"Intelligent customer service chatbot with escalation capabilities for handling inquiries, complaints, and support requests\",\n    \"foundation_model\": \"anthropic.claude-3-sonnet-20240229-v1:0\",\n    \"instruction\": \"You are a professional customer service agent. Help customers with their inquiries, process complaints, track orders, and escalate complex issues to human agents when necessary. Be empathetic, clear, and solution-oriented. Always collect relevant information before escalating.\",\n    \"action_groups\": [\"customer_inquiry_actions\", \"escalation_actions\", \"order_management_actions\"],\n    \"knowledge_bases\": []\n  },\n  \"action_groups\": [\n    {\n      \"name\": \"customer_inquiry_actions\",\n      \"description\": \"Handle general customer inquiries and information requests\",\n      \"api_schema\": {\n        \"openapi\": \"3.0.0\",\n        \"info\": {\n          \"title\": \"Customer Inquiry API\",\n          \"version\": \"1.0.0\"\n        },\n        \"paths\": {\n          \"/inquire\": {\n            \"post\": {\n              \"summary\": \"Process customer inquiry\",\n              \"description\": \"Handle general customer questions and information requests\",\n              \"operationId\": \"handleInquiry\",\n              \"requestBody\": {\n                \"required\": true,\n                \"content\": {\n                  \"application/json\": {\n                    \"schema\": {\n                      \"type\": \"object\",\n                      \"properties\": {\n                        \"customer_id\": {\"type\": \"string\"},\n                        \"inquiry_type\": {\"type\": \"string\"},\n                        \"message\": {\"type\": \"string\"}\n                      }\n                    }\n                  }\n                }\n              },\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Inquiry processed successfully\"\n                }\n              }\n            }\n          },\n          \"/faq\": {\n            \"get\": {\n              \"summary\": \"Get FAQ information\",\n              \"description\": \"Retrieve frequently asked questions and answers\",\n              \"operationId\": \"getFAQ\",\n              \"parameters\": [\n                {\n                  \"name\": \"category\",\n                  \"in\": \"query\",\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"FAQ retrieved successfully\"\n                }\n              }\n            }\n          }\n        }\n      },\n      \"lambda_function\": \"customer-inquiry-handler\"\n    },\n    {\n      \"name\": \"escalation_actions\",\n      \"description\": \"Escalate complex issues to human agents\",\n      \"api_schema\": {\n        \"openapi\": \"3.0.0\",\n        \"info\": {\n          \"title\": \"Escalation API\",\n          \"version\": \"1.0.0\"\n        },\n        \"paths\": {\n          \"/escalate\": {\n            \"post\": {\n              \"summary\": \"Escalate to human agent\",\n              \"description\": \"Create escalation ticket for human agent intervention\",\n              \"operationId\": \"escalateIssue\",\n              \"requestBody\": {\n                \"required\": true,\n                \"content\": {\n                  \"application/json\": {\n                    \"schema\": {\n                      \"type\": \"object\",\n                      \"properties\": {\n                        \"customer_id\": {\"type\": \"string\"},\n                        \"issue_summary\": {\"type\": \"string\"},\n                        \"priority\": {\"type\": \"string\", \"enum\": [\"low\", \"medium\", \"high\", \"urgent\"]},\n                        \"conversation_history\": {\"type\": \"array\"}\n                      }\n                    }\n                  }\n                }\n              },\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Escalation created successfully\"\n                }\n              }\n            }\n          },\n          \"/escalation-status\": {\n            \"get\": {\n              \"summary\": \"Check escalation status\",\n              \"description\": \"Get the current status of an escalated ticket\",\n              \"operationId\": \"getEscalationStatus\",\n              \"parameters\": [\n                {\n                  \"name\": \"ticket_id\",\n                  \"in\": \"query\",\n                  \"required\": true,\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Status retrieved successfully\"\n                }\n              }\n            }\n          }\n        }\n      },\n      \"lambda_function\": \"escalation-handler\"\n    },\n    {\n      \"name\": \"order_management_actions\",\n      \"description\": \"Manage customer orders and track shipments\",\n      \"api_schema\": {\n        \"openapi\": \"3.0.0\",\n        \"info\": {\n          \"title\": \"Order Management API\",\n          \"version\": \"1.0.0\"\n        },\n        \"paths\": {\n          \"/order-status\": {\n            \"get\": {\n              \"summary\": \"Get order status\",\n              \"description\": \"Retrieve current status of customer order\",\n              \"operationId\": \"getOrderStatus\",\n              \"parameters\": [\n                {\n                  \"name\": \"order_id\",\n                  \"in\": \"query\",\n                  \"required\": true,\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Order status retrieved\"\n                }\n              }\n            }\n          },\n          \"/track-shipment\": {\n            \"get\": {\n              \"summary\": \"Track shipment\",\n              \"description\": \"Get real-time shipment tracking information\",\n              \"operationId\": \"trackShipment\",\n              \"parameters\": [\n                {\n                  \"name\": \"tracking_number\",\n                  \"in\": \"query\",\n                  \"required\": true,\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Tracking information retrieved\"\n                }\n              }\n            }\n          },\n          \"/cancel-order\": {\n            \"post\": {\n              \"summary\": \"Cancel order\",\n              \"description\": \"Process order cancellation request\",\n              \"operationId\": \"cancelOrder\",\n              \"requestBody\": {\n                \"required\": true,\n                \"content\": {\n                  \"application/json\": {\n                    \"schema\": {\n                      \"type\": \"object\",\n                      \"properties\": {\n                        \"order_id\": {\"type\": \"string\"},\n                        \"reason\": {\"type\": \"string\"}\n                      }\n                    }\n                  }\n                }\n              },\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Order cancelled successfully\"\n                }\n              }\n            }\n          }\n        }\n      },\n      \"lambda_function\": \"order-management-handler\"\n    }\n  ],\n  \"lambda_functions\": [\n    {\n      \"function_name\": \"customer-inquiry-handler\",\n      \"runtime\": \"python3.12\",\n      \"handler\": \"index.lambda_handler\",\n      \"timeout\": 30,\n      \"memory_size\": 512,\n      \"code\": \"import json\\nimport boto3\\nimport os\\nfrom datetime import datetime\\n\\ndynamodb = boto3.resource('dynamodb')\\ntable = dynamodb.Table(os.environ['INQUIRY_TABLE'])\\n\\ndef lambda_handler(event, context):\\n    print(f\\\"Received event: {json.dumps(event)}\\\")\\n    \\n    agent = event.get('agent', {})\\n    action_group = event.get('actionGroup', '')\\n    api_path = event.get('apiPath', '')\\n    http_method = event.get('httpMethod', '')\\n    parameters = event.get('parameters', [])\\n    request_body = event.get('requestBody', {})\\n    \\n    if api_path == '/inquire' and http_method == 'POST':\\n        return handle_inquiry(request_body)\\n    elif api_path == '/faq' and http_method == 'GET':\\n        return get_faq(parameters)\\n    \\n    return error_response('Invalid API path')\\n\\ndef handle_inquiry(request_body):\\n    try:\\n        content = request_body.get('content', {})\\n        data = json.loads(content) if isinstance(content, str) else content\\n        \\n        customer_id = data.get('customer_id')\\n        inquiry_type = data.get('inquiry_type')\\n        message = data.get('message')\\n        \\n        inquiry_id = f\\\"INQ-{datetime.now().strftime('%Y%m%d%H%M%S')}\\\"\\n        \\n        table.put_item(\\n            Item={\\n                'inquiry_id': inquiry_id,\\n                'customer_id': customer_id,\\n                'inquiry_type': inquiry_type,\\n                'message': message,\\n                'status': 'received',\\n                'timestamp': datetime.now().isoformat()\\n            }\\n        )\\n        \\n        response_body = {\\n            'inquiry_id': inquiry_id,\\n            'status': 'received',\\n            'message': 'Your inquiry has been received and will be processed shortly.'\\n        }\\n        \\n        return success_response(response_body)\\n    except Exception as e:\\n        print(f\\\"Error handling inquiry: {str(e)}\\\")\\n        return error_response(str(e))\\n\\ndef get_faq(parameters):\\n    category = next((p['value'] for p in parameters if p['name'] == 'category'), 'general')\\n    \\n    faq_data = {\\n        'general': [\\n            {'question': 'What are your business hours?', 'answer': 'We are available 24/7 through our chatbot and 9 AM - 6 PM for human agents.'},\\n            {'question': 'How can I contact support?', 'answer': 'You can reach us through this chat, email, or phone.'}\\n        ],\\n        'shipping': [\\n            {'question': 'How long does shipping take?', 'answer': 'Standard shipping takes 3-5 business days.'},\\n            {'question': 'Do you ship internationally?', 'answer': 'Yes, we ship to most countries worldwide.'}\\n        ],\\n        'returns': [\\n            {'question': 'What is your return policy?', 'answer': 'We accept returns within 30 days of purchase.'},\\n            {'question': 'How do I return an item?', 'answer': 'Contact us to initiate a return and receive a return label.'}\\n        ]\\n    }\\n    \\n    faqs = faq_data.get(category, faq_data['general'])\\n    \\n    return success_response({'category': category, 'faqs': faqs})\\n\\ndef success_response(body):\\n    return {\\n        'messageVersion': '1.0',\\n        'response': {\\n            'actionGroup': 'customer_inquiry_actions',\\n            'apiPath': event.get('apiPath', ''),\\n            'httpMethod': event.get('httpMethod', ''),\\n            'httpStatusCode': 200,\\n            'responseBody': {\\n                'application/json': {\\n                    'body': json.dumps(body)\\n                }\\n            }\\n        }\\n    }\\n\\ndef error_response(error_message):\\n    return {\\n        'messageVersion': '1.0',\\n        'response': {\\n            'actionGroup': 'customer_inquiry_actions',\\n            'apiPath': event.get('apiPath', ''),\\n            'httpMethod': event.get('httpMethod', ''),\\n            'httpStatusCode': 400,\\n            'responseBody': {\\n                'application/json': {\\n                    'body': json.dumps({'error': error_message})\\n                }\\n            }\\n        }\\n    }\",\n      \"environment_variables\": {\n        \"LOG_LEVEL\": \"INFO\",\n        \"INQUIRY_TABLE\": \"CustomerInquiries\"\n      }\n    },\n    {\n      \"function_name\": \"escalation-handler\",\n      \"runtime\": \"python3.12\",\n      \"handler\": \"index.lambda_handler\",\n      \"timeout\": 30,\n      \"memory_size\": 512,\n      \"code\": \"import json\\nimport boto3\\nimport os\\nfrom datetime import datetime\\nimport uuid\\n\\ndynamodb = boto3.resource('dynamodb')\\nsns = boto3.client('sns')\\nescalation_table = dynamodb.Table(os.environ['ESCALATION_TABLE'])\\n\\ndef lambda_handler(event, context):\\n    print(f\\\"Received event: {json.dumps(event)}\\\")\\n    \\n    api_path = event.get('apiPath', '')\\n    http_method = event.get('httpMethod', '')\\n    parameters = event.get('parameters', [])\\n    request_body = event.get('requestBody', {})\\n    \\n    if api_path == '/escalate' and http_method == 'POST':\\n        return escalate_issue(request_body)\\n    elif api_path == '/escalation-status' and http_method == 'GET':\\n        return get_escalation_status(parameters)\\n    \\n    return error_response('Invalid API path')\\n\\ndef escalate_issue(request_body):\\n    try:\\n        content = request_body.get('content', {})\\n        data = json.loads(content) if isinstance(content, str) else content\\n        \\n        customer_id = data.get('customer_id')\\n        issue_summary = data.get('issue_summary')\\n        priority = data.get('priority', 'medium')\\n        conversation_history = data.get('conversation_history', [])\\n        \\n        ticket_id = str(uuid.uuid4())\\n        \\n        escalation_table.put_item(\\n            Item={\\n                'ticket_id': ticket_id,\\n                'customer_id': customer_id,\\n                'issue_summary': issue_summary,\\n                'priority': priority,\\n                'conversation_history': json.dumps(conversation_history),\\n                'status': 'escalated',\\n                'created_at': datetime.now().isoformat(),\\n                'assigned_agent': None\\n            }\\n        )\\n        \\n        # Notify support team via SNS\\n        sns.publish(\\n            TopicArn=os.environ['ESCALATION_TOPIC_ARN'],\\n            Subject=f'New Escalation - Priority: {priority.upper()}',\\n            Message=json.dumps({\\n                'ticket_id': ticket_id,\\n                'customer_id': customer_id,\\n                'issue_summary': issue_summary,\\n                'priority': priority\\n            }, indent=2)\\n        )\\n        \\n        response_body = {\\n            'ticket_id': ticket_id,\\n            'status': 'escalated',\\n            'message': f'Your issue has been escalated to our support team. Ticket ID: {ticket_id}',\\n            'estimated_response_time': get_estimated_response_time(priority)\\n        }\\n        \\n        return success_response(response_body)\\n    except Exception as e:\\n        print(f\\\"Error escalating issue: {str(e)}\\\")\\n        return error_response(str(e))\\n\\ndef get_escalation_status(parameters):\\n    try:\\n        ticket_id = next((p['value'] for p in parameters if p['name'] == 'ticket_id'), None)\\n        \\n        if not ticket_id:\\n            return error_response('Ticket ID is required')\\n        \\n        response = escalation_table.get_item(Key={'ticket_id': ticket_id})\\n        \\n        if 'Item' not in response:\\n            return error_response('Ticket not found')\\n        \\n        ticket = response['Item']\\n        \\n        status_info = {\\n            'ticket",
+              "parsing_method": "text"
+            }
+          }
+        },
+        {
+          "field_name": "action_groups",
+          "error_type": "schema_violation",
+          "error_message": "Field required",
+          "severity": "error",
+          "remediation_suggestion": "Add the required field 'action_groups' to the code_generator output",
+          "context": {
+            "error_type": "missing",
+            "input": {
+              "analysis_text": "```json\n{\n  \"bedrock_agent_config\": {\n    \"agent_name\": \"CustomerServiceEscalationBot\",\n    \"description\": \"Intelligent customer service chatbot with escalation capabilities for handling inquiries, complaints, and support requests\",\n    \"foundation_model\": \"anthropic.claude-3-sonnet-20240229-v1:0\",\n    \"instruction\": \"You are a professional customer service agent. Help customers with their inquiries, process complaints, track orders, and escalate complex issues to human agents when necessary. Be empathetic, clear, and solution-oriented. Always collect relevant information before escalating.\",\n    \"action_groups\": [\"customer_inquiry_actions\", \"escalation_actions\", \"order_management_actions\"],\n    \"knowledge_bases\": []\n  },\n  \"action_groups\": [\n    {\n      \"name\": \"customer_inquiry_actions\",\n      \"description\": \"Handle general customer inquiries and information requests\",\n      \"api_schema\": {\n        \"openapi\": \"3.0.0\",\n        \"info\": {\n          \"title\": \"Customer Inquiry API\",\n          \"version\": \"1.0.0\"\n        },\n        \"paths\": {\n          \"/inquire\": {\n            \"post\": {\n              \"summary\": \"Process customer inquiry\",\n              \"description\": \"Handle general customer questions and information requests\",\n              \"operationId\": \"handleInquiry\",\n              \"requestBody\": {\n                \"required\": true,\n                \"content\": {\n                  \"application/json\": {\n                    \"schema\": {\n                      \"type\": \"object\",\n                      \"properties\": {\n                        \"customer_id\": {\"type\": \"string\"},\n                        \"inquiry_type\": {\"type\": \"string\"},\n                        \"message\": {\"type\": \"string\"}\n                      }\n                    }\n                  }\n                }\n              },\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Inquiry processed successfully\"\n                }\n              }\n            }\n          },\n          \"/faq\": {\n            \"get\": {\n              \"summary\": \"Get FAQ information\",\n              \"description\": \"Retrieve frequently asked questions and answers\",\n              \"operationId\": \"getFAQ\",\n              \"parameters\": [\n                {\n                  \"name\": \"category\",\n                  \"in\": \"query\",\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"FAQ retrieved successfully\"\n                }\n              }\n            }\n          }\n        }\n      },\n      \"lambda_function\": \"customer-inquiry-handler\"\n    },\n    {\n      \"name\": \"escalation_actions\",\n      \"description\": \"Escalate complex issues to human agents\",\n      \"api_schema\": {\n        \"openapi\": \"3.0.0\",\n        \"info\": {\n          \"title\": \"Escalation API\",\n          \"version\": \"1.0.0\"\n        },\n        \"paths\": {\n          \"/escalate\": {\n            \"post\": {\n              \"summary\": \"Escalate to human agent\",\n              \"description\": \"Create escalation ticket for human agent intervention\",\n              \"operationId\": \"escalateIssue\",\n              \"requestBody\": {\n                \"required\": true,\n                \"content\": {\n                  \"application/json\": {\n                    \"schema\": {\n                      \"type\": \"object\",\n                      \"properties\": {\n                        \"customer_id\": {\"type\": \"string\"},\n                        \"issue_summary\": {\"type\": \"string\"},\n                        \"priority\": {\"type\": \"string\", \"enum\": [\"low\", \"medium\", \"high\", \"urgent\"]},\n                        \"conversation_history\": {\"type\": \"array\"}\n                      }\n                    }\n                  }\n                }\n              },\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Escalation created successfully\"\n                }\n              }\n            }\n          },\n          \"/escalation-status\": {\n            \"get\": {\n              \"summary\": \"Check escalation status\",\n              \"description\": \"Get the current status of an escalated ticket\",\n              \"operationId\": \"getEscalationStatus\",\n              \"parameters\": [\n                {\n                  \"name\": \"ticket_id\",\n                  \"in\": \"query\",\n                  \"required\": true,\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Status retrieved successfully\"\n                }\n              }\n            }\n          }\n        }\n      },\n      \"lambda_function\": \"escalation-handler\"\n    },\n    {\n      \"name\": \"order_management_actions\",\n      \"description\": \"Manage customer orders and track shipments\",\n      \"api_schema\": {\n        \"openapi\": \"3.0.0\",\n        \"info\": {\n          \"title\": \"Order Management API\",\n          \"version\": \"1.0.0\"\n        },\n        \"paths\": {\n          \"/order-status\": {\n            \"get\": {\n              \"summary\": \"Get order status\",\n              \"description\": \"Retrieve current status of customer order\",\n              \"operationId\": \"getOrderStatus\",\n              \"parameters\": [\n                {\n                  \"name\": \"order_id\",\n                  \"in\": \"query\",\n                  \"required\": true,\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Order status retrieved\"\n                }\n              }\n            }\n          },\n          \"/track-shipment\": {\n            \"get\": {\n              \"summary\": \"Track shipment\",\n              \"description\": \"Get real-time shipment tracking information\",\n              \"operationId\": \"trackShipment\",\n              \"parameters\": [\n                {\n                  \"name\": \"tracking_number\",\n                  \"in\": \"query\",\n                  \"required\": true,\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Tracking information retrieved\"\n                }\n              }\n            }\n          },\n          \"/cancel-order\": {\n            \"post\": {\n              \"summary\": \"Cancel order\",\n              \"description\": \"Process order cancellation request\",\n              \"operationId\": \"cancelOrder\",\n              \"requestBody\": {\n                \"required\": true,\n                \"content\": {\n                  \"application/json\": {\n                    \"schema\": {\n                      \"type\": \"object\",\n                      \"properties\": {\n                        \"order_id\": {\"type\": \"string\"},\n                        \"reason\": {\"type\": \"string\"}\n                      }\n                    }\n                  }\n                }\n              },\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Order cancelled successfully\"\n                }\n              }\n            }\n          }\n        }\n      },\n      \"lambda_function\": \"order-management-handler\"\n    }\n  ],\n  \"lambda_functions\": [\n    {\n      \"function_name\": \"customer-inquiry-handler\",\n      \"runtime\": \"python3.12\",\n      \"handler\": \"index.lambda_handler\",\n      \"timeout\": 30,\n      \"memory_size\": 512,\n      \"code\": \"import json\\nimport boto3\\nimport os\\nfrom datetime import datetime\\n\\ndynamodb = boto3.resource('dynamodb')\\ntable = dynamodb.Table(os.environ['INQUIRY_TABLE'])\\n\\ndef lambda_handler(event, context):\\n    print(f\\\"Received event: {json.dumps(event)}\\\")\\n    \\n    agent = event.get('agent', {})\\n    action_group = event.get('actionGroup', '')\\n    api_path = event.get('apiPath', '')\\n    http_method = event.get('httpMethod', '')\\n    parameters = event.get('parameters', [])\\n    request_body = event.get('requestBody', {})\\n    \\n    if api_path == '/inquire' and http_method == 'POST':\\n        return handle_inquiry(request_body)\\n    elif api_path == '/faq' and http_method == 'GET':\\n        return get_faq(parameters)\\n    \\n    return error_response('Invalid API path')\\n\\ndef handle_inquiry(request_body):\\n    try:\\n        content = request_body.get('content', {})\\n        data = json.loads(content) if isinstance(content, str) else content\\n        \\n        customer_id = data.get('customer_id')\\n        inquiry_type = data.get('inquiry_type')\\n        message = data.get('message')\\n        \\n        inquiry_id = f\\\"INQ-{datetime.now().strftime('%Y%m%d%H%M%S')}\\\"\\n        \\n        table.put_item(\\n            Item={\\n                'inquiry_id': inquiry_id,\\n                'customer_id': customer_id,\\n                'inquiry_type': inquiry_type,\\n                'message': message,\\n                'status': 'received',\\n                'timestamp': datetime.now().isoformat()\\n            }\\n        )\\n        \\n        response_body = {\\n            'inquiry_id': inquiry_id,\\n            'status': 'received',\\n            'message': 'Your inquiry has been received and will be processed shortly.'\\n        }\\n        \\n        return success_response(response_body)\\n    except Exception as e:\\n        print(f\\\"Error handling inquiry: {str(e)}\\\")\\n        return error_response(str(e))\\n\\ndef get_faq(parameters):\\n    category = next((p['value'] for p in parameters if p['name'] == 'category'), 'general')\\n    \\n    faq_data = {\\n        'general': [\\n            {'question': 'What are your business hours?', 'answer': 'We are available 24/7 through our chatbot and 9 AM - 6 PM for human agents.'},\\n            {'question': 'How can I contact support?', 'answer': 'You can reach us through this chat, email, or phone.'}\\n        ],\\n        'shipping': [\\n            {'question': 'How long does shipping take?', 'answer': 'Standard shipping takes 3-5 business days.'},\\n            {'question': 'Do you ship internationally?', 'answer': 'Yes, we ship to most countries worldwide.'}\\n        ],\\n        'returns': [\\n            {'question': 'What is your return policy?', 'answer': 'We accept returns within 30 days of purchase.'},\\n            {'question': 'How do I return an item?', 'answer': 'Contact us to initiate a return and receive a return label.'}\\n        ]\\n    }\\n    \\n    faqs = faq_data.get(category, faq_data['general'])\\n    \\n    return success_response({'category': category, 'faqs': faqs})\\n\\ndef success_response(body):\\n    return {\\n        'messageVersion': '1.0',\\n        'response': {\\n            'actionGroup': 'customer_inquiry_actions',\\n            'apiPath': event.get('apiPath', ''),\\n            'httpMethod': event.get('httpMethod', ''),\\n            'httpStatusCode': 200,\\n            'responseBody': {\\n                'application/json': {\\n                    'body': json.dumps(body)\\n                }\\n            }\\n        }\\n    }\\n\\ndef error_response(error_message):\\n    return {\\n        'messageVersion': '1.0',\\n        'response': {\\n            'actionGroup': 'customer_inquiry_actions',\\n            'apiPath': event.get('apiPath', ''),\\n            'httpMethod': event.get('httpMethod', ''),\\n            'httpStatusCode': 400,\\n            'responseBody': {\\n                'application/json': {\\n                    'body': json.dumps({'error': error_message})\\n                }\\n            }\\n        }\\n    }\",\n      \"environment_variables\": {\n        \"LOG_LEVEL\": \"INFO\",\n        \"INQUIRY_TABLE\": \"CustomerInquiries\"\n      }\n    },\n    {\n      \"function_name\": \"escalation-handler\",\n      \"runtime\": \"python3.12\",\n      \"handler\": \"index.lambda_handler\",\n      \"timeout\": 30,\n      \"memory_size\": 512,\n      \"code\": \"import json\\nimport boto3\\nimport os\\nfrom datetime import datetime\\nimport uuid\\n\\ndynamodb = boto3.resource('dynamodb')\\nsns = boto3.client('sns')\\nescalation_table = dynamodb.Table(os.environ['ESCALATION_TABLE'])\\n\\ndef lambda_handler(event, context):\\n    print(f\\\"Received event: {json.dumps(event)}\\\")\\n    \\n    api_path = event.get('apiPath', '')\\n    http_method = event.get('httpMethod', '')\\n    parameters = event.get('parameters', [])\\n    request_body = event.get('requestBody', {})\\n    \\n    if api_path == '/escalate' and http_method == 'POST':\\n        return escalate_issue(request_body)\\n    elif api_path == '/escalation-status' and http_method == 'GET':\\n        return get_escalation_status(parameters)\\n    \\n    return error_response('Invalid API path')\\n\\ndef escalate_issue(request_body):\\n    try:\\n        content = request_body.get('content', {})\\n        data = json.loads(content) if isinstance(content, str) else content\\n        \\n        customer_id = data.get('customer_id')\\n        issue_summary = data.get('issue_summary')\\n        priority = data.get('priority', 'medium')\\n        conversation_history = data.get('conversation_history', [])\\n        \\n        ticket_id = str(uuid.uuid4())\\n        \\n        escalation_table.put_item(\\n            Item={\\n                'ticket_id': ticket_id,\\n                'customer_id': customer_id,\\n                'issue_summary': issue_summary,\\n                'priority': priority,\\n                'conversation_history': json.dumps(conversation_history),\\n                'status': 'escalated',\\n                'created_at': datetime.now().isoformat(),\\n                'assigned_agent': None\\n            }\\n        )\\n        \\n        # Notify support team via SNS\\n        sns.publish(\\n            TopicArn=os.environ['ESCALATION_TOPIC_ARN'],\\n            Subject=f'New Escalation - Priority: {priority.upper()}',\\n            Message=json.dumps({\\n                'ticket_id': ticket_id,\\n                'customer_id': customer_id,\\n                'issue_summary': issue_summary,\\n                'priority': priority\\n            }, indent=2)\\n        )\\n        \\n        response_body = {\\n            'ticket_id': ticket_id,\\n            'status': 'escalated',\\n            'message': f'Your issue has been escalated to our support team. Ticket ID: {ticket_id}',\\n            'estimated_response_time': get_estimated_response_time(priority)\\n        }\\n        \\n        return success_response(response_body)\\n    except Exception as e:\\n        print(f\\\"Error escalating issue: {str(e)}\\\")\\n        return error_response(str(e))\\n\\ndef get_escalation_status(parameters):\\n    try:\\n        ticket_id = next((p['value'] for p in parameters if p['name'] == 'ticket_id'), None)\\n        \\n        if not ticket_id:\\n            return error_response('Ticket ID is required')\\n        \\n        response = escalation_table.get_item(Key={'ticket_id': ticket_id})\\n        \\n        if 'Item' not in response:\\n            return error_response('Ticket not found')\\n        \\n        ticket = response['Item']\\n        \\n        status_info = {\\n            'ticket",
+              "parsing_method": "text"
+            }
+          }
+        },
+        {
+          "field_name": "lambda_functions",
+          "error_type": "schema_violation",
+          "error_message": "Field required",
+          "severity": "error",
+          "remediation_suggestion": "Add the required field 'lambda_functions' to the code_generator output",
+          "context": {
+            "error_type": "missing",
+            "input": {
+              "analysis_text": "```json\n{\n  \"bedrock_agent_config\": {\n    \"agent_name\": \"CustomerServiceEscalationBot\",\n    \"description\": \"Intelligent customer service chatbot with escalation capabilities for handling inquiries, complaints, and support requests\",\n    \"foundation_model\": \"anthropic.claude-3-sonnet-20240229-v1:0\",\n    \"instruction\": \"You are a professional customer service agent. Help customers with their inquiries, process complaints, track orders, and escalate complex issues to human agents when necessary. Be empathetic, clear, and solution-oriented. Always collect relevant information before escalating.\",\n    \"action_groups\": [\"customer_inquiry_actions\", \"escalation_actions\", \"order_management_actions\"],\n    \"knowledge_bases\": []\n  },\n  \"action_groups\": [\n    {\n      \"name\": \"customer_inquiry_actions\",\n      \"description\": \"Handle general customer inquiries and information requests\",\n      \"api_schema\": {\n        \"openapi\": \"3.0.0\",\n        \"info\": {\n          \"title\": \"Customer Inquiry API\",\n          \"version\": \"1.0.0\"\n        },\n        \"paths\": {\n          \"/inquire\": {\n            \"post\": {\n              \"summary\": \"Process customer inquiry\",\n              \"description\": \"Handle general customer questions and information requests\",\n              \"operationId\": \"handleInquiry\",\n              \"requestBody\": {\n                \"required\": true,\n                \"content\": {\n                  \"application/json\": {\n                    \"schema\": {\n                      \"type\": \"object\",\n                      \"properties\": {\n                        \"customer_id\": {\"type\": \"string\"},\n                        \"inquiry_type\": {\"type\": \"string\"},\n                        \"message\": {\"type\": \"string\"}\n                      }\n                    }\n                  }\n                }\n              },\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Inquiry processed successfully\"\n                }\n              }\n            }\n          },\n          \"/faq\": {\n            \"get\": {\n              \"summary\": \"Get FAQ information\",\n              \"description\": \"Retrieve frequently asked questions and answers\",\n              \"operationId\": \"getFAQ\",\n              \"parameters\": [\n                {\n                  \"name\": \"category\",\n                  \"in\": \"query\",\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"FAQ retrieved successfully\"\n                }\n              }\n            }\n          }\n        }\n      },\n      \"lambda_function\": \"customer-inquiry-handler\"\n    },\n    {\n      \"name\": \"escalation_actions\",\n      \"description\": \"Escalate complex issues to human agents\",\n      \"api_schema\": {\n        \"openapi\": \"3.0.0\",\n        \"info\": {\n          \"title\": \"Escalation API\",\n          \"version\": \"1.0.0\"\n        },\n        \"paths\": {\n          \"/escalate\": {\n            \"post\": {\n              \"summary\": \"Escalate to human agent\",\n              \"description\": \"Create escalation ticket for human agent intervention\",\n              \"operationId\": \"escalateIssue\",\n              \"requestBody\": {\n                \"required\": true,\n                \"content\": {\n                  \"application/json\": {\n                    \"schema\": {\n                      \"type\": \"object\",\n                      \"properties\": {\n                        \"customer_id\": {\"type\": \"string\"},\n                        \"issue_summary\": {\"type\": \"string\"},\n                        \"priority\": {\"type\": \"string\", \"enum\": [\"low\", \"medium\", \"high\", \"urgent\"]},\n                        \"conversation_history\": {\"type\": \"array\"}\n                      }\n                    }\n                  }\n                }\n              },\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Escalation created successfully\"\n                }\n              }\n            }\n          },\n          \"/escalation-status\": {\n            \"get\": {\n              \"summary\": \"Check escalation status\",\n              \"description\": \"Get the current status of an escalated ticket\",\n              \"operationId\": \"getEscalationStatus\",\n              \"parameters\": [\n                {\n                  \"name\": \"ticket_id\",\n                  \"in\": \"query\",\n                  \"required\": true,\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Status retrieved successfully\"\n                }\n              }\n            }\n          }\n        }\n      },\n      \"lambda_function\": \"escalation-handler\"\n    },\n    {\n      \"name\": \"order_management_actions\",\n      \"description\": \"Manage customer orders and track shipments\",\n      \"api_schema\": {\n        \"openapi\": \"3.0.0\",\n        \"info\": {\n          \"title\": \"Order Management API\",\n          \"version\": \"1.0.0\"\n        },\n        \"paths\": {\n          \"/order-status\": {\n            \"get\": {\n              \"summary\": \"Get order status\",\n              \"description\": \"Retrieve current status of customer order\",\n              \"operationId\": \"getOrderStatus\",\n              \"parameters\": [\n                {\n                  \"name\": \"order_id\",\n                  \"in\": \"query\",\n                  \"required\": true,\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Order status retrieved\"\n                }\n              }\n            }\n          },\n          \"/track-shipment\": {\n            \"get\": {\n              \"summary\": \"Track shipment\",\n              \"description\": \"Get real-time shipment tracking information\",\n              \"operationId\": \"trackShipment\",\n              \"parameters\": [\n                {\n                  \"name\": \"tracking_number\",\n                  \"in\": \"query\",\n                  \"required\": true,\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Tracking information retrieved\"\n                }\n              }\n            }\n          },\n          \"/cancel-order\": {\n            \"post\": {\n              \"summary\": \"Cancel order\",\n              \"description\": \"Process order cancellation request\",\n              \"operationId\": \"cancelOrder\",\n              \"requestBody\": {\n                \"required\": true,\n                \"content\": {\n                  \"application/json\": {\n                    \"schema\": {\n                      \"type\": \"object\",\n                      \"properties\": {\n                        \"order_id\": {\"type\": \"string\"},\n                        \"reason\": {\"type\": \"string\"}\n                      }\n                    }\n                  }\n                }\n              },\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Order cancelled successfully\"\n                }\n              }\n            }\n          }\n        }\n      },\n      \"lambda_function\": \"order-management-handler\"\n    }\n  ],\n  \"lambda_functions\": [\n    {\n      \"function_name\": \"customer-inquiry-handler\",\n      \"runtime\": \"python3.12\",\n      \"handler\": \"index.lambda_handler\",\n      \"timeout\": 30,\n      \"memory_size\": 512,\n      \"code\": \"import json\\nimport boto3\\nimport os\\nfrom datetime import datetime\\n\\ndynamodb = boto3.resource('dynamodb')\\ntable = dynamodb.Table(os.environ['INQUIRY_TABLE'])\\n\\ndef lambda_handler(event, context):\\n    print(f\\\"Received event: {json.dumps(event)}\\\")\\n    \\n    agent = event.get('agent', {})\\n    action_group = event.get('actionGroup', '')\\n    api_path = event.get('apiPath', '')\\n    http_method = event.get('httpMethod', '')\\n    parameters = event.get('parameters', [])\\n    request_body = event.get('requestBody', {})\\n    \\n    if api_path == '/inquire' and http_method == 'POST':\\n        return handle_inquiry(request_body)\\n    elif api_path == '/faq' and http_method == 'GET':\\n        return get_faq(parameters)\\n    \\n    return error_response('Invalid API path')\\n\\ndef handle_inquiry(request_body):\\n    try:\\n        content = request_body.get('content', {})\\n        data = json.loads(content) if isinstance(content, str) else content\\n        \\n        customer_id = data.get('customer_id')\\n        inquiry_type = data.get('inquiry_type')\\n        message = data.get('message')\\n        \\n        inquiry_id = f\\\"INQ-{datetime.now().strftime('%Y%m%d%H%M%S')}\\\"\\n        \\n        table.put_item(\\n            Item={\\n                'inquiry_id': inquiry_id,\\n                'customer_id': customer_id,\\n                'inquiry_type': inquiry_type,\\n                'message': message,\\n                'status': 'received',\\n                'timestamp': datetime.now().isoformat()\\n            }\\n        )\\n        \\n        response_body = {\\n            'inquiry_id': inquiry_id,\\n            'status': 'received',\\n            'message': 'Your inquiry has been received and will be processed shortly.'\\n        }\\n        \\n        return success_response(response_body)\\n    except Exception as e:\\n        print(f\\\"Error handling inquiry: {str(e)}\\\")\\n        return error_response(str(e))\\n\\ndef get_faq(parameters):\\n    category = next((p['value'] for p in parameters if p['name'] == 'category'), 'general')\\n    \\n    faq_data = {\\n        'general': [\\n            {'question': 'What are your business hours?', 'answer': 'We are available 24/7 through our chatbot and 9 AM - 6 PM for human agents.'},\\n            {'question': 'How can I contact support?', 'answer': 'You can reach us through this chat, email, or phone.'}\\n        ],\\n        'shipping': [\\n            {'question': 'How long does shipping take?', 'answer': 'Standard shipping takes 3-5 business days.'},\\n            {'question': 'Do you ship internationally?', 'answer': 'Yes, we ship to most countries worldwide.'}\\n        ],\\n        'returns': [\\n            {'question': 'What is your return policy?', 'answer': 'We accept returns within 30 days of purchase.'},\\n            {'question': 'How do I return an item?', 'answer': 'Contact us to initiate a return and receive a return label.'}\\n        ]\\n    }\\n    \\n    faqs = faq_data.get(category, faq_data['general'])\\n    \\n    return success_response({'category': category, 'faqs': faqs})\\n\\ndef success_response(body):\\n    return {\\n        'messageVersion': '1.0',\\n        'response': {\\n            'actionGroup': 'customer_inquiry_actions',\\n            'apiPath': event.get('apiPath', ''),\\n            'httpMethod': event.get('httpMethod', ''),\\n            'httpStatusCode': 200,\\n            'responseBody': {\\n                'application/json': {\\n                    'body': json.dumps(body)\\n                }\\n            }\\n        }\\n    }\\n\\ndef error_response(error_message):\\n    return {\\n        'messageVersion': '1.0',\\n        'response': {\\n            'actionGroup': 'customer_inquiry_actions',\\n            'apiPath': event.get('apiPath', ''),\\n            'httpMethod': event.get('httpMethod', ''),\\n            'httpStatusCode': 400,\\n            'responseBody': {\\n                'application/json': {\\n                    'body': json.dumps({'error': error_message})\\n                }\\n            }\\n        }\\n    }\",\n      \"environment_variables\": {\n        \"LOG_LEVEL\": \"INFO\",\n        \"INQUIRY_TABLE\": \"CustomerInquiries\"\n      }\n    },\n    {\n      \"function_name\": \"escalation-handler\",\n      \"runtime\": \"python3.12\",\n      \"handler\": \"index.lambda_handler\",\n      \"timeout\": 30,\n      \"memory_size\": 512,\n      \"code\": \"import json\\nimport boto3\\nimport os\\nfrom datetime import datetime\\nimport uuid\\n\\ndynamodb = boto3.resource('dynamodb')\\nsns = boto3.client('sns')\\nescalation_table = dynamodb.Table(os.environ['ESCALATION_TABLE'])\\n\\ndef lambda_handler(event, context):\\n    print(f\\\"Received event: {json.dumps(event)}\\\")\\n    \\n    api_path = event.get('apiPath', '')\\n    http_method = event.get('httpMethod', '')\\n    parameters = event.get('parameters', [])\\n    request_body = event.get('requestBody', {})\\n    \\n    if api_path == '/escalate' and http_method == 'POST':\\n        return escalate_issue(request_body)\\n    elif api_path == '/escalation-status' and http_method == 'GET':\\n        return get_escalation_status(parameters)\\n    \\n    return error_response('Invalid API path')\\n\\ndef escalate_issue(request_body):\\n    try:\\n        content = request_body.get('content', {})\\n        data = json.loads(content) if isinstance(content, str) else content\\n        \\n        customer_id = data.get('customer_id')\\n        issue_summary = data.get('issue_summary')\\n        priority = data.get('priority', 'medium')\\n        conversation_history = data.get('conversation_history', [])\\n        \\n        ticket_id = str(uuid.uuid4())\\n        \\n        escalation_table.put_item(\\n            Item={\\n                'ticket_id': ticket_id,\\n                'customer_id': customer_id,\\n                'issue_summary': issue_summary,\\n                'priority': priority,\\n                'conversation_history': json.dumps(conversation_history),\\n                'status': 'escalated',\\n                'created_at': datetime.now().isoformat(),\\n                'assigned_agent': None\\n            }\\n        )\\n        \\n        # Notify support team via SNS\\n        sns.publish(\\n            TopicArn=os.environ['ESCALATION_TOPIC_ARN'],\\n            Subject=f'New Escalation - Priority: {priority.upper()}',\\n            Message=json.dumps({\\n                'ticket_id': ticket_id,\\n                'customer_id': customer_id,\\n                'issue_summary': issue_summary,\\n                'priority': priority\\n            }, indent=2)\\n        )\\n        \\n        response_body = {\\n            'ticket_id': ticket_id,\\n            'status': 'escalated',\\n            'message': f'Your issue has been escalated to our support team. Ticket ID: {ticket_id}',\\n            'estimated_response_time': get_estimated_response_time(priority)\\n        }\\n        \\n        return success_response(response_body)\\n    except Exception as e:\\n        print(f\\\"Error escalating issue: {str(e)}\\\")\\n        return error_response(str(e))\\n\\ndef get_escalation_status(parameters):\\n    try:\\n        ticket_id = next((p['value'] for p in parameters if p['name'] == 'ticket_id'), None)\\n        \\n        if not ticket_id:\\n            return error_response('Ticket ID is required')\\n        \\n        response = escalation_table.get_item(Key={'ticket_id': ticket_id})\\n        \\n        if 'Item' not in response:\\n            return error_response('Ticket not found')\\n        \\n        ticket = response['Item']\\n        \\n        status_info = {\\n            'ticket",
+              "parsing_method": "text"
+            }
+          }
+        },
+        {
+          "field_name": "cloudformation_templates",
+          "error_type": "schema_violation",
+          "error_message": "Field required",
+          "severity": "error",
+          "remediation_suggestion": "Add the required field 'cloudformation_templates' to the code_generator output",
+          "context": {
+            "error_type": "missing",
+            "input": {
+              "analysis_text": "```json\n{\n  \"bedrock_agent_config\": {\n    \"agent_name\": \"CustomerServiceEscalationBot\",\n    \"description\": \"Intelligent customer service chatbot with escalation capabilities for handling inquiries, complaints, and support requests\",\n    \"foundation_model\": \"anthropic.claude-3-sonnet-20240229-v1:0\",\n    \"instruction\": \"You are a professional customer service agent. Help customers with their inquiries, process complaints, track orders, and escalate complex issues to human agents when necessary. Be empathetic, clear, and solution-oriented. Always collect relevant information before escalating.\",\n    \"action_groups\": [\"customer_inquiry_actions\", \"escalation_actions\", \"order_management_actions\"],\n    \"knowledge_bases\": []\n  },\n  \"action_groups\": [\n    {\n      \"name\": \"customer_inquiry_actions\",\n      \"description\": \"Handle general customer inquiries and information requests\",\n      \"api_schema\": {\n        \"openapi\": \"3.0.0\",\n        \"info\": {\n          \"title\": \"Customer Inquiry API\",\n          \"version\": \"1.0.0\"\n        },\n        \"paths\": {\n          \"/inquire\": {\n            \"post\": {\n              \"summary\": \"Process customer inquiry\",\n              \"description\": \"Handle general customer questions and information requests\",\n              \"operationId\": \"handleInquiry\",\n              \"requestBody\": {\n                \"required\": true,\n                \"content\": {\n                  \"application/json\": {\n                    \"schema\": {\n                      \"type\": \"object\",\n                      \"properties\": {\n                        \"customer_id\": {\"type\": \"string\"},\n                        \"inquiry_type\": {\"type\": \"string\"},\n                        \"message\": {\"type\": \"string\"}\n                      }\n                    }\n                  }\n                }\n              },\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Inquiry processed successfully\"\n                }\n              }\n            }\n          },\n          \"/faq\": {\n            \"get\": {\n              \"summary\": \"Get FAQ information\",\n              \"description\": \"Retrieve frequently asked questions and answers\",\n              \"operationId\": \"getFAQ\",\n              \"parameters\": [\n                {\n                  \"name\": \"category\",\n                  \"in\": \"query\",\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"FAQ retrieved successfully\"\n                }\n              }\n            }\n          }\n        }\n      },\n      \"lambda_function\": \"customer-inquiry-handler\"\n    },\n    {\n      \"name\": \"escalation_actions\",\n      \"description\": \"Escalate complex issues to human agents\",\n      \"api_schema\": {\n        \"openapi\": \"3.0.0\",\n        \"info\": {\n          \"title\": \"Escalation API\",\n          \"version\": \"1.0.0\"\n        },\n        \"paths\": {\n          \"/escalate\": {\n            \"post\": {\n              \"summary\": \"Escalate to human agent\",\n              \"description\": \"Create escalation ticket for human agent intervention\",\n              \"operationId\": \"escalateIssue\",\n              \"requestBody\": {\n                \"required\": true,\n                \"content\": {\n                  \"application/json\": {\n                    \"schema\": {\n                      \"type\": \"object\",\n                      \"properties\": {\n                        \"customer_id\": {\"type\": \"string\"},\n                        \"issue_summary\": {\"type\": \"string\"},\n                        \"priority\": {\"type\": \"string\", \"enum\": [\"low\", \"medium\", \"high\", \"urgent\"]},\n                        \"conversation_history\": {\"type\": \"array\"}\n                      }\n                    }\n                  }\n                }\n              },\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Escalation created successfully\"\n                }\n              }\n            }\n          },\n          \"/escalation-status\": {\n            \"get\": {\n              \"summary\": \"Check escalation status\",\n              \"description\": \"Get the current status of an escalated ticket\",\n              \"operationId\": \"getEscalationStatus\",\n              \"parameters\": [\n                {\n                  \"name\": \"ticket_id\",\n                  \"in\": \"query\",\n                  \"required\": true,\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Status retrieved successfully\"\n                }\n              }\n            }\n          }\n        }\n      },\n      \"lambda_function\": \"escalation-handler\"\n    },\n    {\n      \"name\": \"order_management_actions\",\n      \"description\": \"Manage customer orders and track shipments\",\n      \"api_schema\": {\n        \"openapi\": \"3.0.0\",\n        \"info\": {\n          \"title\": \"Order Management API\",\n          \"version\": \"1.0.0\"\n        },\n        \"paths\": {\n          \"/order-status\": {\n            \"get\": {\n              \"summary\": \"Get order status\",\n              \"description\": \"Retrieve current status of customer order\",\n              \"operationId\": \"getOrderStatus\",\n              \"parameters\": [\n                {\n                  \"name\": \"order_id\",\n                  \"in\": \"query\",\n                  \"required\": true,\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Order status retrieved\"\n                }\n              }\n            }\n          },\n          \"/track-shipment\": {\n            \"get\": {\n              \"summary\": \"Track shipment\",\n              \"description\": \"Get real-time shipment tracking information\",\n              \"operationId\": \"trackShipment\",\n              \"parameters\": [\n                {\n                  \"name\": \"tracking_number\",\n                  \"in\": \"query\",\n                  \"required\": true,\n                  \"schema\": {\"type\": \"string\"}\n                }\n              ],\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Tracking information retrieved\"\n                }\n              }\n            }\n          },\n          \"/cancel-order\": {\n            \"post\": {\n              \"summary\": \"Cancel order\",\n              \"description\": \"Process order cancellation request\",\n              \"operationId\": \"cancelOrder\",\n              \"requestBody\": {\n                \"required\": true,\n                \"content\": {\n                  \"application/json\": {\n                    \"schema\": {\n                      \"type\": \"object\",\n                      \"properties\": {\n                        \"order_id\": {\"type\": \"string\"},\n                        \"reason\": {\"type\": \"string\"}\n                      }\n                    }\n                  }\n                }\n              },\n              \"responses\": {\n                \"200\": {\n                  \"description\": \"Order cancelled successfully\"\n                }\n              }\n            }\n          }\n        }\n      },\n      \"lambda_function\": \"order-management-handler\"\n    }\n  ],\n  \"lambda_functions\": [\n    {\n      \"function_name\": \"customer-inquiry-handler\",\n      \"runtime\": \"python3.12\",\n      \"handler\": \"index.lambda_handler\",\n      \"timeout\": 30,\n      \"memory_size\": 512,\n      \"code\": \"import json\\nimport boto3\\nimport os\\nfrom datetime import datetime\\n\\ndynamodb = boto3.resource('dynamodb')\\ntable = dynamodb.Table(os.environ['INQUIRY_TABLE'])\\n\\ndef lambda_handler(event, context):\\n    print(f\\\"Received event: {json.dumps(event)}\\\")\\n    \\n    agent = event.get('agent', {})\\n    action_group = event.get('actionGroup', '')\\n    api_path = event.get('apiPath', '')\\n    http_method = event.get('httpMethod', '')\\n    parameters = event.get('parameters', [])\\n    request_body = event.get('requestBody', {})\\n    \\n    if api_path == '/inquire' and http_method == 'POST':\\n        return handle_inquiry(request_body)\\n    elif api_path == '/faq' and http_method == 'GET':\\n        return get_faq(parameters)\\n    \\n    return error_response('Invalid API path')\\n\\ndef handle_inquiry(request_body):\\n    try:\\n        content = request_body.get('content', {})\\n        data = json.loads(content) if isinstance(content, str) else content\\n        \\n        customer_id = data.get('customer_id')\\n        inquiry_type = data.get('inquiry_type')\\n        message = data.get('message')\\n        \\n        inquiry_id = f\\\"INQ-{datetime.now().strftime('%Y%m%d%H%M%S')}\\\"\\n        \\n        table.put_item(\\n            Item={\\n                'inquiry_id': inquiry_id,\\n                'customer_id': customer_id,\\n                'inquiry_type': inquiry_type,\\n                'message': message,\\n                'status': 'received',\\n                'timestamp': datetime.now().isoformat()\\n            }\\n        )\\n        \\n        response_body = {\\n            'inquiry_id': inquiry_id,\\n            'status': 'received',\\n            'message': 'Your inquiry has been received and will be processed shortly.'\\n        }\\n        \\n        return success_response(response_body)\\n    except Exception as e:\\n        print(f\\\"Error handling inquiry: {str(e)}\\\")\\n        return error_response(str(e))\\n\\ndef get_faq(parameters):\\n    category = next((p['value'] for p in parameters if p['name'] == 'category'), 'general')\\n    \\n    faq_data = {\\n        'general': [\\n            {'question': 'What are your business hours?', 'answer': 'We are available 24/7 through our chatbot and 9 AM - 6 PM for human agents.'},\\n            {'question': 'How can I contact support?', 'answer': 'You can reach us through this chat, email, or phone.'}\\n        ],\\n        'shipping': [\\n            {'question': 'How long does shipping take?', 'answer': 'Standard shipping takes 3-5 business days.'},\\n            {'question': 'Do you ship internationally?', 'answer': 'Yes, we ship to most countries worldwide.'}\\n        ],\\n        'returns': [\\n            {'question': 'What is your return policy?', 'answer': 'We accept returns within 30 days of purchase.'},\\n            {'question': 'How do I return an item?', 'answer': 'Contact us to initiate a return and receive a return label.'}\\n        ]\\n    }\\n    \\n    faqs = faq_data.get(category, faq_data['general'])\\n    \\n    return success_response({'category': category, 'faqs': faqs})\\n\\ndef success_response(body):\\n    return {\\n        'messageVersion': '1.0',\\n        'response': {\\n            'actionGroup': 'customer_inquiry_actions',\\n            'apiPath': event.get('apiPath', ''),\\n            'httpMethod': event.get('httpMethod', ''),\\n            'httpStatusCode': 200,\\n            'responseBody': {\\n                'application/json': {\\n                    'body': json.dumps(body)\\n                }\\n            }\\n        }\\n    }\\n\\ndef error_response(error_message):\\n    return {\\n        'messageVersion': '1.0',\\n        'response': {\\n            'actionGroup': 'customer_inquiry_actions',\\n            'apiPath': event.get('apiPath', ''),\\n            'httpMethod': event.get('httpMethod', ''),\\n            'httpStatusCode': 400,\\n            'responseBody': {\\n                'application/json': {\\n                    'body': json.dumps({'error': error_message})\\n                }\\n            }\\n        }\\n    }\",\n      \"environment_variables\": {\n        \"LOG_LEVEL\": \"INFO\",\n        \"INQUIRY_TABLE\": \"CustomerInquiries\"\n      }\n    },\n    {\n      \"function_name\": \"escalation-handler\",\n      \"runtime\": \"python3.12\",\n      \"handler\": \"index.lambda_handler\",\n      \"timeout\": 30,\n      \"memory_size\": 512,\n      \"code\": \"import json\\nimport boto3\\nimport os\\nfrom datetime import datetime\\nimport uuid\\n\\ndynamodb = boto3.resource('dynamodb')\\nsns = boto3.client('sns')\\nescalation_table = dynamodb.Table(os.environ['ESCALATION_TABLE'])\\n\\ndef lambda_handler(event, context):\\n    print(f\\\"Received event: {json.dumps(event)}\\\")\\n    \\n    api_path = event.get('apiPath', '')\\n    http_method = event.get('httpMethod', '')\\n    parameters = event.get('parameters', [])\\n    request_body = event.get('requestBody', {})\\n    \\n    if api_path == '/escalate' and http_method == 'POST':\\n        return escalate_issue(request_body)\\n    elif api_path == '/escalation-status' and http_method == 'GET':\\n        return get_escalation_status(parameters)\\n    \\n    return error_response('Invalid API path')\\n\\ndef escalate_issue(request_body):\\n    try:\\n        content = request_body.get('content', {})\\n        data = json.loads(content) if isinstance(content, str) else content\\n        \\n        customer_id = data.get('customer_id')\\n        issue_summary = data.get('issue_summary')\\n        priority = data.get('priority', 'medium')\\n        conversation_history = data.get('conversation_history', [])\\n        \\n        ticket_id = str(uuid.uuid4())\\n        \\n        escalation_table.put_item(\\n            Item={\\n                'ticket_id': ticket_id,\\n                'customer_id': customer_id,\\n                'issue_summary': issue_summary,\\n                'priority': priority,\\n                'conversation_history': json.dumps(conversation_history),\\n                'status': 'escalated',\\n                'created_at': datetime.now().isoformat(),\\n                'assigned_agent': None\\n            }\\n        )\\n        \\n        # Notify support team via SNS\\n        sns.publish(\\n            TopicArn=os.environ['ESCALATION_TOPIC_ARN'],\\n            Subject=f'New Escalation - Priority: {priority.upper()}',\\n            Message=json.dumps({\\n                'ticket_id': ticket_id,\\n                'customer_id': customer_id,\\n                'issue_summary': issue_summary,\\n                'priority': priority\\n            }, indent=2)\\n        )\\n        \\n        response_body = {\\n            'ticket_id': ticket_id,\\n            'status': 'escalated',\\n            'message': f'Your issue has been escalated to our support team. Ticket ID: {ticket_id}',\\n            'estimated_response_time': get_estimated_response_time(priority)\\n        }\\n        \\n        return success_response(response_body)\\n    except Exception as e:\\n        print(f\\\"Error escalating issue: {str(e)}\\\")\\n        return error_response(str(e))\\n\\ndef get_escalation_status(parameters):\\n    try:\\n        ticket_id = next((p['value'] for p in parameters if p['name'] == 'ticket_id'), None)\\n        \\n        if not ticket_id:\\n            return error_response('Ticket ID is required')\\n        \\n        response = escalation_table.get_item(Key={'ticket_id': ticket_id})\\n        \\n        if 'Item' not in response:\\n            return error_response('Ticket not found')\\n        \\n        ticket = response['Item']\\n        \\n        status_info = {\\n            'ticket",
+              "parsing_method": "text"
+            }
+          }
+        },
+        {
+          "field_name": "bedrock_agent_config.agent_name",
+          "error_type": "missing_field",
+          "error_message": "Bedrock agent name not specified",
+          "severity": "error",
+          "remediation_suggestion": "Provide a valid agent name for Bedrock Agent configuration",
+          "context": {}
+        },
+        {
+          "field_name": "bedrock_agent_config.foundation_model",
+          "error_type": "missing_field",
+          "error_message": "Foundation model not specified",
+          "severity": "error",
+          "remediation_suggestion": "Specify a valid Bedrock foundation model ID",
+          "context": {}
+        }
+      ]
+    },
+    "error_patterns": {
+      "schema_violation_bedrock_agent_config": {
+        "count": 1,
+        "agents": [
+          "code_generator"
+        ],
+        "common_remediation": "Add the required field 'bedrock_agent_config' to the code_generator output"
+      },
+      "schema_violation_action_groups": {
+        "count": 1,
+        "agents": [
+          "code_generator"
+        ],
+        "common_remediation": "Add the required field 'action_groups' to the code_generator output"
+      },
+      "schema_violation_lambda_functions": {
+        "count": 1,
+        "agents": [
+          "code_generator"
+        ],
+        "common_remediation": "Add the required field 'lambda_functions' to the code_generator output"
+      },
+      "schema_violation_cloudformation_templates": {
+        "count": 1,
+        "agents": [
+          "code_generator"
+        ],
+        "common_remediation": "Add the required field 'cloudformation_templates' to the code_generator output"
+      },
+      "missing_field_bedrock_agent_config.agent_name": {
+        "count": 1,
+        "agents": [
+          "code_generator"
+        ],
+        "common_remediation": "Provide a valid agent name for Bedrock Agent configuration"
+      },
+      "missing_field_bedrock_agent_config.foundation_model": {
+        "count": 1,
+        "agents": [
+          "code_generator"
+        ],
+        "common_remediation": "Specify a valid Bedrock foundation model ID"
+      }
+    },
+    "severity_breakdown": {
+      "critical": 0,
+      "error": 6,
+      "warning": 0,
+      "info": 0
+    },
+    "total_field_errors": 6,
+    "most_common_errors": [
+      [
+        "schema_violation_bedrock_agent_config",
+        {
+          "count": 1,
+          "agents": [
+            "code_generator"
+          ],
+          "common_remediation": "Add the required field 'bedrock_agent_config' to the code_generator output"
+        }
+      ],
+      [
+        "schema_violation_action_groups",
+        {
+          "count": 1,
+          "agents": [
+            "code_generator"
+          ],
+          "common_remediation": "Add the required field 'action_groups' to the code_generator output"
+        }
+      ],
+      [
+        "schema_violation_lambda_functions",
+        {
+          "count": 1,
+          "agents": [
+            "code_generator"
+          ],
+          "common_remediation": "Add the required field 'lambda_functions' to the code_generator output"
+        }
+      ],
+      [
+        "schema_violation_cloudformation_templates",
+        {
+          "count": 1,
+          "agents": [
+            "code_generator"
+          ],
+          "common_remediation": "Add the required field 'cloudformation_templates' to the code_generator output"
+        }
+      ],
+      [
+        "missing_field_bedrock_agent_config.agent_name",
+        {
+          "count": 1,
+          "agents": [
+            "code_generator"
+          ],
+          "common_remediation": "Provide a valid agent name for Bedrock Agent configuration"
+        }
+      ],
+      [
+        "missing_field_bedrock_agent_config.foundation_model",
+        {
+          "count": 1,
+          "agents": [
+            "code_generator"
+          ],
+          "common_remediation": "Specify a valid Bedrock foundation model ID"
+        }
+      ]
+    ]
+  },
+  "compatibility_scoring": {
+    "requirements_to_architecture_score": 1.0,
+    "architecture_to_code_score": 0.29999999999999993,
+    "overall_pipeline_score": 0.6499999999999999,
+    "compatibility_level": "poor",
+    "critical_issues": [
+      "Semantic rule violation: Bedrock service selection should result in agent configuration",
+      "Semantic rule violation: Lambda service selection should result in function implementations",
+      "Semantic rule violation: Security architecture should result in IAM implementations",
+      "Semantic rule violation: Bedrock service selection should result in agent configuration",
+      "Semantic rule violation: Lambda service selection should result in function implementations",
+      "Semantic rule violation: Security architecture should result in IAM implementations"
+    ],
+    "improvement_areas": [
+      "Improve data flow (current score: 0.30)",
+      "Improve data flow (current score: 0.65)"
+    ]
+  },
+  "remediation_plan": {
+    "priority_fixes": [
+      {
+        "type": "compatibility_fix",
+        "priority": "high",
+        "agent_pair": "architecture_to_code",
+        "issue": "Missing mapping: selected_services -> bedrock_agent_config",
+        "remediation": "Implement mapping from solution_architect to code_generator",
+        "estimated_effort": "medium",
+        "impact": "Data flow interruption"
+      },
+      {
+        "type": "compatibility_fix",
+        "priority": "high",
+        "agent_pair": "architecture_to_code",
+        "issue": "Missing mapping: architecture_blueprint.deployment_model -> cloudformation_templates",
+        "remediation": "Implement mapping from solution_architect to code_generator",
+        "estimated_effort": "medium",
+        "impact": "Data flow interruption"
+      },
+      {
+        "type": "compatibility_fix",
+        "priority": "high",
+        "agent_pair": "architecture_to_code",
+        "issue": "Missing mapping: security_architecture.iam_design -> iam_policies",
+        "remediation": "Implement mapping from solution_architect to code_generator",
+        "estimated_effort": "medium",
+        "impact": "Data flow interruption"
+      },
+      {
+        "type": "compatibility_fix",
+        "priority": "high",
+        "agent_pair": "architecture_to_code",
+        "issue": "Missing mapping: iac_templates -> cloudformation_templates",
+        "remediation": "Implement mapping from solution_architect to code_generator",
+        "estimated_effort": "medium",
+        "impact": "Data flow interruption"
+      },
+      {
+        "type": "compatibility_fix",
+        "priority": "high",
+        "agent_pair": "overall_semantic_flow",
+        "issue": "Missing mapping: selected_services -> bedrock_agent_config",
+        "remediation": "Implement mapping from solution_architect to code_generator",
+        "estimated_effort": "medium",
+        "impact": "Data flow interruption"
+      },
+      {
+        "type": "compatibility_fix",
+        "priority": "high",
+        "agent_pair": "overall_semantic_flow",
+        "issue": "Missing mapping: architecture_blueprint.deployment_model -> cloudformation_templates",
+        "remediation": "Implement mapping from solution_architect to code_generator",
+        "estimated_effort": "medium",
+        "impact": "Data flow interruption"
+      },
+      {
+        "type": "compatibility_fix",
+        "priority": "high",
+        "agent_pair": "overall_semantic_flow",
+        "issue": "Missing mapping: security_architecture.iam_design -> iam_policies",
+        "remediation": "Implement mapping from solution_architect to code_generator",
+        "estimated_effort": "medium",
+        "impact": "Data flow interruption"
+      },
+      {
+        "type": "compatibility_fix",
+        "priority": "high",
+        "agent_pair": "overall_semantic_flow",
+        "issue": "Missing mapping: iac_templates -> cloudformation_templates",
+        "remediation": "Implement mapping from solution_architect to code_generator",
+        "estimated_effort": "medium",
+        "impact": "Data flow interruption"
+      }
+    ],
+    "optional_improvements": [
+      {
+        "type": "validation_fix",
+        "priority": "medium",
+        "agent": "code_generator",
+        "field": "bedrock_agent_config",
+        "issue": "Field required",
+        "remediation": "Add the required field 'bedrock_agent_config' to the code_generator output",
+        "estimated_effort": "low",
+        "impact": "Reduced quality"
+      },
+      {
+        "type": "validation_fix",
+        "priority": "medium",
+        "agent": "code_generator",
+        "field": "action_groups",
+        "issue": "Field required",
+        "remediation": "Add the required field 'action_groups' to the code_generator output",
+        "estimated_effort": "low",
+        "impact": "Reduced quality"
+      },
+      {
+        "type": "validation_fix",
+        "priority": "medium",
+        "agent": "code_generator",
+        "field": "lambda_functions",
+        "issue": "Field required",
+        "remediation": "Add the required field 'lambda_functions' to the code_generator output",
+        "estimated_effort": "low",
+        "impact": "Reduced quality"
+      },
+      {
+        "type": "validation_fix",
+        "priority": "medium",
+        "agent": "code_generator",
+        "field": "cloudformation_templates",
+        "issue": "Field required",
+        "remediation": "Add the required field 'cloudformation_templates' to the code_generator output",
+        "estimated_effort": "low",
+        "impact": "Reduced quality"
+      },
+      {
+        "type": "validation_fix",
+        "priority": "medium",
+        "agent": "code_generator",
+        "field": "bedrock_agent_config.agent_name",
+        "issue": "Bedrock agent name not specified",
+        "remediation": "Provide a valid agent name for Bedrock Agent configuration",
+        "estimated_effort": "medium",
+        "impact": "Reduced quality"
+      },
+      {
+        "type": "validation_fix",
+        "priority": "medium",
+        "agent": "code_generator",
+        "field": "bedrock_agent_config.foundation_model",
+        "issue": "Foundation model not specified",
+        "remediation": "Specify a valid Bedrock foundation model ID",
+        "estimated_effort": "medium",
+        "impact": "Reduced quality"
+      },
+      {
+        "type": "semantic_fix",
+        "priority": "medium",
+        "agent_pair": "architecture_to_code",
+        "issue": "Semantic rule violation: Bedrock service selection should result in agent configuration",
+        "remediation": "Review and align semantic meaning between agents",
+        "estimated_effort": "high",
+        "impact": "Logical inconsistency"
+      },
+      {
+        "type": "semantic_fix",
+        "priority": "medium",
+        "agent_pair": "architecture_to_code",
+        "issue": "Semantic rule violation: Lambda service selection should result in function implementations",
+        "remediation": "Review and align semantic meaning between agents",
+        "estimated_effort": "high",
+        "impact": "Logical inconsistency"
+      },
+      {
+        "type": "semantic_fix",
+        "priority": "medium",
+        "agent_pair": "architecture_to_code",
+        "issue": "Semantic rule violation: Security architecture should result in IAM implementations",
+        "remediation": "Review and align semantic meaning between agents",
+        "estimated_effort": "high",
+        "impact": "Logical inconsistency"
+      },
+      {
+        "type": "semantic_fix",
+        "priority": "medium",
+        "agent_pair": "overall_semantic_flow",
+        "issue": "Semantic rule violation: Bedrock service selection should result in agent configuration",
+        "remediation": "Review and align semantic meaning between agents",
+        "estimated_effort": "high",
+        "impact": "Logical inconsistency"
+      },
+      {
+        "type": "semantic_fix",
+        "priority": "medium",
+        "agent_pair": "overall_semantic_flow",
+        "issue": "Semantic rule violation: Lambda service selection should result in function implementations",
+        "remediation": "Review and align semantic meaning between agents",
+        "estimated_effort": "high",
+        "impact": "Logical inconsistency"
+      },
+      {
+        "type": "semantic_fix",
+        "priority": "medium",
+        "agent_pair": "overall_semantic_flow",
+        "issue": "Semantic rule violation: Security architecture should result in IAM implementations",
+        "remediation": "Review and align semantic meaning between agents",
+        "estimated_effort": "high",
+        "impact": "Logical inconsistency"
+      }
+    ],
+    "estimated_effort": "High (1-2 weeks)",
+    "implementation_order": [
+      "Fix critical validation errors",
+      "Resolve compatibility issues",
+      "Address semantic inconsistencies",
+      "Implement optional improvements"
+    ],
+    "success_criteria": [
+      "All agents pass schema validation",
+      "Compatibility score > 0.8",
+      "No critical or error-level validation issues",
+      "Semantic data flow is logically consistent"
+    ]
+  },
+  "agent_analysis": {
+    "requirements_analyst": {
+      "validation_status": "passed",
+      "quality_score": 0.9999999999999999,
+      "compatibility_score": 1.0,
+      "error_count": 0,
+      "warning_count": 0,
+      "recommendation_count": 0,
+      "execution_metadata": {
+        "start_time": "2025-10-08 16:12:35.364494+00:00",
+        "end_time": "2025-10-08 16:12:35.364498+00:00",
+        "duration_seconds": 5.0,
+        "model_invocations": 1,
+        "tokens_used": 1000
+      },
+      "key_issues": [],
+      "improvement_suggestions": []
+    },
+    "solution_architect": {
+      "validation_status": "passed",
+      "quality_score": 0.9999999999999999,
+      "compatibility_score": 1.0,
+      "error_count": 0,
+      "warning_count": 0,
+      "recommendation_count": 0,
+      "execution_metadata": {
+        "start_time": "2025-10-08 16:13:23.412366+00:00",
+        "end_time": "2025-10-08 16:13:23.412371+00:00",
+        "duration_seconds": 8.0,
+        "model_invocations": 1,
+        "tokens_used": 1500
+      },
+      "key_issues": [],
+      "improvement_suggestions": []
+    },
+    "code_generator": {
+      "validation_status": "failed",
+      "quality_score": 0.0,
+      "compatibility_score": 0.0,
+      "error_count": 6,
+      "warning_count": 3,
+      "recommendation_count": 3,
+      "execution_metadata": {
+        "start_time": "2025-10-08 16:14:10.233202+00:00",
+        "end_time": "2025-10-08 16:14:10.233206+00:00",
+        "duration_seconds": 12.0,
+        "model_invocations": 1,
+        "tokens_used": 2000
+      },
+      "key_issues": [
+        "Field required",
+        "Field required",
+        "Field required",
+        "Field required",
+        "Bedrock agent name not specified",
+        "Foundation model not specified"
+      ],
+      "improvement_suggestions": [
+        "Define action groups to provide specific capabilities to the agent",
+        "Implement Lambda functions for action group handlers",
+        "Include CloudFormation templates for infrastructure deployment"
+      ]
+    }
+  },
+  "recommendations": [
+    "Priority: Fix validation failures in code_generator",
+    "Improve compatibility between architecture_to_code, overall_semantic_flow",
+    "Focus on improving overall output quality across all agents",
+    "Implement comprehensive error handling in all agents",
+    "Add validation checkpoints between agent executions",
+    "Consider implementing retry logic for failed validations",
+    "Monitor validation metrics over time to identify trends"
+  ]
+}

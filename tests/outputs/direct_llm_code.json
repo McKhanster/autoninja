@@ -1,0 +1,354 @@
+{
+  "bedrock_agent_config": {
+    "agent_name": "CustomerServiceEscalationBot",
+    "description": "Intelligent customer service chatbot with escalation capabilities",
+    "foundation_model": "anthropic.claude-3-sonnet-20240229-v1:0",
+    "instruction": "You are a helpful customer service agent. Handle customer inquiries, check order status, process returns, and escalate complex issues to human agents when necessary. Always be polite and professional.",
+    "action_groups": [
+      "customer_inquiry_actions",
+      "escalation_actions"
+    ],
+    "knowledge_bases": [
+      "customer_kb_id"
+    ]
+  },
+  "action_groups": [
+    {
+      "name": "customer_inquiry_actions",
+      "description": "Handle customer inquiries, orders, and returns",
+      "api_schema": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "Customer Service API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/order-status": {
+            "post": {
+              "description": "Get order status by order ID",
+              "parameters": [
+                {
+                  "name": "orderId",
+                  "in": "query",
+                  "required": true,
+                  "schema": {
+                    "type": "string"
+                  }
+                }
+              ],
+              "responses": {
+                "200": {
+                  "description": "Order details"
+                }
+              }
+            }
+          },
+          "/process-return": {
+            "post": {
+              "description": "Initiate return process",
+              "requestBody": {
+                "required": true,
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "orderId": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": {
+                "200": {
+                  "description": "Return confirmation"
+                }
+              }
+            }
+          }
+        }
+      },
+      "lambda_function": "customer-inquiry-handler"
+    },
+    {
+      "name": "escalation_actions",
+      "description": "Escalate complex issues to human agents",
+      "api_schema": {
+        "openapi": "3.0.0",
+        "info": {
+          "title": "Escalation API",
+          "version": "1.0.0"
+        },
+        "paths": {
+          "/create-ticket": {
+            "post": {
+              "description": "Create support ticket for human agent",
+              "requestBody": {
+                "required": true,
+                "content": {
+                  "application/json": {
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "customerId": {
+                          "type": "string"
+                        },
+                        "issue": {
+                          "type": "string"
+                        },
+                        "priority": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "responses": {
+                "200": {
+                  "description": "Ticket created"
+                }
+              }
+            }
+          }
+        }
+      },
+      "lambda_function": "escalation-handler"
+    }
+  ],
+  "lambda_functions": [
+    {
+      "function_name": "customer-inquiry-handler",
+      "runtime": "python3.12",
+      "handler": "index.lambda_handler",
+      "code": "import json\nimport boto3\n\ndynamodb = boto3.resource('dynamodb')\n\ndef lambda_handler(event, context):\n    action = event.get('apiPath')\n    parameters = event.get('parameters', [])\n    \n    if action == '/order-status':\n        order_id = next((p['value'] for p in parameters if p['name'] == 'orderId'), None)\n        table = dynamodb.Table('Orders')\n        response = table.get_item(Key={'orderId': order_id})\n        return {'statusCode': 200, 'body': json.dumps(response.get('Item', {}))}\n    \n    elif action == '/process-return':\n        body = json.loads(event.get('requestBody', {}).get('content', {}).get('application/json', '{}'))\n        # Process return logic\n        return {'statusCode': 200, 'body': json.dumps({'returnId': 'RET-12345', 'status': 'initiated'})}\n    \n    return {'statusCode': 400, 'body': 'Invalid action'}",
+      "environment_variables": {
+        "LOG_LEVEL": "INFO",
+        "ORDERS_TABLE": "Orders"
+      }
+    },
+    {
+      "function_name": "escalation-handler",
+      "runtime": "python3.12",
+      "handler": "index.lambda_handler",
+      "code": "import json\nimport boto3\nfrom datetime import datetime\n\nsns = boto3.client('sns')\ndynamodb = boto3.resource('dynamodb')\n\ndef lambda_handler(event, context):\n    action = event.get('apiPath')\n    \n    if action == '/create-ticket':\n        body = json.loads(event.get('requestBody', {}).get('content', {}).get('application/json', '{}'))\n        ticket_id = f\"TICKET-{datetime.now().strftime('%Y%m%d%H%M%S')}\"\n        \n        table = dynamodb.Table('SupportTickets')\n        table.put_item(Item={'ticketId': ticket_id, **body, 'createdAt': datetime.now().isoformat()})\n        \n        sns.publish(TopicArn=context.get('SNS_TOPIC_ARN'), Message=f\"New ticket: {ticket_id}\")\n        \n        return {'statusCode': 200, 'body': json.dumps({'ticketId': ticket_id, 'status': 'escalated'})}\n    \n    return {'statusCode': 400, 'body': 'Invalid action'}",
+      "environment_variables": {
+        "LOG_LEVEL": "INFO",
+        "SNS_TOPIC_ARN": "arn:aws:sns:region:account:escalation-topic"
+      }
+    },
+    {
+      "function_name": "api-gateway-handler",
+      "runtime": "python3.12",
+      "handler": "index.lambda_handler",
+      "code": "import json\nimport boto3\n\nbedrock_agent_runtime = boto3.client('bedrock-agent-runtime')\n\ndef lambda_handler(event, context):\n    body = json.loads(event.get('body', '{}'))\n    user_input = body.get('message', '')\n    session_id = body.get('sessionId', 'default-session')\n    \n    response = bedrock_agent_runtime.invoke_agent(\n        agentId='AGENT_ID',\n        agentAliasId='AGENT_ALIAS_ID',\n        sessionId=session_id,\n        inputText=user_input\n    )\n    \n    return {\n        'statusCode': 200,\n        'headers': {'Content-Type': 'application/json'},\n        'body': json.dumps({'response': response})\n    }",
+      "environment_variables": {
+        "AGENT_ID": "placeholder",
+        "AGENT_ALIAS_ID": "placeholder"
+      }
+    }
+  ],
+  "cloudformation_templates": {
+    "main_template": {
+      "AWSTemplateFormatVersion": "2010-09-09",
+      "Description": "Serverless Customer Service Chatbot with Bedrock",
+      "Resources": {
+        "OrdersTable": {
+          "Type": "AWS::DynamoDB::Table",
+          "Properties": {
+            "TableName": "Orders",
+            "AttributeDefinitions": [
+              {
+                "AttributeName": "orderId",
+                "AttributeType": "S"
+              }
+            ],
+            "KeySchema": [
+              {
+                "AttributeName": "orderId",
+                "KeyType": "HASH"
+              }
+            ],
+            "BillingMode": "PAY_PER_REQUEST"
+          }
+        },
+        "SupportTicketsTable": {
+          "Type": "AWS::DynamoDB::Table",
+          "Properties": {
+            "TableName": "SupportTickets",
+            "AttributeDefinitions": [
+              {
+                "AttributeName": "ticketId",
+                "AttributeType": "S"
+              }
+            ],
+            "KeySchema": [
+              {
+                "AttributeName": "ticketId",
+                "KeyType": "HASH"
+              }
+            ],
+            "BillingMode": "PAY_PER_REQUEST"
+          }
+        },
+        "EscalationTopic": {
+          "Type": "AWS::SNS::Topic",
+          "Properties": {
+            "TopicName": "customer-service-escalation",
+            "Subscription": [
+              {
+                "Endpoint": "support@example.com",
+                "Protocol": "email"
+              }
+            ]
+          }
+        },
+        "ChatbotAPI": {
+          "Type": "AWS::ApiGateway::RestApi",
+          "Properties": {
+            "Name": "CustomerServiceChatbotAPI",
+            "Description": "API Gateway for customer service chatbot"
+          }
+        },
+        "ChatbotResource": {
+          "Type": "AWS::ApiGateway::Resource",
+          "Properties": {
+            "RestApiId": {
+              "Ref": "ChatbotAPI"
+            },
+            "ParentId": {
+              "Fn::GetAtt": [
+                "ChatbotAPI",
+                "RootResourceId"
+              ]
+            },
+            "PathPart": "chat"
+          }
+        },
+        "ChatbotMethod": {
+          "Type": "AWS::ApiGateway::Method",
+          "Properties": {
+            "RestApiId": {
+              "Ref": "ChatbotAPI"
+            },
+            "ResourceId": {
+              "Ref": "ChatbotResource"
+            },
+            "HttpMethod": "POST",
+            "AuthorizationType": "AWS_IAM",
+            "Integration": {
+              "Type": "AWS_PROXY",
+              "IntegrationHttpMethod": "POST",
+              "Uri": {
+                "Fn::Sub": "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ApiGatewayHandlerFunction.Arn}/invocations"
+              }
+            }
+          }
+        },
+        "BedrockAgentRole": {
+          "Type": "AWS::IAM::Role",
+          "Properties": {
+            "AssumeRolePolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Principal": {
+                    "Service": "bedrock.amazonaws.com"
+                  },
+                  "Action": "sts:AssumeRole"
+                }
+              ]
+            },
+            "ManagedPolicyArns": [
+              "arn:aws:iam::aws:policy/AmazonBedrockFullAccess"
+            ]
+          }
+        }
+      },
+      "Outputs": {
+        "ApiEndpoint": {
+          "Description": "API Gateway endpoint URL",
+          "Value": {
+            "Fn::Sub": "https://${ChatbotAPI}.execute-api.${AWS::Region}.amazonaws.com/prod/chat"
+          }
+        }
+      }
+    }
+  },
+  "iam_policies": [
+    {
+      "policy_name": "BedrockAgentExecutionPolicy",
+      "policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Action": [
+              "bedrock:InvokeModel",
+              "bedrock:InvokeAgent"
+            ],
+            "Resource": "*"
+          },
+          {
+            "Effect": "Allow",
+            "Action": [
+              "lambda:InvokeFunction"
+            ],
+            "Resource": [
+              "arn:aws:lambda:*:*:function:customer-inquiry-handler",
+              "arn:aws:lambda:*:*:function:escalation-handler"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "policy_name": "LambdaExecutionPolicy",
+      "policy_document": {
+        "Version": "2012-10-17",
+        "Statement": [
+          {
+            "Effect": "Allow",
+            "Action": [
+              "dynamodb:GetItem",
+              "dynamodb:PutItem",
+              "dynamodb:Query",
+              "dynamodb:Scan"
+            ],
+            "Resource": [
+              "arn:aws:dynamodb:*:*:table/Orders",
+              "arn:aws:dynamodb:*:*:table/SupportTickets"
+            ]
+          },
+          {
+            "Effect": "Allow",
+            "Action": [
+              "sns:Publish"
+            ],
+            "Resource": "arn:aws:sns:*:*:customer-service-escalation"
+          },
+          {
+            "Effect": "Allow",
+            "Action": [
+              "logs:CreateLogGroup",
+              "logs:CreateLogStream",
+              "logs:PutLogEvents"
+            ],
+            "Resource": "arn:aws:logs:*:*:*"
+          }
+        ]
+      }
+    }
+  ],
+  "deployment_scripts": {
+    "deploy.sh": "#!/bin/bash\nset -e\n\necho 'Deploying Customer Service Chatbot...'\n\n# Package Lambda functions\ncd lambda/customer-inquiry && zip -r ../../inquiry.zip .\ncd ../escalation && zip -r ../../escalation.zip .\ncd ../api-gateway && zip -r ../../api.zip .\ncd ../..\n\n# Deploy CloudFormation stack\naws cloudformation deploy \\\n  --template-file cloudformation/main.yaml \\\n  --stack-name customer-service-chatbot \\\n  --capabilities CAPABILITY_IAM\n\n# Upload Lambda code\naws lambda update-function-code --function-name customer-inquiry-handler --zip-file fileb://inquiry.zip\naws lambda update-function-code --function-name escalation-handler --zip-file fileb://escalation.zip\naws lambda update-function-code --function-name api-gateway-handler --zip-file fileb://api.zip\n\necho 'Deployment complete!'",
+    "setup.py": "#!/usr/bin/env python3\nimport boto3\nimport json\n\ndef setup_bedrock_agent():\n    bedrock = boto3.client('bedrock-agent')\n    \n    # Create Bedrock Agent\n    agent_response = bedrock.create_agent(\n        agentName='CustomerServiceEscalationBot',\n        foundationModel='anthropic.claude-3-sonnet-20240229-v1:0',\n        instruction='You are a helpful customer service agent...',\n        agentResourceRoleArn='arn:aws:iam::ACCOUNT:role/BedrockAgentRole'\n    )\n    \n    agent_id = agent_response['agent']['agentId']\n    print(f'Agent created: {agent_id}')\n    \n    # Create action groups\n    bedrock.create_agent_action_group(\n        agentId=agent_id,\n        actionGroupName='customer_inquiry_actions',\n        actionGroupExecutor={'lambda': 'arn:aws:lambda:REGION:ACCOUNT:function:customer-inquiry-handler'},\n        apiSchema={'payload': json.dumps({'openapi': '3.0.0'})}\n    )\n    \n    print('Setup complete!')\n\nif __name__ == '__main__':\n    setup_bedrock_agent()",
+    "test.sh": "#!/bin/bash\n\n# Test API Gateway endpoint\ncurl -X POST https://API_ID.execute-api.REGION.amazonaws.com/prod/chat \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"message\": \"What is the status of order 12345?\", \"sessionId\": \"test-session\"}'\n\necho '\\nTest complete!'"
+  }
+}

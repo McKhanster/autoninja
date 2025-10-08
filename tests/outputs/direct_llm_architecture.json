@@ -1,0 +1,413 @@
+{
+  "selected_services": [
+    {
+      "service": "Amazon Bedrock",
+      "purpose": "AI-powered natural language understanding and response generation with multi-language support",
+      "priority": "high"
+    },
+    {
+      "service": "AWS Lambda",
+      "purpose": "Serverless compute for orchestration, business logic, and API processing",
+      "priority": "high"
+    },
+    {
+      "service": "Amazon API Gateway",
+      "purpose": "RESTful API endpoints for chatbot interactions with throttling and authentication",
+      "priority": "high"
+    },
+    {
+      "service": "Amazon DynamoDB",
+      "purpose": "Store conversation history, session state, and customer context",
+      "priority": "high"
+    },
+    {
+      "service": "Amazon Connect",
+      "purpose": "Human escalation and contact center integration",
+      "priority": "high"
+    },
+    {
+      "service": "Amazon Comprehend",
+      "purpose": "Language detection and sentiment analysis for intent classification",
+      "priority": "medium"
+    },
+    {
+      "service": "Amazon EventBridge",
+      "purpose": "Event-driven orchestration for escalations and notifications",
+      "priority": "medium"
+    },
+    {
+      "service": "Amazon S3",
+      "purpose": "Store chat logs, training data, and product information documents",
+      "priority": "medium"
+    },
+    {
+      "service": "AWS Secrets Manager",
+      "purpose": "Secure storage of API keys, database credentials, and third-party integrations",
+      "priority": "medium"
+    },
+    {
+      "service": "Amazon CloudWatch",
+      "purpose": "Monitoring, logging, and alerting for system health and performance",
+      "priority": "medium"
+    },
+    {
+      "service": "Amazon SNS",
+      "purpose": "Notifications for escalations and system alerts",
+      "priority": "low"
+    },
+    {
+      "service": "AWS WAF",
+      "purpose": "Web application firewall for API Gateway protection",
+      "priority": "medium"
+    },
+    {
+      "service": "Amazon ElastiCache (Redis)",
+      "purpose": "Caching layer for frequently accessed product data and session management",
+      "priority": "low"
+    }
+  ],
+  "architecture_blueprint": {
+    "deployment_model": "serverless",
+    "region_strategy": "multi-region active-passive for high availability",
+    "service_relationships": {
+      "api_gateway": [
+        "lambda_orchestrator",
+        "waf"
+      ],
+      "lambda_orchestrator": [
+        "bedrock",
+        "dynamodb",
+        "comprehend",
+        "elasticache"
+      ],
+      "lambda_intent_handler": [
+        "dynamodb",
+        "s3",
+        "external_order_api"
+      ],
+      "lambda_escalation": [
+        "connect",
+        "eventbridge",
+        "sns"
+      ],
+      "bedrock": [
+        "s3_knowledge_base"
+      ],
+      "eventbridge": [
+        "lambda_escalation",
+        "sns"
+      ],
+      "comprehend": [
+        "bedrock"
+      ],
+      "connect": [
+        "lambda_callback"
+      ]
+    },
+    "data_flow": "User sends message to API Gateway -> WAF validates request -> API Gateway triggers Lambda orchestrator -> Comprehend detects language and sentiment -> Lambda queries ElastiCache for session data, falls back to DynamoDB -> Based on intent, Lambda routes to specialized handlers (product inquiry, order status, troubleshooting) -> Bedrock generates contextual response using knowledge base from S3 -> Response stored in DynamoDB for conversation history -> If escalation needed, EventBridge triggers Connect integration -> Response returned to user via API Gateway. All interactions logged to CloudWatch and S3 for analytics.",
+    "scalability": "Auto-scaling via Lambda concurrency (up to 1000 concurrent executions), DynamoDB on-demand capacity, API Gateway handles 10,000+ requests per second",
+    "availability": "99.95% SLA with multi-AZ deployment, Lambda automatic retries, DynamoDB global tables for disaster recovery"
+  },
+  "security_architecture": {
+    "iam_design": {
+      "roles": [
+        "ChatbotLambdaExecutionRole",
+        "BedrockInvokeRole",
+        "DynamoDBAccessRole",
+        "ConnectIntegrationRole",
+        "EventBridgeInvokeRole"
+      ],
+      "policies": [
+        "BedrockInvokeModelPolicy",
+        "DynamoDBReadWritePolicy",
+        "S3ReadOnlyPolicy",
+        "SecretsManagerReadPolicy",
+        "CloudWatchLogsPolicy",
+        "ComprehendDetectPolicy",
+        "ConnectStartOutboundVoiceContactPolicy",
+        "SNSPublishPolicy"
+      ],
+      "least_privilege": "Each Lambda function has specific IAM role with minimal permissions required"
+    },
+    "encryption": {
+      "at_rest": "AWS KMS with customer-managed keys for DynamoDB, S3, and Secrets Manager",
+      "in_transit": "TLS 1.3 for all API communications, VPC endpoints for service-to-service communication"
+    },
+    "authentication": {
+      "api_level": "API Gateway with AWS IAM authentication and API keys",
+      "user_level": "JWT tokens with Amazon Cognito for customer identity",
+      "service_level": "IAM roles and resource policies"
+    },
+    "compliance": {
+      "data_privacy": "PII detection and masking using Comprehend, GDPR-compliant data retention policies",
+      "audit": "CloudTrail enabled for all API calls, S3 versioning for audit logs",
+      "network": "VPC endpoints for private connectivity, Security Groups with minimal ingress rules"
+    },
+    "waf_rules": [
+      "Rate limiting (100 requests per minute per IP)",
+      "SQL injection protection",
+      "XSS protection",
+      "Geo-blocking for restricted regions",
+      "Bot detection and mitigation"
+    ]
+  },
+  "iac_templates": {
+    "cloudformation": {
+      "template_version": "2010-09-09",
+      "description": "Customer Service Chatbot Infrastructure",
+      "resources": [
+        "AWS::ApiGateway::RestApi",
+        "AWS::ApiGateway::Deployment",
+        "AWS::ApiGateway::Stage",
+        "AWS::Lambda::Function (Orchestrator)",
+        "AWS::Lambda::Function (IntentHandler)",
+        "AWS::Lambda::Function (Escalation)",
+        "AWS::Lambda::Permission",
+        "AWS::DynamoDB::Table (ConversationHistory)",
+        "AWS::DynamoDB::Table (SessionState)",
+        "AWS::S3::Bucket (ChatLogs)",
+        "AWS::S3::Bucket (KnowledgeBase)",
+        "AWS::IAM::Role (LambdaExecution)",
+        "AWS::IAM::Policy",
+        "AWS::KMS::Key",
+        "AWS::KMS::Alias",
+        "AWS::SecretsManager::Secret",
+        "AWS::CloudWatch::LogGroup",
+        "AWS::SNS::Topic",
+        "AWS::Events::Rule",
+        "AWS::WAFv2::WebACL",
+        "AWS::ElastiCache::CacheCluster"
+      ],
+      "parameters": [
+        "Environment",
+        "BedrockModelId",
+        "ConnectInstanceId",
+        "ApiKeyValue"
+      ],
+      "outputs": [
+        "ApiGatewayEndpoint",
+        "DynamoDBTableName",
+        "S3BucketName",
+        "LambdaFunctionArn"
+      ]
+    },
+    "terraform_alternative": {
+      "provider": "hashicorp/aws",
+      "modules": [
+        "api-gateway",
+        "lambda-functions",
+        "dynamodb-tables",
+        "bedrock-config",
+        "connect-integration",
+        "monitoring"
+      ]
+    }
+  },
+  "cost_estimation": {
+    "monthly_estimate": 1850,
+    "assumptions": "100,000 conversations/month, avg 10 messages per conversation, 3-minute avg conversation duration",
+    "breakdown": {
+      "amazon_bedrock": 800,
+      "aws_lambda": 250,
+      "amazon_dynamodb": 180,
+      "amazon_api_gateway": 150,
+      "amazon_connect": 300,
+      "amazon_comprehend": 80,
+      "amazon_s3": 30,
+      "amazon_elasticache": 40,
+      "aws_secrets_manager": 5,
+      "amazon_cloudwatch": 10,
+      "amazon_sns": 3,
+      "aws_waf": 2
+    },
+    "cost_optimization": [
+      "Use DynamoDB on-demand pricing for variable traffic",
+      "Implement Lambda reserved concurrency during peak hours",
+      "Enable S3 Intelligent-Tiering for log storage",
+      "Use ElastiCache only during business hours with scheduled scaling",
+      "Implement API Gateway caching to reduce Lambda invocations",
+      "Use Bedrock batch inference for non-real-time analytics"
+    ],
+    "scaling_costs": {
+      "at_500k_conversations": 7200,
+      "at_1m_conversations": 13500
+    }
+  },
+  "integration_design": {
+    "api_endpoints": [
+      {
+        "path": "/v1/chat/message",
+        "method": "POST",
+        "purpose": "Send user message and receive chatbot response"
+      },
+      {
+        "path": "/v1/chat/session",
+        "method": "POST",
+        "purpose": "Initialize new chat session"
+      },
+      {
+        "path": "/v1/chat/history",
+        "method": "GET",
+        "purpose": "Retrieve conversation history"
+      },
+      {
+        "path": "/v1/chat/escalate",
+        "method": "POST",
+        "purpose": "Request human agent escalation"
+      },
+      {
+        "path": "/v1/orders/{orderId}",
+        "method": "GET",
+        "purpose": "Query order status"
+      },
+      {
+        "path": "/v1/products/search",
+        "method": "GET",
+        "purpose": "Search product information"
+      },
+      {
+        "path": "/v1/troubleshoot",
+        "method": "POST",
+        "purpose": "Technical troubleshooting assistance"
+      },
+      {
+        "path": "/v1/health",
+        "method": "GET",
+        "purpose": "System health check"
+      }
+    ],
+    "authentication": {
+      "primary": "AWS Cognito with JWT tokens",
+      "fallback": "API Gateway API keys for partner integrations",
+      "admin": "AWS IAM with MFA"
+    },
+    "request_format": {
+      "message_endpoint": {
+        "session_id": "string (UUID)",
+        "message": "string",
+        "language": "string (ISO 639-1 code, optional)",
+        "context": {
+          "customer_id": "string",
+          "previous_interactions": "array"
+        }
+      }
+    },
+    "response_format": {
+      "success": {
+        "session_id": "string",
+        "response": "string",
+        "intent": "string",
+        "confidence": "float",
+        "suggestions": "array",
+        "requires_escalation": "boolean"
+      }
+    },
+    "external_integrations": [
+      {
+        "system": "Order Management System",
+        "protocol": "REST API",
+        "purpose": "Real-time order status retrieval"
+      },
+      {
+        "system": "Product Catalog",
+        "protocol": "GraphQL",
+        "purpose": "Product information and inventory"
+      },
+      {
+        "system": "CRM System",
+        "protocol": "REST API with OAuth 2.0",
+        "purpose": "Customer profile and history"
+      },
+      {
+        "system": "Ticketing System",
+        "protocol": "Webhook",
+        "purpose": "Create support tickets during escalation"
+      }
+    ],
+    "webhook_callbacks": [
+      {
+        "event": "agent_available",
+        "purpose": "Notify customer when human agent joins"
+      },
+      {
+        "event": "conversation_ended",
+        "purpose": "Send satisfaction survey"
+      }
+    ]
+  },
+  "operational_excellence": {
+    "monitoring": {
+      "metrics": [
+        "API Gateway 4xx/5xx errors",
+        "Lambda duration and throttles",
+        "Bedrock invocation latency",
+        "DynamoDB read/write capacity",
+        "Conversation resolution rate",
+        "Escalation rate",
+        "Average response time"
+      ],
+      "alarms": [
+        "API error rate > 5%",
+        "Lambda concurrent executions > 800",
+        "DynamoDB throttling events",
+        "Escalation rate > 20%",
+        "Response time > 3 seconds"
+      ],
+      "dashboards": [
+        "Real-time conversation metrics",
+        "System health overview",
+        "Cost tracking",
+        "Customer satisfaction scores"
+      ]
+    },
+    "logging": {
+      "application_logs": "CloudWatch Logs with 30-day retention",
+      "access_logs": "S3 with 1-year retention and Glacier archival",
+      "audit_logs": "CloudTrail with 7-year retention for compliance"
+    },
+    "disaster_recovery": {
+      "rpo": "1 hour",
+      "rto": "2 hours",
+      "backup_strategy": "DynamoDB point-in-time recovery, S3 versioning and cross-region replication",
+      "failover": "Route53 health checks with automatic failover to secondary region"
+    }
+  },
+  "implementation_phases": {
+    "phase_1": {
+      "duration": "4 weeks",
+      "deliverables": [
+        "Core infrastructure setup",
+        "API Gateway and Lambda functions",
+        "Bedrock integration with single language",
+        "DynamoDB schema and basic chat flow"
+      ]
+    },
+    "phase_2": {
+      "duration": "3 weeks",
+      "deliverables": [
+        "Multi-language support with Comprehend",
+        "Product and order inquiry integrations",
+        "Session management and history",
+        "ElastiCache implementation"
+      ]
+    },
+    "phase_3": {
+      "duration": "3 weeks",
+      "deliverables": [
+        "Amazon Connect integration for escalations",
+        "Advanced intent recognition",
+        "Troubleshooting workflows",
+        "Comprehensive monitoring and alerting"
+      ]
+    },
+    "phase_4": {
+      "duration": "2 weeks",
+      "deliverables": [
+        "Security hardening and WAF rules",
+        "Load testing and performance optimization",
+        "Documentation and runbooks",
+        "Production deployment"
+      ]
+    }
+  }
+}

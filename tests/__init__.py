@@ -1,1 +1,1 @@
-"""Test suite for AutoNinja system."""
+# Test package for AutoNinja
