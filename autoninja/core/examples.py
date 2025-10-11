@@ -100,9 +100,9 @@ async def example_model_fallback():
         
         # List of models to try in order of preference
         preferred_models = [
-            BedrockModelId.CLAUDE_OPUS_4_1,      # First choice for high quality
+            BedrockModelId.CLAUDE_SONNET_4_5,      # First choice for high quality
             BedrockModelId.CLAUDE_SONNET_4_5,    # Fallback for good performance
-            BedrockModelId.CLAUDE_HAIKU_3        # Last resort for basic functionality
+            BedrockModelId.CLAUDE_SONNET_4_5        # Last resort for basic functionality
         ]
         
         messages = [

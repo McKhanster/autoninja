@@ -146,6 +146,38 @@ def setup_logging(
         )
         root_logger.addHandler(code_generator_handler)
         
+        # Quality Validator specific log
+        quality_validator_log_file = log_dir / "quality_validator.log"
+        quality_validator_handler = logging.handlers.RotatingFileHandler(
+            quality_validator_log_file,
+            maxBytes=max_file_size,
+            backupCount=backup_count
+        )
+        quality_validator_handler.setLevel(numeric_level)
+        quality_validator_handler.setFormatter(detailed_formatter)
+        
+        # Add filter for quality validator logs
+        quality_validator_handler.addFilter(
+            lambda record: 'quality_validator' in record.name
+        )
+        root_logger.addHandler(quality_validator_handler)
+        
+        # Deployment Manager specific log
+        deployment_manager_log_file = log_dir / "deployment_manager.log"
+        deployment_manager_handler = logging.handlers.RotatingFileHandler(
+            deployment_manager_log_file,
+            maxBytes=max_file_size,
+            backupCount=backup_count
+        )
+        deployment_manager_handler.setLevel(numeric_level)
+        deployment_manager_handler.setFormatter(detailed_formatter)
+        
+        # Add filter for deployment manager logs
+        deployment_manager_handler.addFilter(
+            lambda record: 'deployment_manager' in record.name
+        )
+        root_logger.addHandler(deployment_manager_handler)
+        
         # Bedrock inference log (for raw requests/responses)
         bedrock_log_file = log_dir / "bedrock_inference.log"
         bedrock_handler = logging.handlers.RotatingFileHandler(

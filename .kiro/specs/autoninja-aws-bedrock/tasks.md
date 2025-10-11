@@ -136,8 +136,9 @@
   - Log pipeline handoff data and verify response structure is compatible with the next agent in the pipeline
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 11.1, 11.2, 11.3, 11.5, 11.6_
 
-- [ ] 6.4 Implement Quality Validator Agent
-  - Create LangChain agent with validation tools
+- [x] 6.4 Implement Quality Validator Agent
+  - Read and understand the implementation for the Requirements Analyst,  Solution Architect and Code Generator Agent
+  - Based on your understand and the observed pattern of the three previous agents. create LangChain agent with validation tools
   - Implement comprehensive code and configuration analysis
   - Add security scanning and compliance validation logic
   - Make inference to the model with the response from Code Generator Agent
@@ -147,8 +148,10 @@
   - Log pipeline handoff data and verify response structure is compatible with the next agent in the pipeline
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 11.1, 11.2, 11.3, 11.5, 11.6_
 
-- [ ] 6.5 Implement Deployment Manager Agent
-  - Create LangChain agent with deployment tools
+- [x] 6.5 Implement Deployment Manager Agent
+- IMPORTANT - MOCKING LLM INFERENCE IS NOT ALLOWED. CONFIGURE FOR REAL BEDROCK INFERENCE. 
+- Read and understand the implementation for the Requirements Analyst,  Solution Architect, Code Generator, and Quality Validator Agent
+  - Based on your understand and the observed pattern of the three previous agents. create LangChain agent with deployment tools
   - Implement CloudFormation deployment automation
   - Add monitoring setup and operational documentation generation
   - Make inference to the model with the response from Quality Validator Agent
@@ -156,17 +159,9 @@
   - Log both raw request and raw response with execution IDs and timestamps
   - Log all agent input data, processing steps, and output data
   - Log final pipeline results and deployment artifacts
+  - Ensure all tasks are completed and tested before marking 6.5 as complete. 
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 11.1, 11.2, 11.3, 11.5, 11.6_
 
-- [ ] 6.6 Implement Comprehensive Logging System
-  - Update logging configuration to create dedicated log files for each agent
-  - Implement structured logging with execution IDs, session IDs, and timestamps
-  - Create log rotation and retention policies
-  - Add Bedrock inference logging with raw request/response capture
-  - Implement pipeline logging for multi-agent orchestration
-  - Create error logging with detailed context and stack traces
-  - Add log file management and archival to S3
-  - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7_
 
 - [ ] 7. Create LangGraph workflow orchestration
 - [ ] 7.1 Implement main AutoNinja workflow graph

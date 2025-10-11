@@ -150,10 +150,10 @@ def test_model_selection_logic():
         high_model = manager.select_model_by_complexity(TaskComplexity.HIGH)
         critical_model = manager.select_model_by_complexity(TaskComplexity.CRITICAL)
         
-        assert low_model == BedrockModelId.CLAUDE_HAIKU_3
+        assert low_model == BedrockModelId.CLAUDE_SONNET_4_5
         assert medium_model == BedrockModelId.CLAUDE_SONNET_4_5
-        assert high_model == BedrockModelId.CLAUDE_OPUS_4_1
-        assert critical_model == BedrockModelId.CLAUDE_OPUS_4_1
+        assert high_model == BedrockModelId.CLAUDE_SONNET_4_5
+        assert critical_model == BedrockModelId.CLAUDE_SONNET_4_5
         
         print("✅ Model selection logic works correctly")
         print(f"   LOW -> {low_model.value}")

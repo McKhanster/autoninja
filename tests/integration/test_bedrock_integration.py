@@ -69,10 +69,10 @@ class TestBedrockIntegration:
             critical_model = manager.select_model_by_complexity(TaskComplexity.CRITICAL)
             
             # Verify model selection logic
-            assert low_model == BedrockModelId.CLAUDE_HAIKU_3
+            assert low_model == BedrockModelId.CLAUDE_SONNET_4_5
             assert medium_model == BedrockModelId.CLAUDE_SONNET_4_5
-            assert high_model == BedrockModelId.CLAUDE_OPUS_4_1
-            assert critical_model == BedrockModelId.CLAUDE_OPUS_4_1
+            assert high_model == BedrockModelId.CLAUDE_SONNET_4_5
+            assert critical_model == BedrockModelId.CLAUDE_SONNET_4_5
             
         except Exception as e:
             pytest.skip(f"Bedrock service not available or configured: {str(e)}")
@@ -126,7 +126,7 @@ class TestBedrockIntegration:
             manager = get_bedrock_client_manager()
             
             # Use the fastest model for testing
-            model_id = BedrockModelId.CLAUDE_HAIKU_3
+            model_id = BedrockModelId.CLAUDE_SONNET_4_5
             
             # Check if model is available
             available_models = manager.get_available_models()
@@ -161,7 +161,7 @@ class TestBedrockIntegration:
             manager = get_bedrock_client_manager()
             
             # Get a circuit breaker for testing
-            model_id = BedrockModelId.CLAUDE_HAIKU_3
+            model_id = BedrockModelId.CLAUDE_SONNET_4_5
             circuit_breaker = manager._circuit_breakers[model_id.value]
             
             # Initially should be closed

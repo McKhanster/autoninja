@@ -145,10 +145,10 @@ class TestBedrockClientManager:
                 manager = BedrockClientManager()
             
             # Test complexity mappings
-            assert manager.select_model_by_complexity(TaskComplexity.LOW) == BedrockModelId.CLAUDE_HAIKU_3
+            assert manager.select_model_by_complexity(TaskComplexity.LOW) == BedrockModelId.CLAUDE_SONNET_4_5
             assert manager.select_model_by_complexity(TaskComplexity.MEDIUM) == BedrockModelId.CLAUDE_SONNET_4_5
-            assert manager.select_model_by_complexity(TaskComplexity.HIGH) == BedrockModelId.CLAUDE_OPUS_4_1
-            assert manager.select_model_by_complexity(TaskComplexity.CRITICAL) == BedrockModelId.CLAUDE_OPUS_4_1
+            assert manager.select_model_by_complexity(TaskComplexity.HIGH) == BedrockModelId.CLAUDE_SONNET_4_5
+            assert manager.select_model_by_complexity(TaskComplexity.CRITICAL) == BedrockModelId.CLAUDE_SONNET_4_5
     
     @patch('autoninja.core.bedrock_client.boto3.Session')
     @patch('autoninja.core.bedrock_client.ChatBedrock')

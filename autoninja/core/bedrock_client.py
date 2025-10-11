@@ -36,8 +36,6 @@ class TaskComplexity(Enum):
 class BedrockModelId(Enum):
     """Available Bedrock model identifiers."""
     CLAUDE_SONNET_4_5 = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-    CLAUDE_OPUS_4_1 = "us.anthropic.claude-opus-4-1-20250805-v1:0"
-    CLAUDE_HAIKU_3 = "us.anthropic.claude-3-haiku-20240307-v1:0"
 
 
 @dataclass
@@ -148,10 +146,10 @@ class BedrockClientManager:
             BedrockModelId: The selected model identifier
         """
         model_mapping = {
-            TaskComplexity.LOW: BedrockModelId.CLAUDE_HAIKU_3,
+            TaskComplexity.LOW: BedrockModelId.CLAUDE_SONNET_4_5,
             TaskComplexity.MEDIUM: BedrockModelId.CLAUDE_SONNET_4_5,
-            TaskComplexity.HIGH: BedrockModelId.CLAUDE_OPUS_4_1,
-            TaskComplexity.CRITICAL: BedrockModelId.CLAUDE_OPUS_4_1
+            TaskComplexity.HIGH: BedrockModelId.CLAUDE_SONNET_4_5,
+            TaskComplexity.CRITICAL: BedrockModelId.CLAUDE_SONNET_4_5
         }
         
         selected_model = model_mapping.get(complexity, BedrockModelId.CLAUDE_SONNET_4_5)
