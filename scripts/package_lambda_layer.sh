@@ -32,7 +32,10 @@ echo "Size: $(du -h build/autoninja-shared-layer.zip | cut -f1)"
 # Upload to S3 if bucket name is provided
 if [ ! -z "$S3_BUCKET" ]; then
     echo "Uploading to S3 bucket: $S3_BUCKET"
-    aws s3 cp build/autoninja-shared-layer.zip "s3://$S3_BUCKET/layers/autoninja-shared-layer.zip"
+    aws s3 cp build/autoninja-shared-layer.zip "s3://$S3_BUCKET/layers/autoninja-shared-layer.zip" \
+        --sse aws:kms \
+        ${AWS_REGION:+--region "$AWS_REGION"} \
+        ${AWS_PROFILE:+--profile "$AWS_PROFILE"}
     echo "Upload complete!"
 else
     echo "To upload to S3, set S3_BUCKET environment variable and run again"

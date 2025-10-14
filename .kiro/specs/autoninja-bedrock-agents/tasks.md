@@ -225,14 +225,14 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
   - Redeploy CloudFormation stack with updated schemas
   - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6_
 
-- [ ] 6. Implement Requirements Analyst Lambda function
-  - [ ] 6.1 Create Lambda handler with proper event parsing
+- [x] 6. Implement Requirements Analyst Lambda function
+  - [x] 6.1 Create Lambda handler with proper event parsing
     - Parse Bedrock Agent input event format
     - Extract job_name, user_request, and other parameters
     - Route to appropriate action handler based on apiPath
     - _Requirements: 2.1, 10.1, 10.2_
   
-  - [ ] 6.2 Implement extract_requirements action
+  - [x] 6.2 Implement extract_requirements action
     - Log raw input to DynamoDB immediately
     - Extract requirements for ALL sub-agents (Code Generator, Solution Architect, Quality Validator, Deployment Manager)
     - Generate comprehensive requirements JSON
@@ -241,7 +241,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response to Bedrock Agent
     - _Requirements: 2.1, 2.4, 2.5, 7.2, 7.3, 7.4, 7.5, 7.6, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 6.3 Implement analyze_complexity action
+  - [x] 6.3 Implement analyze_complexity action
     - Log raw input to DynamoDB immediately
     - Analyze requirements complexity
     - Generate complexity assessment
@@ -250,7 +250,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response
     - _Requirements: 2.2, 7.2, 7.3, 7.6, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 6.4 Implement validate_requirements action
+  - [x] 6.4 Implement validate_requirements action
     - Log raw input to DynamoDB immediately
     - Validate requirements completeness
     - Identify missing items
@@ -259,20 +259,23 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response
     - _Requirements: 2.3, 7.2, 7.3, 7.6, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 6.5 Implement error handling
+  - [x] 6.5 Implement error handling
     - Add try-catch blocks for all actions
     - Log errors to DynamoDB with error_message field
     - Return structured error responses
     - _Requirements: 10.4, 10.11_
 
 - [ ] 7. Implement Code Generator Lambda function
+  - Read about Bedrock Agents and AgentCore from the AWS Documentation MCP.
   - [ ] 7.1 Create Lambda handler with proper event parsing
+    - Review Requirement Analyst's implementation to understand the pattern. 
     - Parse Bedrock Agent input event format
     - Extract job_name, requirements, and other parameters
     - Route to appropriate action handler based on apiPath
     - _Requirements: 4.1, 10.1, 10.2_
   
   - [ ] 7.2 Implement generate_lambda_code action
+   - Review Requirement Analyst's implementation to understand the pattern. 
     - Log raw input to DynamoDB immediately
     - Generate Python Lambda function code with error handling
     - Generate requirements.txt with dependencies
@@ -281,7 +284,8 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response to Bedrock Agent
     - _Requirements: 4.1, 4.4, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 6.3 Implement generate_agent_config action
+  - [ ] 7.3 Implement generate_agent_config action
+   - Review Requirement Analyst's implementation to understand the pattern. 
     - Log raw input to DynamoDB immediately
     - Generate Bedrock Agent configuration JSON
     - Include agent name, instructions, foundation model, action groups
@@ -290,7 +294,8 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response
     - _Requirements: 4.2, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 6.4 Implement generate_openapi_schema action
+  - [ ] 7.4 Implement generate_openapi_schema action
+   - Review Requirement Analyst's implementation to understand the pattern. 
     - Log raw input to DynamoDB immediately
     - Generate OpenAPI 3.0 schema for action groups
     - Include all endpoints, parameters, request/response schemas
@@ -299,20 +304,23 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response
     - _Requirements: 4.3, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 6.5 Implement error handling
+  - [ ] 7.5 Implement error handling
+   - Review Requirement Analyst's implementation to understand the pattern. 
     - Add try-catch blocks for all actions
     - Log errors to DynamoDB
     - Return structured error responses
     - _Requirements: 10.4, 10.11_
+  - [ ] 7.6 Test implementation
+    - Review Requirement Analyst's test to understand the pattern, tests/requirement_analyst/test_requirements_analyst_agent.py
 
-- [ ] 7. Implement Solution Architect Lambda function
-  - [ ] 7.1 Create Lambda handler with proper event parsing
+- [ ] 8. Implement Solution Architect Lambda function
+  - [ ] 8.1 Create Lambda handler with proper event parsing
     - Parse Bedrock Agent input event format
     - Extract job_name, requirements, code_file_references, and other parameters
     - Route to appropriate action handler based on apiPath
     - _Requirements: 3.1, 10.1, 10.2_
   
-  - [ ] 7.2 Implement design_architecture action
+  - [ ] 8.2 Implement design_architecture action
     - Log raw input to DynamoDB immediately
     - Review code files from Code Generator (retrieve from S3)
     - Design AWS architecture based on requirements and code
@@ -322,7 +330,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response to Bedrock Agent
     - _Requirements: 3.1, 3.4, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 7.3 Implement select_services action
+  - [ ] 8.3 Implement select_services action
     - Log raw input to DynamoDB immediately
     - Select appropriate AWS services based on requirements
     - Generate service selection rationale
@@ -331,7 +339,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response
     - _Requirements: 3.2, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 7.4 Implement generate_iac action
+  - [ ] 8.4 Implement generate_iac action
     - Log raw input to DynamoDB immediately
     - Generate CloudFormation template referencing Lambda code files
     - Include Bedrock Agent configuration from Code Generator
@@ -342,20 +350,20 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response
     - _Requirements: 3.3, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 7.5 Implement error handling
+  - [ ] 8.5 Implement error handling
     - Add try-catch blocks for all actions
     - Log errors to DynamoDB
     - Return structured error responses
     - _Requirements: 10.4, 10.11_
 
-- [ ] 8. Implement Quality Validator Lambda function
-  - [ ] 8.1 Create Lambda handler with proper event parsing
+- [ ] 9. Implement Quality Validator Lambda function
+  - [ ] 9.1 Create Lambda handler with proper event parsing
     - Parse Bedrock Agent input event format
     - Extract job_name, code, architecture, and other parameters
     - Route to appropriate action handler based on apiPath
     - _Requirements: 5.1, 10.1, 10.2_
   
-  - [ ] 8.2 Implement validate_code action
+  - [ ] 9.2 Implement validate_code action
     - Log raw input to DynamoDB immediately
     - Perform code quality validation (syntax, error handling, logging, structure)
     - Calculate quality score
@@ -365,7 +373,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response with is_valid, issues, quality_score
     - _Requirements: 5.1, 5.4, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8, 17.2, 17.3_
   
-  - [ ] 8.3 Implement security_scan action
+  - [ ] 9.3 Implement security_scan action
     - Log raw input to DynamoDB immediately
     - Scan for hardcoded credentials
     - Validate IAM permissions follow least-privilege
@@ -376,7 +384,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response with vulnerabilities and risk_level
     - _Requirements: 5.2, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 8.4 Implement compliance_check action
+  - [ ] 9.4 Implement compliance_check action
     - Log raw input to DynamoDB immediately
     - Check AWS best practices compliance
     - Check Lambda best practices compliance
@@ -386,21 +394,21 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response with compliant flag and violations
     - _Requirements: 5.3, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 8.5 Implement error handling
+  - [ ] 9.5 Implement error handling
     - Add try-catch blocks for all actions
     - Log errors to DynamoDB
     - Return structured error responses
     - _Requirements: 10.4, 10.11_
 
-- [ ] 9. Implement Deployment Manager Lambda function
-  - [ ] 9.1 Create Lambda handler with proper event parsing
+- [ ] 10. Implement Deployment Manager Lambda function
+  - [ ] 10.1 Create Lambda handler with proper event parsing
     - Parse Bedrock Agent input event format
     - Extract job_name, requirements, code, architecture, validation_status, and other parameters
     - Check validation_status before proceeding (must be green light)
     - Route to appropriate action handler based on apiPath
     - _Requirements: 6.1, 10.1, 10.2_
   
-  - [ ] 9.2 Implement generate_cloudformation action
+  - [ ] 10.2 Implement generate_cloudformation action
     - Log raw input to DynamoDB immediately
     - Gather all artifacts from S3 (requirements, code, architecture, validation)
     - Generate complete CloudFormation template including Lambda functions, Bedrock Agent, action groups, IAM roles
@@ -409,7 +417,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response with template
     - _Requirements: 6.1, 6.2, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 9.3 Implement deploy_stack action
+  - [ ] 10.3 Implement deploy_stack action
     - Log raw input to DynamoDB immediately
     - Deploy CloudFormation stack to AWS using boto3
     - Wait for stack creation to complete
@@ -419,7 +427,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response with stack_id, status, outputs
     - _Requirements: 6.2, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 9.4 Implement configure_agent action
+  - [ ] 10.4 Implement configure_agent action
     - Log raw input to DynamoDB immediately
     - Create Bedrock Agent using boto3
     - Configure action groups with OpenAPI schemas
@@ -429,7 +437,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response with agent_id, agent_arn, alias_id
     - _Requirements: 6.3, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 9.5 Implement test_deployment action
+  - [ ] 10.5 Implement test_deployment action
     - Log raw input to DynamoDB immediately
     - Test deployed agent with sample inputs using InvokeAgent API
     - Verify agent responds correctly
@@ -438,14 +446,14 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return formatted response with test_results and is_successful
     - _Requirements: 6.4, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 9.6 Implement error handling
+  - [ ] 10.6 Implement error handling
     - Add try-catch blocks for all actions
     - Log errors to DynamoDB
     - Return structured error responses
     - _Requirements: 10.4, 10.11_
 
-- [ ] 10. Create CloudFormation template for AutoNinja system
-  - [ ] 10.1 Define template parameters
+- [ ] 11. Create CloudFormation template for AutoNinja system
+  - [ ] 11.1 Define template parameters
     - Environment (production/staging/dev)
     - BedrockModel (foundation model ID)
     - DynamoDBBillingMode (PAY_PER_REQUEST or PROVISIONED)

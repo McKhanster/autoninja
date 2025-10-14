@@ -128,7 +128,7 @@ class DynamoDBClient:
                     'timestamp': timestamp
                 },
                 UpdateExpression="""
-                    SET response = :response,
+                    SET #response = :response,
                         tokens_used = :tokens,
                         cost_estimate = :cost,
                         duration_seconds = :duration,
@@ -136,6 +136,7 @@ class DynamoDBClient:
                         #status = :status
                 """,
                 ExpressionAttributeNames={
+                    '#response': 'response',
                     '#status': 'status'
                 },
                 ExpressionAttributeValues={
