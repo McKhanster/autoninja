@@ -664,46 +664,5 @@ MIT License - see LICENSE file for details.
 
 
 <!-- 
-eval "$(ssh-agent -s)"
-ssh-add ~/.ssh/mckhanster
-ssh -T git@github.com
-
-
-aws sso login --profile AdministratorAccess-784327326356
-
-export AWS_REGION=us-east-2 &&
-export AWS_ACCOUNT_ID=784327326356 && 
-export AWS_PROFILE=AdministratorAccess-784327326356  
-
-export AWS_REGION=us-east-2 && export AWS_PROFILE=AdministratorAccess-784327326356 && aws cloudformation create-stack \
-  --stack-name autoninja-production \
-  --template-url https://autoninja-cfn-templates-784327326356.s3.us-east-2.amazonaws.com/autoninja-complete.yaml \
-  --parameters \
-    ParameterKey=Environment,ParameterValue=production \
-    ParameterKey=BedrockModel,ParameterValue=anthropic.claude-sonnet-4-5-20250929-v1:0 \
-    ParameterKey=DynamoDBBillingMode,ParameterValue=PAY_PER_REQUEST \
-    ParameterKey=LogRetentionDays,ParameterValue=30 \
-  --capabilities CAPABILITY_NAMED_IAM \
-  --region us-east-2
-
-export AWS_REGION=us-east-2 &&
-export AWS_ACCOUNT_ID=784327326356 && 
-export AWS_PROFILE=AdministratorAccess-784327326356   && aws cloudformation update-stack \
-  --stack-name autoninja-production \
-  --template-body file://infrastructure/cloudformation/autoninja-complete.yaml \
-  --capabilities CAPABILITY_NAMED_IAM
-
-export AWS_REGION=us-east-2 && export AWS_PROFILE=AdministratorAccess-784327326356 && aws cloudformation describe-stacks --stack-name autoninja-production --query 'Stacks[0].[StackName,StackStatus]' --output text 2>&1 || echo "Stack not found"
-
-export AWS_REGION=us-east-2 && export AWS_ACCOUNT_ID=784327326356 && export AWS_PROFILE=AdministratorAccess-784327326356 && BUCKET_NAME=autoninja-artifacts-${AWS_ACCOUNT_ID}-production && aws s3 cp build/autoninja-shared-layer.zip s3://${BUCKET_NAME}/layers/autoninja-shared-layer.zip --sse aws:kms
-
-# 1. Upload schemas to S3
-export AWS_REGION=us-east-2 && export AWS_ACCOUNT_ID=784327326356 && export AWS_PROFILE=AdministratorAccess-784327326356 && ./scripts/upload_schemas.sh autoninja-artifacts-784327326356-production 
-
-# 2. Update CloudFormation stack
-export AWS_REGION=us-east-2 && export AWS_ACCOUNT_ID=784327326356 && export AWS_PROFILE=AdministratorAccess-784327326356 && aws cloudformation update-stack \
-    --stack-name autoninja-production \
-    --template-body file://infrastructure/cloudformation/autoninja-complete.yaml \
-    --capabilities CAPABILITY_NAMED_IAM
 
 -->
