@@ -1,0 +1,254 @@
+openapi: 3.0.0
+info:
+  title: Deployment Manager Action Group API
+  description: API for generating CloudFormation templates, deploying stacks, configuring
+    agents, and testing deployments
+  version: 1.0.0
+paths:
+  /generate-cloudformation:
+    post:
+      summary: Generate complete CloudFormation template
+      description: Creates comprehensive CloudFormation template including Lambda
+        functions, Bedrock Agent, action groups, and IAM roles
+      operationId: generateCloudformation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - job_name
+              - requirements
+              - code
+              - architecture
+              - validation_status
+              properties:
+                job_name:
+                  type: string
+                  description: Unique job identifier in format job-{keyword}-{YYYYMMDD-HHMMSS}
+                  example: job-friend-20251013-143022
+                requirements:
+                  type: object
+                  description: Requirements from Requirements Analyst
+                code:
+                  type: object
+                  description: Code artifacts from Code Generator
+                architecture:
+                  type: object
+                  description: Architecture design from Solution Architect
+                validation_status:
+                  type: string
+                  description: Validation status from Quality Validator (must be green
+                    light)
+      responses:
+        '200':
+          description: CloudFormation template successfully generated
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - job_name
+                - cloudformation_template
+                - status
+                properties:
+                  job_name:
+                    type: string
+                  cloudformation_template:
+                    type: string
+                    description: Complete CloudFormation template in YAML format
+                  status:
+                    type: string
+        '400':
+          description: Invalid request or validation not passed
+        '500':
+          description: Internal server error
+  /deploy-stack:
+    post:
+      summary: Deploy CloudFormation stack to AWS
+      description: Deploys the CloudFormation stack and waits for completion
+      operationId: deployStack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - job_name
+              - cloudformation_template
+              - stack_name
+              properties:
+                job_name:
+                  type: string
+                  description: Unique job identifier
+                  example: job-friend-20251013-143022
+                cloudformation_template:
+                  type: string
+                  description: CloudFormation template to deploy
+                stack_name:
+                  type: string
+                  description: Name for the CloudFormation stack
+                  example: friend-agent-stack
+                parameters:
+                  type: string
+                  description: JSON string containing stack parameters
+      responses:
+        '200':
+          description: Stack deployment completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - job_name
+                - stack_id
+                - status
+                properties:
+                  job_name:
+                    type: string
+                  stack_id:
+                    type: string
+                    description: CloudFormation stack ID
+                  status:
+                    type: string
+                  outputs:
+                    type: string
+                    description: JSON string containing stack outputs
+                  error_message:
+                    type: string
+                    description: Error details if deployment failed
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error
+  /configure-agent:
+    post:
+      summary: Configure Bedrock Agent
+      description: Creates and configures Bedrock Agent with action groups and creates
+        agent alias
+      operationId: configureAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - job_name
+              - agent_config
+              - lambda_arns
+              properties:
+                job_name:
+                  type: string
+                  description: Unique job identifier
+                  example: job-friend-20251013-143022
+                agent_config:
+                  type: object
+                  description: Agent configuration from Code Generator
+                  properties:
+                    agent_name:
+                      type: string
+                    instructions:
+                      type: string
+                    foundation_model:
+                      type: string
+                lambda_arns:
+                  type: string
+                  description: JSON string containing map of action group names to
+                    Lambda ARNs
+      responses:
+        '200':
+          description: Agent successfully configured
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - job_name
+                - agent_id
+                - agent_arn
+                - alias_id
+                properties:
+                  job_name:
+                    type: string
+                  agent_id:
+                    type: string
+                    description: Bedrock Agent ID
+                  agent_arn:
+                    type: string
+                    description: Bedrock Agent ARN
+                  alias_id:
+                    type: string
+                    description: Agent alias ID
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error
+  /test-deployment:
+    post:
+      summary: Test deployed agent
+      description: Tests the deployed agent with sample inputs to verify functionality
+      operationId: testDeployment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - job_name
+              - agent_id
+              - alias_id
+              properties:
+                job_name:
+                  type: string
+                  description: Unique job identifier
+                  example: job-friend-20251013-143022
+                agent_id:
+                  type: string
+                  description: Bedrock Agent ID to test
+                alias_id:
+                  type: string
+                  description: Agent alias ID to test
+                test_inputs:
+                  type: array
+                  description: Sample inputs for testing
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: Testing completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - job_name
+                - test_results
+                - is_successful
+                properties:
+                  job_name:
+                    type: string
+                  test_results:
+                    type: object
+                    description: Results from test invocations
+                    properties:
+                      tests_run:
+                        type: integer
+                      tests_passed:
+                        type: integer
+                      tests_failed:
+                        type: integer
+                      details:
+                        type: array
+                        items:
+                          type: object
+                  is_successful:
+                    type: boolean
+                    description: Whether all tests passed
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error

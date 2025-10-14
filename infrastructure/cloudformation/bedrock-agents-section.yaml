@@ -1,0 +1,200 @@
+# This file contains the Bedrock Agent resources section
+# It will be integrated into the main template
+
+  # ============================================================================
+  # Bedrock Collaborator Agents (5 agents)
+  # ============================================================================
+  
+  # Requirements Analyst Bedrock Agent
+  RequirementsAnalystAgent:
+    Type: AWS::Bedrock::Agent
+    DependsOn:
+      - RequirementsAnalystFunction
+      - RequirementsAnalystAgentRole
+    Properties:
+      AgentName: !Sub 'autoninja-requirements-analyst-${Environment}'
+      Description: Requirements Analyst agent - extracts and validates requirements from user requests
+      AgentResourceRoleArn: !GetAtt RequirementsAnalystAgentRole.Arn
+      FoundationModel: !Ref BedrockModel
+      AgentCollaboration: DISABLED
+      IdleSessionTTLInSeconds: 1800
+      AutoPrepare: true
+      Instruction: |
+        You are a requirements analyst for the AutoNinja system. Your role is to extract structured
+        requirements from user requests for AI agents. You generate requirements for ALL sub-agents
+        in the pipeline (Code Generator, Solution Architect, Quality Validator, Deployment Manager).
+
+        When you receive a request:
+        1. Extract the job_name parameter from the request
+        2. Analyze the user's description to identify agent purpose, capabilities, interactions, data needs, and integrations
+        3. Generate comprehensive requirements document covering what each downstream agent needs
+        4. Assess complexity (simple/moderate/complex)
+        5. Validate completeness of requirements
+        6. Return structured requirements in JSON format
+
+        Always use the job_name provided by the supervisor for tracking.
+      ActionGroups:
+        - ActionGroupName: requirements-analyst-actions
+          ActionGroupState: ENABLED
+          ActionGroupExecutor:
+            Lambda: !GetAtt RequirementsAnalystFunction.Arn
+          Description: Actions for requirements analysis
+          # Note: OpenAPI schema will be added in task 5
+      Tags:
+        Environment: !Ref Environment
+        Application: AutoNinja
+
+  # Code Generator Bedrock Agent
+  CodeGeneratorAgent:
+    Type: AWS::Bedrock::Agent
+    DependsOn:
+      - CodeGeneratorFunction
+      - CodeGeneratorAgentRole
+    Properties:
+      AgentName: !Sub 'autoninja-code-generator-${Environment}'
+      Description: Code Generator agent - generates Lambda code, agent configs, and OpenAPI schemas
+      AgentResourceRoleArn: !GetAtt CodeGeneratorAgentRole.Arn
+      FoundationModel: !Ref BedrockModel
+      AgentCollaboration: DISABLED
+      IdleSessionTTLInSeconds: 1800
+      AutoPrepare: true
+      Instruction: |
+        You are a code generator for the AutoNinja system. Your role is to generate production-ready
+        code for AI agents based on requirements.
+
+        When you receive requirements:
+        1. Extract the job_name parameter from the request
+        2. Generate Lambda function code in Python with proper error handling, input validation, and structured logging
+        3. Generate Bedrock Agent configuration JSON with action groups
+        4. Generate OpenAPI schemas for all action groups
+        5. Generate system prompts for the agent
+        6. Follow Python best practices and AWS Lambda patterns
+
+        Always use the job_name provided by the supervisor for tracking.
+      ActionGroups:
+        - ActionGroupName: code-generator-actions
+          ActionGroupState: ENABLED
+          ActionGroupExecutor:
+            Lambda: !GetAtt CodeGeneratorFunction.Arn
+          Description: Actions for code generation
+          # Note: OpenAPI schema will be added in task 5
+      Tags:
+        Environment: !Ref Environment
+        Application: AutoNinja
+
+  # Solution Architect Bedrock Agent
+  SolutionArchitectAgent:
+    Type: AWS::Bedrock::Agent
+    DependsOn:
+      - SolutionArchitectFunction
+      - SolutionArchitectAgentRole
+    Properties:
+      AgentName: !Sub 'autoninja-solution-architect-${Environment}'
+      Description: Solution Architect agent - designs AWS architecture and generates IaC
+      AgentResourceRoleArn: !GetAtt SolutionArchitectAgentRole.Arn
+      FoundationModel: !Ref BedrockModel
+      AgentCollaboration: DISABLED
+      IdleSessionTTLInSeconds: 1800
+      AutoPrepare: true
+      Instruction: |
+        You are a solution architect for the AutoNinja system. Your role is to design AWS
+        architectures for AI agents based on requirements and code files.
+
+        When you receive requirements and code file references:
+        1. Extract the job_name parameter from the request
+        2. Review code files from Code Generator (Lambda code, agent config, OpenAPI schemas, system prompts)
+        3. Design complete AWS architecture including Bedrock Agent, Lambda functions, data storage, IAM roles
+        4. Select appropriate AWS services based on requirements
+        5. Generate infrastructure-as-code templates (CloudFormation/Terraform) that reference the code files
+        6. Follow AWS best practices and Well-Architected Framework
+
+        Always reference code files from the Code Generator when designing IaC.
+        Always use the job_name provided by the supervisor for tracking.
+      ActionGroups:
+        - ActionGroupName: solution-architect-actions
+          ActionGroupState: ENABLED
+          ActionGroupExecutor:
+            Lambda: !GetAtt SolutionArchitectFunction.Arn
+          Description: Actions for architecture design
+          # Note: OpenAPI schema will be added in task 5
+      Tags:
+        Environment: !Ref Environment
+        Application: AutoNinja
+
+  # Quality Validator Bedrock Agent
+  QualityValidatorAgent:
+    Type: AWS::Bedrock::Agent
+    DependsOn:
+      - QualityValidatorFunction
+      - QualityValidatorAgentRole
+    Properties:
+      AgentName: !Sub 'autoninja-quality-validator-${Environment}'
+      Description: Quality Validator agent - validates code quality, security, and compliance
+      AgentResourceRoleArn: !GetAtt QualityValidatorAgentRole.Arn
+      FoundationModel: !Ref BedrockModel
+      AgentCollaboration: DISABLED
+      IdleSessionTTLInSeconds: 1800
+      AutoPrepare: true
+      Instruction: |
+        You are a quality validator for the AutoNinja system. Your role is to validate generated
+        code for quality, security, and compliance before deployment.
+
+        When you receive generated code:
+        1. Extract the job_name parameter from the request
+        2. Perform code quality validation (syntax, error handling, logging, structure)
+        3. Perform security scanning (hardcoded credentials, IAM permissions, injection vulnerabilities, encryption)
+        4. Perform compliance checks (AWS best practices, Lambda best practices, Python PEP 8)
+        5. Calculate quality score with extremely low threshold (50% pass rate for testing)
+        6. Generate quality report with findings and recommendations
+
+        Always use the job_name provided by the supervisor for tracking.
+      ActionGroups:
+        - ActionGroupName: quality-validator-actions
+          ActionGroupState: ENABLED
+          ActionGroupExecutor:
+            Lambda: !GetAtt QualityValidatorFunction.Arn
+          Description: Actions for quality validation
+          # Note: OpenAPI schema will be added in task 5
+      Tags:
+        Environment: !Ref Environment
+        Application: AutoNinja
+
+  # Deployment Manager Bedrock Agent
+  DeploymentManagerAgent:
+    Type: AWS::Bedrock::Agent
+    DependsOn:
+      - DeploymentManagerFunction
+      - DeploymentManagerAgentRole
+    Properties:
+      AgentName: !Sub 'autoninja-deployment-manager-${Environment}'
+      Description: Deployment Manager agent - deploys validated agents to AWS
+      AgentResourceRoleArn: !GetAtt DeploymentManagerAgentRole.Arn
+      FoundationModel: !Ref BedrockModel
+      AgentCollaboration: DISABLED
+      IdleSessionTTLInSeconds: 1800
+      AutoPrepare: true
+      Instruction: |
+        You are a deployment manager for the AutoNinja system. Your role is to deploy validated
+        agents to AWS and verify successful deployment.
+
+        When you receive requirements, code, architecture, and validation green light:
+        1. Extract the job_name parameter from the request
+        2. Gather all artifacts (requirements, code files, IaC templates, validation report)
+        3. Generate complete CloudFormation template including all resources
+        4. Deploy CloudFormation stack to AWS
+        5. Configure Bedrock Agent with action groups and aliases
+        6. Test the deployed agent with sample inputs
+        7. Return deployed agent ARN, alias ID, and endpoints
+
+        You can ONLY proceed if the Quality Validator gives a green light.
+        Always use the job_name provided by the supervisor for tracking.
+      ActionGroups:
+        - ActionGroupName: deployment-manager-actions
+          ActionGroupState: ENABLED
+          ActionGroupExecutor:
+            Lambda: !GetAtt DeploymentManagerFunction.Arn
+          Description: Actions for deployment management
+          # Note: OpenAPI schema will be added in task 5
+      Tags:
+        Environment: !Ref Environment
+        Application: AutoNinja

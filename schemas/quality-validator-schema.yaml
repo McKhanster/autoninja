@@ -1,0 +1,203 @@
+openapi: 3.0.0
+info:
+  title: Quality Validator Action Group API
+  description: API for validating code quality, performing security scans, and checking
+    compliance
+  version: 1.0.0
+paths:
+  /validate-code:
+    post:
+      summary: Validate code quality
+      description: Performs comprehensive code quality validation including syntax,
+        error handling, logging, and structure checks
+      operationId: validateCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - job_name
+              - code
+              properties:
+                job_name:
+                  type: string
+                  description: Unique job identifier in format job-{keyword}-{YYYYMMDD-HHMMSS}
+                  example: job-friend-20251013-143022
+                code:
+                  type: string
+                  description: JSON string containing code artifacts to validate
+                language:
+                  type: string
+                  description: Programming language
+                  default: python
+                  example: python
+      responses:
+        '200':
+          description: Code validation completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - job_name
+                - is_valid
+                - issues
+                - quality_score
+                properties:
+                  job_name:
+                    type: string
+                  is_valid:
+                    type: boolean
+                    description: Whether code passes validation (threshold set to
+                      50% for testing)
+                  issues:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        severity:
+                          type: string
+                        message:
+                          type: string
+                        file:
+                          type: string
+                        line:
+                          type: integer
+                  quality_score:
+                    type: number
+                    format: float
+                    minimum: 0
+                    maximum: 100
+                    description: Overall quality score (0-100)
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error
+  /security-scan:
+    post:
+      summary: Perform security scanning
+      description: Scans code for security vulnerabilities including hardcoded credentials,
+        injection risks, and improper IAM permissions
+      operationId: securityScan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - job_name
+              - code
+              properties:
+                job_name:
+                  type: string
+                  description: Unique job identifier
+                  example: job-friend-20251013-143022
+                code:
+                  type: string
+                  description: JSON string containing code artifacts to scan
+                iam_policies:
+                  type: object
+                  description: IAM policies to validate
+      responses:
+        '200':
+          description: Security scan completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - job_name
+                - vulnerabilities
+                - risk_level
+                properties:
+                  job_name:
+                    type: string
+                  vulnerabilities:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          description: Type of vulnerability
+                        severity:
+                          type: string
+                        description:
+                          type: string
+                        location:
+                          type: string
+                        remediation:
+                          type: string
+                  risk_level:
+                    type: string
+                    description: Overall risk assessment
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error
+  /compliance-check:
+    post:
+      summary: Check compliance with standards
+      description: Validates compliance with AWS best practices, Lambda best practices,
+        and Python PEP 8 standards
+      operationId: complianceCheck
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - job_name
+              - code
+              properties:
+                job_name:
+                  type: string
+                  description: Unique job identifier
+                  example: job-friend-20251013-143022
+                code:
+                  type: string
+                  description: JSON string containing code artifacts to check
+                architecture:
+                  type: object
+                  description: Architecture design to validate
+      responses:
+        '200':
+          description: Compliance check completed
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - job_name
+                - compliant
+                - violations
+                properties:
+                  job_name:
+                    type: string
+                  compliant:
+                    type: boolean
+                    description: Whether code meets compliance standards
+                  violations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        standard:
+                          type: string
+                          description: Which standard was violated
+                        rule:
+                          type: string
+                        description:
+                          type: string
+                        severity:
+                          type: string
+                        recommendation:
+                          type: string
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal server error
