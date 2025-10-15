@@ -487,7 +487,7 @@ def extract_architecture_requirements(user_request: str) -> Dict[str, Any]:
         },
         "bedrock": {
             "agent_count": 1,
-            "foundation_model": "anthropic.claude-sonnet-4-5-20250929-v1:0",
+            "foundation_model": "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
             "action_groups": 1
         },
         "iam": {

@@ -50,13 +50,11 @@ Parameters:
 
   BedrockModel:
     Type: String
-    Description: Foundation model ID for Bedrock Agents
-    Default: anthropic.claude-sonnet-4-5-20250929-v1:0
+    Description: Foundation model ID or inference profile ARN for Bedrock Agents
+    Default: us.anthropic.claude-sonnet-4-5-20250929-v1:0
     AllowedValues:
-      - anthropic.claude-sonnet-4-5-20250929-v1:0
-      - anthropic.claude-3-5-sonnet-20241022-v2:0
-      - anthropic.claude-3-5-sonnet-20240620-v1:0
-    ConstraintDescription: Must be a valid Bedrock foundation model ID
+      - us.anthropic.claude-sonnet-4-5-20250929-v1:0
+    ConstraintDescription: Must be a valid Bedrock inference profile or foundation model ID
 
   DynamoDBBillingMode:
     Type: String
@@ -790,7 +788,9 @@ Resources:
                 Effect: Allow
                 Action:
                   - bedrock:InvokeModel
-                Resource: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}'
+                Resource:
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/*'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*'
               - Sid: InvokeLambda
                 Effect: Allow
                 Action:
@@ -829,7 +829,9 @@ Resources:
                 Effect: Allow
                 Action:
                   - bedrock:InvokeModel
-                Resource: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}'
+                Resource:
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/*'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*'
               - Sid: InvokeLambda
                 Effect: Allow
                 Action:
@@ -868,7 +870,9 @@ Resources:
                 Effect: Allow
                 Action:
                   - bedrock:InvokeModel
-                Resource: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}'
+                Resource:
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/*'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*'
               - Sid: InvokeLambda
                 Effect: Allow
                 Action:
@@ -907,7 +911,9 @@ Resources:
                 Effect: Allow
                 Action:
                   - bedrock:InvokeModel
-                Resource: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}'
+                Resource:
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/*'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*'
               - Sid: InvokeLambda
                 Effect: Allow
                 Action:
@@ -946,7 +952,9 @@ Resources:
                 Effect: Allow
                 Action:
                   - bedrock:InvokeModel
-                Resource: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}'
+                Resource:
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/*'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*'
               - Sid: InvokeLambda
                 Effect: Allow
                 Action:
@@ -985,7 +993,9 @@ Resources:
                 Effect: Allow
                 Action:
                   - bedrock:InvokeModel
-                Resource: !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}'
+                Resource:
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}::foundation-model/*'
+                  - !Sub 'arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*'
               - Sid: InvokeCollaboratorAgents
                 Effect: Allow
                 Action:
@@ -1091,15 +1101,15 @@ Resources:
         You are a code generator for the AutoNinja system. Your role is to generate production-ready
         code for AI agents based on requirements.
 
-        When you receive requirements:
-        1. Extract the job_name parameter from the request
-        2. Generate Lambda function code in Python with proper error handling, input validation, and structured logging
-        3. Generate Bedrock Agent configuration JSON with action groups
-        4. Generate OpenAPI schemas for all action groups
-        5. Generate system prompts for the agent
-        6. Follow Python best practices and AWS Lambda patterns
+        IMPORTANT: You MUST use the action group functions to generate code. Do not respond conversationally.
 
-        Always use the job_name provided by the supervisor for tracking.
+        When you receive a request to generate code:
+        1. If job_name is not provided, generate one in format: job-{keyword}-{YYYYMMDD-HHMMSS}
+        2. Use the /generate-lambda-code action to generate Lambda function code
+        3. Use the /generate-agent-config action to generate Bedrock Agent configuration
+        4. Use the /generate-openapi-schema action to generate OpenAPI schemas
+
+        Always call the appropriate action group function. Never just describe what you would do.
       ActionGroups:
         - ActionGroupName: code-generator-actions
           ActionGroupState: ENABLED

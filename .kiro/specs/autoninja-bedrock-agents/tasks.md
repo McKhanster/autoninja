@@ -265,192 +265,335 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Return structured error responses
     - _Requirements: 10.4, 10.11_
 
-- [ ] 7. Implement Code Generator Lambda function
+- [x] 7. Implement Code Generator Lambda function
   - Read about Bedrock Agents and AgentCore from the AWS Documentation MCP.
-  - [ ] 7.1 Create Lambda handler with proper event parsing
-    - Review Requirement Analyst's implementation to understand the pattern. 
-    - Parse Bedrock Agent input event format
-    - Extract job_name, requirements, and other parameters
-    - Route to appropriate action handler based on apiPath
+  
+  - [x] 7.1 Create Lambda handler with proper event parsing
+    - **CRITICAL**: Review `lambda/requirements-analyst/handler.py` line-by-line to understand the EXACT pattern
+    - Copy the main `lambda_handler()` structure from Requirements Analyst
+    - Parse Bedrock Agent input event format (same as Requirements Analyst)
+    - Extract job_name, requirements, and other parameters from `properties` array
+    - Route to appropriate action handler based on apiPath (same pattern as Requirements Analyst)
     - _Requirements: 4.1, 10.1, 10.2_
   
-  - [ ] 7.2 Implement generate_lambda_code action
-   - Review Requirement Analyst's implementation to understand the pattern. 
-    - Log raw input to DynamoDB immediately
-    - Generate Python Lambda function code with error handling
-    - Generate requirements.txt with dependencies
-    - Log raw output to DynamoDB immediately
-    - Save both raw response and generated code files to S3
-    - Return formatted response to Bedrock Agent
+  - [x] 7.2 Implement generate_lambda_code action
+    - **CRITICAL**: Copy the EXACT structure from `handle_extract_requirements()` in Requirements Analyst
+    - **STEP 1**: Call `dynamodb_client.log_inference_input()` IMMEDIATELY at the start (before any processing)
+    - **STEP 2**: Store the returned `timestamp` value in a variable
+    - **STEP 3**: Generate Python Lambda function code with error handling (your custom logic here)
+    - **STEP 4**: Generate requirements.txt with dependencies (your custom logic here)
+    - **STEP 5**: Call `dynamodb_client.log_inference_output()` with the stored `timestamp` IMMEDIATELY after generation
+    - **STEP 6**: Save generated code files to S3 using `s3_client.save_converted_artifact()`
+    - **STEP 7**: Save raw response to S3 using `s3_client.save_raw_response()`
+    - **STEP 8**: Return formatted response to Bedrock Agent (same format as Requirements Analyst)
+    - **VERIFICATION**: After implementation, check DynamoDB to confirm BOTH input and output records are created for EACH invocation
     - _Requirements: 4.1, 4.4, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 7.3 Implement generate_agent_config action
-   - Review Requirement Analyst's implementation to understand the pattern. 
-    - Log raw input to DynamoDB immediately
-    - Generate Bedrock Agent configuration JSON
-    - Include agent name, instructions, foundation model, action groups
-    - Log raw output to DynamoDB immediately
-    - Save both raw response and config JSON to S3
-    - Return formatted response
+  - [x] 7.3 Implement generate_agent_config action
+    - **CRITICAL**: Copy the EXACT structure from `handle_analyze_complexity()` in Requirements Analyst
+    - **STEP 1**: Call `dynamodb_client.log_inference_input()` IMMEDIATELY at the start
+    - **STEP 2**: Store the returned `timestamp` value
+    - **STEP 3**: Generate Bedrock Agent configuration JSON (your custom logic)
+    - **STEP 4**: Call `dynamodb_client.log_inference_output()` with the stored `timestamp`
+    - **STEP 5**: Save config JSON to S3 using `s3_client.save_converted_artifact()`
+    - **STEP 6**: Save raw response to S3 using `s3_client.save_raw_response()`
+    - **STEP 7**: Return formatted response
+    - **VERIFICATION**: Check DynamoDB for both input and output records
     - _Requirements: 4.2, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 7.4 Implement generate_openapi_schema action
-   - Review Requirement Analyst's implementation to understand the pattern. 
-    - Log raw input to DynamoDB immediately
-    - Generate OpenAPI 3.0 schema for action groups
-    - Include all endpoints, parameters, request/response schemas
-    - Log raw output to DynamoDB immediately
-    - Save both raw response and schema YAML to S3
-    - Return formatted response
+  - [x] 7.4 Implement generate_openapi_schema action
+    - **CRITICAL**: Copy the EXACT structure from `handle_validate_requirements()` in Requirements Analyst
+    - **STEP 1**: Call `dynamodb_client.log_inference_input()` IMMEDIATELY at the start
+    - **STEP 2**: Store the returned `timestamp` value
+    - **STEP 3**: Generate OpenAPI 3.0 schema (your custom logic)
+    - **STEP 4**: Call `dynamodb_client.log_inference_output()` with the stored `timestamp`
+    - **STEP 5**: Save schema YAML to S3 using `s3_client.save_converted_artifact()`
+    - **STEP 6**: Save raw response to S3 using `s3_client.save_raw_response()`
+    - **STEP 7**: Return formatted response
+    - **VERIFICATION**: Check DynamoDB for both input and output records
     - _Requirements: 4.3, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 7.5 Implement error handling
-   - Review Requirement Analyst's implementation to understand the pattern. 
-    - Add try-catch blocks for all actions
-    - Log errors to DynamoDB
-    - Return structured error responses
+  - [x] 7.5 Implement error handling
+    - **CRITICAL**: Copy the EXACT error handling pattern from Requirements Analyst
+    - Add try-catch blocks for all actions (same structure as Requirements Analyst)
+    - Log errors to DynamoDB using `dynamodb_client.log_error_to_dynamodb()`
+    - Return structured error responses (same format as Requirements Analyst)
     - _Requirements: 10.4, 10.11_
-  - [ ] 7.6 Test implementation
-    - Review Requirement Analyst's test to understand the pattern, tests/requirement_analyst/test_requirements_analyst_agent.py
+  
+  - [x] 7.6 Test implementation and verify DynamoDB logging
+    - **CRITICAL**: Review `tests/requirement_analyst/test_requirements_analyst_agent.py` to understand test pattern
+    - Create `tests/code_generator/test_code_generator_agent.py` following the same structure
+    - Run the test with all 3 actions (generate_lambda_code, generate_agent_config, generate_openapi_schema)
+    - **VERIFICATION STEP 1**: After running tests, query DynamoDB to confirm records exist:
+      ```bash
+      aws dynamodb query --table-name autoninja-inference-records-production \
+        --index-name AgentNameTimestampIndex \
+        --key-condition-expression "agent_name = :agent" \
+        --expression-attribute-values '{":agent":{"S":"code-generator"}}' \
+        --region us-east-2
+      ```
+    - **VERIFICATION STEP 2**: Confirm you see 6 records total (3 input + 3 output) for the 3 test invocations
+    - **VERIFICATION STEP 3**: Check each record has both `prompt` and `response` fields populated
+    - **FAILURE CONDITION**: If you see fewer than 6 records, the logging is NOT working correctly - review the code against Requirements Analyst implementation
 
-- [ ] 8. Implement Solution Architect Lambda function
-  - [ ] 8.1 Create Lambda handler with proper event parsing
-    - Parse Bedrock Agent input event format
-    - Extract job_name, requirements, code_file_references, and other parameters
-    - Route to appropriate action handler based on apiPath
+- [x] 8. Implement Solution Architect Lambda function
+  
+  - [x] 8.1 Create Lambda handler with proper event parsing
+    - **CRITICAL**: Copy the EXACT structure from `lambda/requirements-analyst/handler.py` main `lambda_handler()` function
+    - Parse Bedrock Agent input event format (same as Requirements Analyst and Code Generator)
+    - Extract job_name, requirements, code_file_references, and other parameters from `properties` array
+    - Route to appropriate action handler based on apiPath (same pattern)
     - _Requirements: 3.1, 10.1, 10.2_
   
-  - [ ] 8.2 Implement design_architecture action
-    - Log raw input to DynamoDB immediately
-    - Review code files from Code Generator (retrieve from S3)
-    - Design AWS architecture based on requirements and code
-    - Generate architecture design document
-    - Log raw output to DynamoDB immediately
-    - Save both raw response and architecture design to S3
-    - Return formatted response to Bedrock Agent
+  - [x] 8.2 Implement design_architecture action
+    - **CRITICAL**: Copy the EXACT structure from `handle_extract_requirements()` in Requirements Analyst
+    - **STEP 1**: Call `dynamodb_client.log_inference_input()` IMMEDIATELY at the start (before any processing)
+    - **STEP 2**: Store the returned `timestamp` value in a variable
+    - **STEP 3**: Retrieve code files from Code Generator using `s3_client` (your custom logic)
+    - **STEP 4**: Design AWS architecture based on requirements and code (your custom logic)
+    - **STEP 5**: Generate architecture design document (your custom logic)
+    - **STEP 6**: Call `dynamodb_client.log_inference_output()` with the stored `timestamp` IMMEDIATELY after generation
+    - **STEP 7**: Save architecture design to S3 using `s3_client.save_converted_artifact()`
+    - **STEP 8**: Save raw response to S3 using `s3_client.save_raw_response()`
+    - **STEP 9**: Return formatted response to Bedrock Agent (same format as Requirements Analyst)
+    - **VERIFICATION**: Check DynamoDB for both input and output records
     - _Requirements: 3.1, 3.4, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 8.3 Implement select_services action
-    - Log raw input to DynamoDB immediately
-    - Select appropriate AWS services based on requirements
-    - Generate service selection rationale
-    - Log raw output to DynamoDB immediately
-    - Save both raw response and service selection to S3
-    - Return formatted response
+  - [x] 8.3 Implement select_services action
+    - **CRITICAL**: Copy the EXACT structure from `handle_analyze_complexity()` in Requirements Analyst
+    - **STEP 1**: Call `dynamodb_client.log_inference_input()` IMMEDIATELY at the start
+    - **STEP 2**: Store the returned `timestamp` value
+    - **STEP 3**: Select appropriate AWS services based on requirements (your custom logic)
+    - **STEP 4**: Generate service selection rationale (your custom logic)
+    - **STEP 5**: Call `dynamodb_client.log_inference_output()` with the stored `timestamp`
+    - **STEP 6**: Save service selection to S3 using `s3_client.save_converted_artifact()`
+    - **STEP 7**: Save raw response to S3 using `s3_client.save_raw_response()`
+    - **STEP 8**: Return formatted response
+    - **VERIFICATION**: Check DynamoDB for both input and output records
     - _Requirements: 3.2, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 8.4 Implement generate_iac action
-    - Log raw input to DynamoDB immediately
-    - Generate CloudFormation template referencing Lambda code files
-    - Include Bedrock Agent configuration from Code Generator
-    - Set up IAM roles and policies
-    - Configure action groups with OpenAPI schemas
-    - Log raw output to DynamoDB immediately
-    - Save both raw response and IaC templates to S3
-    - Return formatted response
+  - [x] 8.4 Implement generate_iac action
+    - **CRITICAL**: Copy the EXACT structure from `handle_validate_requirements()` in Requirements Analyst
+    - **STEP 1**: Call `dynamodb_client.log_inference_input()` IMMEDIATELY at the start
+    - **STEP 2**: Store the returned `timestamp` value
+    - **STEP 3**: Generate CloudFormation template referencing Lambda code files (your custom logic)
+    - **STEP 4**: Include Bedrock Agent configuration from Code Generator (your custom logic)
+    - **STEP 5**: Set up IAM roles and policies (your custom logic)
+    - **STEP 6**: Configure action groups with OpenAPI schemas (your custom logic)
+    - **STEP 7**: Call `dynamodb_client.log_inference_output()` with the stored `timestamp`
+    - **STEP 8**: Save IaC templates to S3 using `s3_client.save_converted_artifact()`
+    - **STEP 9**: Save raw response to S3 using `s3_client.save_raw_response()`
+    - **STEP 10**: Return formatted response
+    - **VERIFICATION**: Check DynamoDB for both input and output records
     - _Requirements: 3.3, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 8.5 Implement error handling
-    - Add try-catch blocks for all actions
-    - Log errors to DynamoDB
-    - Return structured error responses
+  - [x] 8.5 Implement error handling
+    - **CRITICAL**: Copy the EXACT error handling pattern from Requirements Analyst
+    - Add try-catch blocks for all actions (same structure as Requirements Analyst)
+    - Log errors to DynamoDB using `dynamodb_client.log_error_to_dynamodb()`
+    - Return structured error responses (same format as Requirements Analyst)
     - _Requirements: 10.4, 10.11_
+  
+  - [x] 8.6 Test implementation and verify DynamoDB logging
+    - Create `tests/solution_architect/test_solution_architect_agent.py` following the same structure as Requirements Analyst test
+    - Run the test with all 3 actions (design_architecture, select_services, generate_iac)
+    - **VERIFICATION**: Query DynamoDB to confirm 6 records total (3 input + 3 output) exist for solution-architect agent
+    - **FAILURE CONDITION**: If you see fewer than 6 records, review the code against Requirements Analyst implementation
 
-- [ ] 9. Implement Quality Validator Lambda function
-  - [ ] 9.1 Create Lambda handler with proper event parsing
-    - Parse Bedrock Agent input event format
-    - Extract job_name, code, architecture, and other parameters
-    - Route to appropriate action handler based on apiPath
+- [x] 9. Implement Quality Validator BEDROCK Agent Lambda function
+  
+
+  
+  - [x] 9.1 Create Lambda handler with proper BEDROCK Agent event parsing
+    **BEFORE YOU START - IMPORTANT TIPS:**
+  - ✅ Check actual AWS resources first: Run `aws s3 ls | grep autoninja` to get the real bucket name
+  - ✅ DynamoDB logging creates 1 record per action (not 2): `log_inference_input()` creates, `log_inference_output()` updates
+  - ✅ When replacing functions, read extra context to avoid leaving orphaned code (especially multi-line strings)
+  - ✅ "EXACT structure" means the flow pattern (logging → processing → saving), NOT the business logic
+  - ✅ Test files need correct bucket name: `f"autoninja-artifacts-{os.environ.get('AWS_ACCOUNT_ID')}-production"`
+    - **CRITICAL**: Copy the EXACT structure from `lambda/requirements-analyst/handler.py` main `lambda_handler()` function
+    - Parse BEDROCK Agent input event format (same as Requirements Analyst)
+    - Extract job_name, code, architecture, and other parameters from `properties` array
+    - Route to appropriate action handler based on apiPath (same pattern)
     - _Requirements: 5.1, 10.1, 10.2_
   
-  - [ ] 9.2 Implement validate_code action
-    - Log raw input to DynamoDB immediately
-    - Perform code quality validation (syntax, error handling, logging, structure)
-    - Calculate quality score
-    - Set extremely low threshold (e.g., 50% pass rate) for testing
-    - Log raw output to DynamoDB immediately
-    - Save both raw response and validation report to S3
-    - Return formatted response with is_valid, issues, quality_score
+  - [x] 9.2 Implement validate_code action
+    - **CRITICAL**: Copy the EXACT structure from `handle_extract_requirements()` in Requirements Analyst
+    - **WHAT "EXACT STRUCTURE" MEANS**: Same flow of logging → processing → saving, NOT the same business logic
+    - **STEP 1**: Call `dynamodb_client.log_inference_input()` IMMEDIATELY at the start (before any processing)
+    - **STEP 2**: Store the returned `timestamp` value in a variable (e.g., `timestamp = dynamodb_client.log_inference_input(...)['timestamp']`)
+    - **STEP 3**: Perform code quality validation - syntax, error handling, logging, structure (your custom logic)
+    - **STEP 4**: Calculate quality score (your custom logic)
+    - **STEP 5**: Set extremely low threshold (e.g., 50% pass rate) for testi (your custom logic)
+    - **STEP 6**: Call `dynamodb_client.log_inference_output()` with the stored `timestamp` IMMEDIATELY after validation
+    - **NOTE**: This UPDATES the same DynamoDB record created in STEP 1, doesn't create a new one
+    - **STEP 7**: Save validation report to S3 using `s3_client.save_converted_artifact()`
+    - **STEP 8**: Save raw response to S3 using `s3_client.save_raw_response()`
+    - **STEP 9**: Return formatted response to BEDROCK Agent with is_valid, issues, quality_score (same format as Requirements Analyst)
+    - **VERIFICATION**: Check DynamoDB - should see 1 record with both `prompt` and `response` fields populated
     - _Requirements: 5.1, 5.4, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8, 17.2, 17.3_
   
-  - [ ] 9.3 Implement security_scan action
-    - Log raw input to DynamoDB immediately
-    - Scan for hardcoded credentials
-    - Validate IAM permissions follow least-privilege
-    - Check for injection vulnerabilities
-    - Verify encryption usage
-    - Log raw output to DynamoDB immediately
-    - Save both raw response and security findings to S3
-    - Return formatted response with vulnerabilities and risk_level
+  - [x] 9.3 Implement security_scan action
+    - **CRITICAL**: Copy the EXACT structure from `handle_analyze_complexity()` in Requirements Analyst
+    - **STEP 1**: Call `dynamodb_client.log_inference_input()` IMMEDIATELY at the start
+    - **STEP 2**: Store the returned `timestamp` value in a variable
+    - **STEP 3**: Scan for hardcoded credentials (your custom logic)
+    - **STEP 4**: Validate IAM permissions follow least-privilege (your custom logic)
+    - **STEP 5**: Check for injection vulnerabilities (your custom logic)
+    - **STEP 6**: Verify encryption usage (your custom logic)
+    - **STEP 7**: Call `dynamodb_client.log_inference_output()` with the stored `timestamp` to UPDATE the record
+    - **STEP 8**: Save security findings to S3 using `s3_client.save_converted_artifact()`
+    - **STEP 9**: Save raw response to S3 using `s3_client.save_raw_response()`
+    - **STEP 10**: Return formatted response to BEDROCK Agent with vulnerabilities and risk_level
+    - **VERIFICATION**: Check DynamoDB - should see 1 record with both `prompt` and `response` fields
     - _Requirements: 5.2, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 9.4 Implement compliance_check action
-    - Log raw input to DynamoDB immediately
-    - Check AWS best practices compliance
-    - Check Lambda best practices compliance
-    - Check Python PEP 8 standards
-    - Log raw output to DynamoDB immediately
-    - Save both raw response and compliance report to S3
-    - Return formatted response with compliant flag and violations
+  - [x] 9.4 Implement compliance_check action
+    - **CRITICAL**: Copy the EXACT structure from `handle_validate_requirements()` in Requirements Analyst
+    - **STEP 1**: Call `dynamodb_client.log_inference_input()` IMMEDIATELY at the start
+    - **STEP 2**: Store the returned `timestamp` value in a variable
+    - **STEP 3**: Check AWS best practices compliance (your custom logic)
+    - **STEP 4**: Check Lambda best practices compliance (your custom logic)
+    - **STEP 5**: Check Python PEP 8 standards (your custom logic)
+    - **STEP 6**: Call `dynamodb_client.log_inference_output()` with the stored `timestamp` to UPDATE the record
+    - **STEP 7**: Save compliance report to S3 using `s3_client.save_converted_artifact()`
+    - **STEP 8**: Save raw response to S3 using `s3_client.save_raw_response()`
+    - **STEP 9**: Return formatted response to BEDROCK Agent with compliant flag and violations
+    - **VERIFICATION**: Check DynamoDB - should see 1 record with both `prompt` and `response` fields
     - _Requirements: 5.3, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
-  - [ ] 9.5 Implement error handling
-    - Add try-catch blocks for all actions
-    - Log errors to DynamoDB
-    - Return structured error responses
+  - [x] 9.5 Implement error handling
+    - **CRITICAL**: Copy the EXACT error handling pattern from Requirements Analyst
+    - Add try-catch blocks for all actions (same structure as Requirements Analyst)
+    - Log errors to DynamoDB using `dynamodb_client.log_error_to_dynamodb()`
+    - Return structured error responses to BEDROCK Agent (same format as Requirements Analyst)
     - _Requirements: 10.4, 10.11_
+  
+  - [x] 9.6 Test implementation and verify DynamoDB logging
+    - **IMPORTANT**: First verify the S3 bucket name by running `aws s3 ls | grep autoninja` to get the actual bucket name
+    - Update test file to use correct bucket: `f"autoninja-artifacts-{os.environ.get('AWS_ACCOUNT_ID', '784327326356')}-production"`
+    - Create `tests/quality_validator/test_handler.py` following the same structure as `tests/solution_architect/test_handler.py`
+    - Run the test with all 3 actions (validate_code, security_scan, compliance_check)
+    - **VERIFICATION**: Query DynamoDB to confirm 3 records total (one per action, each containing both input and output)
+    - **NOTE**: Each record is created by `log_inference_input()` and then UPDATED by `log_inference_output()` - not separate records
+    - **VERIFICATION COMMAND**: `aws dynamodb scan --table-name autoninja-inference-records-production --filter-expression "agent_name = :agent AND begins_with(job_name, :job)" --expression-attribute-values '{":agent":{"S":"quality-validator"}, ":job":{"S":"job-test-"}}' --region us-east-2 --query 'Count'`
+    - **SUCCESS CRITERIA**: All 3 tests pass AND 3 DynamoDB records exist AND artifacts saved to S3
+    - **FAILURE CONDITION**: If you see fewer than 3 records, review the code against Requirements Analyst implementation
+  
+  - [x] 9.7 Package and deploy Quality Validator Lambda to AWS
+    - Make the deployment script executable: `chmod +x scripts/deploy_quality_validator.sh`
+    - Run deployment script: `./scripts/deploy_quality_validator.sh`
+    - Verify Lambda function updated successfully in AWS Console
+    - _Requirements: 10.9_
+  
+  - [x] 9.8 Update BEDROCK Agent with OpenAPI schema
+    - Upload `schemas/quality-validator-schema.yaml` to S3 bucket for schemas
+    - Update Quality Validator BEDROCK Agent action group to reference the schema
+    - Prepare the BEDROCK Agent (creates new version)
+    - Create/update alias to point to new version
+    - _Requirements: 12.4_
+  
+  - [-] 9.9 Test Quality Validator BEDROCK Agent end-to-end
+    - Create test script `tests/quality_validator/test_quality_validator_agent.py`
+    - Invoke BEDROCK Agent with test code samples
+    - Verify all 3 actions work: validate_code, security_scan, compliance_check
+    - Verify responses contain expected validation results
+    - Verify DynamoDB records created for BEDROCK Agent invocations
+    - Verify S3 artifacts saved correctly
+    - _Requirements: 17.1, 17.2, 17.3_
 
 - [ ] 10. Implement Deployment Manager Lambda function
+  
+  **BEFORE YOU START - IMPORTANT TIPS:**
+  - ✅ Check actual AWS resources first: Run `aws s3 ls | grep autoninja` to get the real bucket name
+  - ✅ DynamoDB logging creates 1 record per action (not 2): `log_inference_input()` creates, `log_inference_output()` updates
+  - ✅ When replacing functions, read extra context to avoid leaving orphaned code (especially multi-line strings)
+  - ✅ "EXACT structure" means the flow pattern (logging → processing → saving), NOT the business logic
+  - ✅ Test files need correct bucket name: `f"autoninja-artifacts-{os.environ.get('AWS_ACCOUNT_ID')}-production"`
+  - ✅ Use `s3_client.get_artifact()` for retrieving files - it handles missing files gracefully
+  
   - [ ] 10.1 Create Lambda handler with proper event parsing
-    - Parse Bedrock Agent input event format
-    - Extract job_name, requirements, code, architecture, validation_status, and other parameters
-    - Check validation_status before proceeding (must be green light)
-    - Route to appropriate action handler based on apiPath
+    - **CRITICAL**: Copy the EXACT structure from `lambda/requirements-analyst/handler.py` main `lambda_handler()` function
+    - Parse Bedrock Agent input event format (same as Requirements Analyst)
+    - Extract job_name, requirements, code, architecture, validation_status, and other parameters from `properties` array
+    - Check validation_status before proceeding (must be green light) - add this validation logic
+    - Route to appropriate action handler based on apiPath (same pattern)
     - _Requirements: 6.1, 10.1, 10.2_
   
   - [ ] 10.2 Implement generate_cloudformation action
-    - Log raw input to DynamoDB immediately
-    - Gather all artifacts from S3 (requirements, code, architecture, validation)
-    - Generate complete CloudFormation template including Lambda functions, Bedrock Agent, action groups, IAM roles
-    - Log raw output to DynamoDB immediately
-    - Save both raw response and CloudFormation template to S3
-    - Return formatted response with template
+    - **CRITICAL**: Copy the EXACT structure from `handle_extract_requirements()` in Requirements Analyst
+    - **WHAT "EXACT STRUCTURE" MEANS**: Same flow of logging → processing → saving, NOT the same business logic
+    - **STEP 1**: Call `dynamodb_client.log_inference_input()` IMMEDIATELY at the start (before any processing)
+    - **STEP 2**: Store the returned `timestamp` value in a variable (e.g., `timestamp = dynamodb_client.log_inference_input(...)['timestamp']`)
+    - **STEP 3**: Gather all artifacts from S3 using `s3_client` - requirements, code, architecture, validation (your custom logic)
+    - **TIP**: Use `s3_client.get_artifact()` which handles missing files gracefully (returns None instead of crashing)
+    - **STEP 4**: Generate complete CloudFormation template including Lambda functions, Bedrock Agent, action groups, IAM roles (your custom logic)
+    - **STEP 5**: Call `dynamodb_client.log_inference_output()` with the stored `timestamp` IMMEDIATELY after generation
+    - **NOTE**: This UPDATES the same DynamoDB record created in STEP 1, doesn't create a new one
+    - **STEP 6**: Save CloudFormation template to S3 using `s3_client.save_converted_artifact()`
+    - **STEP 7**: Save raw response to S3 using `s3_client.save_raw_response()`
+    - **STEP 8**: Return formatted response with template (same format as Requirements Analyst)
+    - **VERIFICATION**: Check DynamoDB - should see 1 record with both `prompt` and `response` fields populated
     - _Requirements: 6.1, 6.2, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
   - [ ] 10.3 Implement deploy_stack action
-    - Log raw input to DynamoDB immediately
-    - Deploy CloudFormation stack to AWS using boto3
-    - Wait for stack creation to complete
-    - Handle deployment failures with proper error messages
-    - Log raw output to DynamoDB immediately
-    - Save both raw response and deployment results to S3
-    - Return formatted response with stack_id, status, outputs
+    - **CRITICAL**: Copy the EXACT structure from `handle_analyze_complexity()` in Requirements Analyst
+    - **STEP 1**: Call `dynamodb_client.log_inference_input()` IMMEDIATELY at the start
+    - **STEP 2**: Store the returned `timestamp` value in a variable
+    - **STEP 3**: Deploy CloudFormation stack to AWS using boto3 (your custom logic)
+    - **STEP 4**: Wait for stack creation to complete (your custom logic)
+    - **STEP 5**: Handle deployment failures with proper error messages (your custom logic)
+    - **STEP 6**: Call `dynamodb_client.log_inference_output()` with the stored `timestamp` to UPDATE the record
+    - **STEP 7**: Save deployment results to S3 using `s3_client.save_converted_artifact()`
+    - **STEP 8**: Save raw response to S3 using `s3_client.save_raw_response()`
+    - **STEP 9**: Return formatted response with stack_id, status, outputs
+    - **VERIFICATION**: Check DynamoDB - should see 1 record with both `prompt` and `response` fields
     - _Requirements: 6.2, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
   - [ ] 10.4 Implement configure_agent action
-    - Log raw input to DynamoDB immediately
-    - Create Bedrock Agent using boto3
-    - Configure action groups with OpenAPI schemas
-    - Create agent alias
-    - Log raw output to DynamoDB immediately
-    - Save both raw response and agent configuration to S3
-    - Return formatted response with agent_id, agent_arn, alias_id
+    - **CRITICAL**: Copy the EXACT structure from `handle_validate_requirements()` in Requirements Analyst
+    - **STEP 1**: Call `dynamodb_client.log_inference_input()` IMMEDIATELY at the start
+    - **STEP 2**: Store the returned `timestamp` value in a variable
+    - **STEP 3**: Create Bedrock Agent using boto3 (your custom logic)
+    - **STEP 4**: Configure action groups with OpenAPI schemas (your custom logic)
+    - **STEP 5**: Create agent alias (your custom logic)
+    - **STEP 6**: Call `dynamodb_client.log_inference_output()` with the stored `timestamp` to UPDATE the record
+    - **STEP 7**: Save agent configuration to S3 using `s3_client.save_converted_artifact()`
+    - **STEP 8**: Save raw response to S3 using `s3_client.save_raw_response()`
+    - **STEP 9**: Return formatted response with agent_id, agent_arn, alias_id
+    - **VERIFICATION**: Check DynamoDB - should see 1 record with both `prompt` and `response` fields
     - _Requirements: 6.3, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
   - [ ] 10.5 Implement test_deployment action
-    - Log raw input to DynamoDB immediately
-    - Test deployed agent with sample inputs using InvokeAgent API
-    - Verify agent responds correctly
-    - Log raw output to DynamoDB immediately
-    - Save both raw response and test results to S3
-    - Return formatted response with test_results and is_successful
+    - **CRITICAL**: Copy the EXACT structure from any action handler in Requirements Analyst (e.g., `handle_extract_requirements()`)
+    - **STEP 1**: Call `dynamodb_client.log_inference_input()` IMMEDIATELY at the start
+    - **STEP 2**: Store the returned `timestamp` value in a variable
+    - **STEP 3**: Test deployed agent with sample inputs using InvokeAgent API (your custom logic)
+    - **STEP 4**: Verify agent responds correctly (your custom logic)
+    - **STEP 5**: Call `dynamodb_client.log_inference_output()` with the stored `timestamp` to UPDATE the record
+    - **STEP 6**: Save test results to S3 using `s3_client.save_converted_artifact()`
+    - **STEP 7**: Save raw response to S3 using `s3_client.save_raw_response()`
+    - **STEP 8**: Return formatted response with test_results and is_successful
+    - **VERIFICATION**: Check DynamoDB - should see 1 record with both `prompt` and `response` fields
     - _Requirements: 6.4, 7.2, 7.3, 7.6, 7.7, 10.3, 10.5, 10.6, 10.7, 10.8_
   
   - [ ] 10.6 Implement error handling
-    - Add try-catch blocks for all actions
-    - Log errors to DynamoDB
-    - Return structured error responses
+    - **CRITICAL**: Copy the EXACT error handling pattern from Requirements Analyst
+    - Add try-catch blocks for all actions (same structure as Requirements Analyst)
+    - Log errors to DynamoDB using `dynamodb_client.log_error_to_dynamodb()`
+    - Return structured error responses (same format as Requirements Analyst)
     - _Requirements: 10.4, 10.11_
+  
+  - [ ] 10.7 Test implementation and verify DynamoDB logging
+    - **IMPORTANT**: First verify the S3 bucket name by running `aws s3 ls | grep autoninja` to get the actual bucket name
+    - Update test file to use correct bucket: `f"autoninja-artifacts-{os.environ.get('AWS_ACCOUNT_ID', '784327326356')}-production"`
+    - Create `tests/deployment_manager/test_handler.py` following the same structure as `tests/solution_architect/test_handler.py`
+    - Run the test with all 4 actions (generate_cloudformation, deploy_stack, configure_agent, test_deployment)
+    - **VERIFICATION**: Query DynamoDB to confirm 4 records total (one per action, each containing both input and output)
+    - **NOTE**: Each record is created by `log_inference_input()` and then UPDATED by `log_inference_output()` - not separate records
+    - **VERIFICATION COMMAND**: `aws dynamodb scan --table-name autoninja-inference-records-production --filter-expression "agent_name = :agent AND begins_with(job_name, :job)" --expression-attribute-values '{":agent":{"S":"deployment-manager"}, ":job":{"S":"job-test-"}}' --region us-east-2 --query 'Count'`
+    - **SUCCESS CRITERIA**: All 4 tests pass AND 4 DynamoDB records exist AND artifacts saved to S3
+    - **FAILURE CONDITION**: If you see fewer than 4 records, review the code against Requirements Analyst implementation
 
 - [ ] 11. Create CloudFormation template for AutoNinja system
   - [ ] 11.1 Define template parameters
