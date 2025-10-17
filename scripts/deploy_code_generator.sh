@@ -1,13 +1,13 @@
 #!/bin/bash
-# Script to deploy Quality Validator Lambda function
+# Script to deploy Code Generator Lambda function
 
 set -e
 
 # Configuration
-FUNCTION_NAME="autoninja-quality-validator-production"
-HANDLER_DIR="lambda/quality-validator"
-BUILD_DIR="build/quality-validator"
-ZIP_FILE="build/quality-validator.zip"
+FUNCTION_NAME="autoninja-code-generator-production"
+HANDLER_DIR="lambda/code-generator"
+BUILD_DIR="build/code-generator"
+ZIP_FILE="build/code-generator.zip"
 
 # Check required environment variables
 if [ -z "$AWS_REGION" ]; then
@@ -20,7 +20,7 @@ if [ -z "$AWS_PROFILE" ]; then
 fi
 
 echo "========================================="
-echo "Deploying Quality Validator Lambda"
+echo "Deploying Code Generator Lambda"
 echo "========================================="
 echo "Function: $FUNCTION_NAME"
 echo "Region: $AWS_REGION"
@@ -57,5 +57,5 @@ echo ""
 echo "✅ Deployment complete!"
 echo ""
 echo "To test the function, run:"
-echo "  python tests/quality-validator/test_quality-validator_agent.py"
+echo "  python tests/code-generator/test_code-generator_agent.py"
 

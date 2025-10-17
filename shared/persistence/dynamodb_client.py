@@ -9,6 +9,7 @@ and persist data immediately.
 import os
 import json
 import time
+import uuid
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 from decimal import Decimal
@@ -44,7 +45,8 @@ class DynamoDBClient:
         action_name: str,
         prompt: str,
         inference_id: Optional[str] = None,
-        model_id: Optional[str] = None
+        model_id: Optional[str] = None,
+        id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Log raw inference input (prompt) to DynamoDB immediately.
@@ -60,14 +62,17 @@ class DynamoDBClient:
             prompt: Complete raw prompt sent to the model
             inference_id: Optional unique inference ID
             model_id: Optional model identifier
+            id: Optional UUID provided by orchestrator (generated if not provided)
             
         Returns:
             Dict containing the saved record
         """
         timestamp = datetime.utcnow().isoformat() + 'Z'
         inference_id = inference_id or f"{agent_name}-{action_name}-{int(time.time() * 1000)}"
+        record_id = id or str(uuid.uuid4())
         
         record = {
+            'id': record_id,
             'job_name': job_name,
             'timestamp': timestamp,
             'session_id': session_id,

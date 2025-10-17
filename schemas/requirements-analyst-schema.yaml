@@ -1,16 +1,14 @@
 openapi: 3.0.0
 info:
   title: Requirements Analyst Action Group API
-  description: API for extracting, analyzing, and validating requirements from user
-    requests
+  description: API for extracting, analyzing, and validating requirements from user requests
   version: 1.0.0
+
 paths:
   /extract-requirements:
     post:
       summary: Extract structured requirements from user request
-      description: Analyzes user request and extracts comprehensive requirements for
-        all sub-agents (Code Generator, Solution Architect, Quality Validator, Deployment
-        Manager)
+      description: Analyzes user request and extracts comprehensive requirements for all sub-agents
       operationId: extractRequirements
       requestBody:
         required: true
@@ -19,17 +17,15 @@ paths:
             schema:
               type: object
               required:
-              - job_name
-              - user_request
+                - job_name
+                - user_request
               properties:
                 job_name:
                   type: string
                   description: Unique job identifier in format job-{keyword}-{YYYYMMDD-HHMMSS}
-                  example: job-friend-20251013-143022
                 user_request:
                   type: string
                   description: Natural language description of the desired agent
-                  example: I would like a friend agent that can have conversations
       responses:
         '200':
           description: Requirements successfully extracted
@@ -37,57 +33,25 @@ paths:
             application/json:
               schema:
                 type: object
-                required:
-                - job_name
-                - requirements
-                - status
                 properties:
                   job_name:
                     type: string
+                    description: Job identifier
                   requirements:
-                    type: object
-                    properties:
-                      agent_purpose:
-                        type: string
-                      capabilities:
-                        type: array
-                        items:
-                          type: string
-                      interactions:
-                        type: array
-                        items:
-                          type: string
-                      data_needs:
-                        type: array
-                        items:
-                          type: string
-                      integrations:
-                        type: array
-                        items:
-                          type: string
-                      system_prompts:
-                        type: string
-                      lambda_requirements:
-                        type: object
-                      architecture_requirements:
-                        type: object
-                      deployment_requirements:
-                        type: object
-                      complexity:
-                        type: string
-                      additional_notes:
-                        type: string
+                    type: string
+                    description: JSON string containing structured requirements object
                   status:
                     type: string
+                    description: Status of operation
         '400':
           description: Invalid request
         '500':
           description: Internal server error
+
   /analyze-complexity:
     post:
       summary: Analyze complexity of requirements
-      description: Assesses the complexity of extracted requirements and provides
-        complexity score
+      description: Assesses the complexity of extracted requirements and provides complexity score
       operationId: analyzeComplexity
       requestBody:
         required: true
@@ -96,16 +60,15 @@ paths:
             schema:
               type: object
               required:
-              - job_name
-              - requirements
+                - job_name
+                - requirements
               properties:
                 job_name:
                   type: string
                   description: Unique job identifier
-                  example: job-friend-20251013-143022
                 requirements:
-                  type: object
-                  description: Previously extracted requirements
+                  type: string
+                  description: JSON string containing previously extracted requirements
       responses:
         '200':
           description: Complexity analysis completed
@@ -113,30 +76,24 @@ paths:
             application/json:
               schema:
                 type: object
-                required:
-                - job_name
-                - complexity_score
-                - assessment
                 properties:
                   job_name:
                     type: string
+                    description: Job identifier
                   complexity_score:
                     type: string
+                    description: Complexity score (low, medium, high)
                   assessment:
-                    type: object
-                    properties:
-                      estimated_effort:
-                        type: string
-                      key_challenges:
-                        type: array
-                        items:
-                          type: string
-                      recommended_approach:
-                        type: string
+                    type: string
+                    description: JSON string containing detailed complexity assessment
+                  status:
+                    type: string
+                    description: Status of operation
         '400':
           description: Invalid request
         '500':
           description: Internal server error
+
   /validate-requirements:
     post:
       summary: Validate completeness of requirements
@@ -149,16 +106,15 @@ paths:
             schema:
               type: object
               required:
-              - job_name
-              - requirements
+                - job_name
+                - requirements
               properties:
                 job_name:
                   type: string
                   description: Unique job identifier
-                  example: job-friend-20251013-143022
                 requirements:
-                  type: object
-                  description: Requirements to validate
+                  type: string
+                  description: JSON string containing requirements to validate
       responses:
         '200':
           description: Validation completed
@@ -166,23 +122,26 @@ paths:
             application/json:
               schema:
                 type: object
-                required:
-                - job_name
-                - is_valid
-                - missing_items
                 properties:
                   job_name:
                     type: string
+                    description: Job identifier
                   is_valid:
                     type: boolean
+                    description: Whether requirements are complete
                   missing_items:
                     type: array
                     items:
                       type: string
+                    description: List of missing requirement items
                   recommendations:
                     type: array
                     items:
                       type: string
+                    description: Recommendations for improvement
+                  status:
+                    type: string
+                    description: Status of operation
         '400':
           description: Invalid request
         '500':

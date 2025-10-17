@@ -1,15 +1,14 @@
 openapi: 3.0.0
 info:
   title: Deployment Manager Action Group API
-  description: API for generating CloudFormation templates, deploying stacks, configuring
-    agents, and testing deployments
+  description: API for generating CloudFormation templates, deploying stacks, configuring agents, and testing deployments
   version: 1.0.0
+
 paths:
   /generate-cloudformation:
     post:
       summary: Generate complete CloudFormation template
-      description: Creates comprehensive CloudFormation template including Lambda
-        functions, Bedrock Agent, action groups, and IAM roles
+      description: Creates comprehensive CloudFormation template including Lambda functions, Bedrock Agent, action groups, and IAM roles
       operationId: generateCloudformation
       requestBody:
         required: true
@@ -18,29 +17,23 @@ paths:
             schema:
               type: object
               required:
-              - job_name
-              - requirements
-              - code
-              - architecture
-              - validation_status
+                - job_name
               properties:
                 job_name:
                   type: string
                   description: Unique job identifier in format job-{keyword}-{YYYYMMDD-HHMMSS}
-                  example: job-friend-20251013-143022
                 requirements:
-                  type: object
-                  description: Requirements from Requirements Analyst
+                  type: string
+                  description: JSON string containing requirements from Requirements Analyst
                 code:
-                  type: object
-                  description: Code artifacts from Code Generator
+                  type: string
+                  description: JSON string containing code artifacts from Code Generator
                 architecture:
-                  type: object
-                  description: Architecture design from Solution Architect
+                  type: string
+                  description: JSON string containing architecture design from Solution Architect
                 validation_status:
                   type: string
-                  description: Validation status from Quality Validator (must be green
-                    light)
+                  description: Validation status from Quality Validator
       responses:
         '200':
           description: CloudFormation template successfully generated
@@ -48,22 +41,21 @@ paths:
             application/json:
               schema:
                 type: object
-                required:
-                - job_name
-                - cloudformation_template
-                - status
                 properties:
                   job_name:
                     type: string
+                    description: Job identifier
                   cloudformation_template:
                     type: string
                     description: Complete CloudFormation template in YAML format
                   status:
                     type: string
+                    description: Status of operation
         '400':
-          description: Invalid request or validation not passed
+          description: Invalid request
         '500':
           description: Internal server error
+
   /deploy-stack:
     post:
       summary: Deploy CloudFormation stack to AWS
@@ -76,21 +68,19 @@ paths:
             schema:
               type: object
               required:
-              - job_name
-              - cloudformation_template
-              - stack_name
+                - job_name
+                - cloudformation_template
+                - stack_name
               properties:
                 job_name:
                   type: string
                   description: Unique job identifier
-                  example: job-friend-20251013-143022
                 cloudformation_template:
                   type: string
                   description: CloudFormation template to deploy
                 stack_name:
                   type: string
                   description: Name for the CloudFormation stack
-                  example: friend-agent-stack
                 parameters:
                   type: string
                   description: JSON string containing stack parameters
@@ -101,18 +91,16 @@ paths:
             application/json:
               schema:
                 type: object
-                required:
-                - job_name
-                - stack_id
-                - status
                 properties:
                   job_name:
                     type: string
+                    description: Job identifier
                   stack_id:
                     type: string
                     description: CloudFormation stack ID
                   status:
                     type: string
+                    description: Deployment status
                   outputs:
                     type: string
                     description: JSON string containing stack outputs
@@ -123,11 +111,11 @@ paths:
           description: Invalid request
         '500':
           description: Internal server error
+
   /configure-agent:
     post:
       summary: Configure Bedrock Agent
-      description: Creates and configures Bedrock Agent with action groups and creates
-        agent alias
+      description: Creates and configures Bedrock Agent with action groups and creates agent alias
       operationId: configureAgent
       requestBody:
         required: true
@@ -136,28 +124,19 @@ paths:
             schema:
               type: object
               required:
-              - job_name
-              - agent_config
-              - lambda_arns
+                - job_name
+                - agent_config
+                - lambda_arns
               properties:
                 job_name:
                   type: string
                   description: Unique job identifier
-                  example: job-friend-20251013-143022
                 agent_config:
-                  type: object
-                  description: Agent configuration from Code Generator
-                  properties:
-                    agent_name:
-                      type: string
-                    instructions:
-                      type: string
-                    foundation_model:
-                      type: string
+                  type: string
+                  description: JSON string containing agent configuration from Code Generator
                 lambda_arns:
                   type: string
-                  description: JSON string containing map of action group names to
-                    Lambda ARNs
+                  description: JSON string containing map of action group names to Lambda ARNs
       responses:
         '200':
           description: Agent successfully configured
@@ -165,14 +144,10 @@ paths:
             application/json:
               schema:
                 type: object
-                required:
-                - job_name
-                - agent_id
-                - agent_arn
-                - alias_id
                 properties:
                   job_name:
                     type: string
+                    description: Job identifier
                   agent_id:
                     type: string
                     description: Bedrock Agent ID
@@ -182,10 +157,14 @@ paths:
                   alias_id:
                     type: string
                     description: Agent alias ID
+                  status:
+                    type: string
+                    description: Status of operation
         '400':
           description: Invalid request
         '500':
           description: Internal server error
+
   /test-deployment:
     post:
       summary: Test deployed agent
@@ -198,14 +177,13 @@ paths:
             schema:
               type: object
               required:
-              - job_name
-              - agent_id
-              - alias_id
+                - job_name
+                - agent_id
+                - alias_id
               properties:
                 job_name:
                   type: string
                   description: Unique job identifier
-                  example: job-friend-20251013-143022
                 agent_id:
                   type: string
                   description: Bedrock Agent ID to test
@@ -213,10 +191,8 @@ paths:
                   type: string
                   description: Agent alias ID to test
                 test_inputs:
-                  type: array
-                  description: Sample inputs for testing
-                  items:
-                    type: string
+                  type: string
+                  description: JSON string containing array of sample inputs for testing
       responses:
         '200':
           description: Testing completed
@@ -224,30 +200,19 @@ paths:
             application/json:
               schema:
                 type: object
-                required:
-                - job_name
-                - test_results
-                - is_successful
                 properties:
                   job_name:
                     type: string
+                    description: Job identifier
                   test_results:
-                    type: object
-                    description: Results from test invocations
-                    properties:
-                      tests_run:
-                        type: integer
-                      tests_passed:
-                        type: integer
-                      tests_failed:
-                        type: integer
-                      details:
-                        type: array
-                        items:
-                          type: object
+                    type: string
+                    description: JSON string containing results from test invocations
                   is_successful:
                     type: boolean
                     description: Whether all tests passed
+                  status:
+                    type: string
+                    description: Status of operation
         '400':
           description: Invalid request
         '500':

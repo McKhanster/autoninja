@@ -1,15 +1,14 @@
 openapi: 3.0.0
 info:
   title: Quality Validator Action Group API
-  description: API for validating code quality, performing security scans, and checking
-    compliance
+  description: API for validating code quality, performing security scans, and checking compliance
   version: 1.0.0
+
 paths:
   /validate-code:
     post:
       summary: Validate code quality
-      description: Performs comprehensive code quality validation including syntax,
-        error handling, logging, and structure checks
+      description: Performs comprehensive code quality validation including syntax, error handling, logging, and structure checks
       operationId: validateCode
       requestBody:
         required: true
@@ -18,21 +17,18 @@ paths:
             schema:
               type: object
               required:
-              - job_name
-              - code
+                - job_name
+                - code
               properties:
                 job_name:
                   type: string
                   description: Unique job identifier in format job-{keyword}-{YYYYMMDD-HHMMSS}
-                  example: job-friend-20251013-143022
                 code:
                   type: string
                   description: JSON string containing code artifacts to validate
                 language:
                   type: string
-                  description: Programming language
-                  default: python
-                  example: python
+                  description: Programming language (default python)
       responses:
         '200':
           description: Code validation completed
@@ -40,46 +36,31 @@ paths:
             application/json:
               schema:
                 type: object
-                required:
-                - job_name
-                - is_valid
-                - issues
-                - quality_score
                 properties:
                   job_name:
                     type: string
+                    description: Job identifier
                   is_valid:
                     type: boolean
-                    description: Whether code passes validation (threshold set to
-                      50% for testing)
+                    description: Whether code passes validation
                   issues:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        severity:
-                          type: string
-                        message:
-                          type: string
-                        file:
-                          type: string
-                        line:
-                          type: integer
+                    type: string
+                    description: JSON string containing list of code quality issues found
                   quality_score:
                     type: number
-                    format: float
-                    minimum: 0
-                    maximum: 100
                     description: Overall quality score (0-100)
+                  status:
+                    type: string
+                    description: Status of operation
         '400':
           description: Invalid request
         '500':
           description: Internal server error
+
   /security-scan:
     post:
       summary: Perform security scanning
-      description: Scans code for security vulnerabilities including hardcoded credentials,
-        injection risks, and improper IAM permissions
+      description: Scans code for security vulnerabilities including hardcoded credentials, injection risks, and improper IAM permissions
       operationId: securityScan
       requestBody:
         required: true
@@ -88,19 +69,18 @@ paths:
             schema:
               type: object
               required:
-              - job_name
-              - code
+                - job_name
+                - code
               properties:
                 job_name:
                   type: string
                   description: Unique job identifier
-                  example: job-friend-20251013-143022
                 code:
                   type: string
                   description: JSON string containing code artifacts to scan
                 iam_policies:
-                  type: object
-                  description: IAM policies to validate
+                  type: string
+                  description: JSON string containing IAM policies to validate
       responses:
         '200':
           description: Security scan completed
@@ -108,41 +88,28 @@ paths:
             application/json:
               schema:
                 type: object
-                required:
-                - job_name
-                - vulnerabilities
-                - risk_level
                 properties:
                   job_name:
                     type: string
+                    description: Job identifier
                   vulnerabilities:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        type:
-                          type: string
-                          description: Type of vulnerability
-                        severity:
-                          type: string
-                        description:
-                          type: string
-                        location:
-                          type: string
-                        remediation:
-                          type: string
+                    type: string
+                    description: JSON string containing list of security vulnerabilities found
                   risk_level:
                     type: string
-                    description: Overall risk assessment
+                    description: Overall risk assessment (low, medium, high)
+                  status:
+                    type: string
+                    description: Status of operation
         '400':
           description: Invalid request
         '500':
           description: Internal server error
+
   /compliance-check:
     post:
       summary: Check compliance with standards
-      description: Validates compliance with AWS best practices, Lambda best practices,
-        and Python PEP 8 standards
+      description: Validates compliance with AWS best practices, Lambda best practices, and Python PEP 8 standards
       operationId: complianceCheck
       requestBody:
         required: true
@@ -151,19 +118,18 @@ paths:
             schema:
               type: object
               required:
-              - job_name
-              - code
+                - job_name
+                - code
               properties:
                 job_name:
                   type: string
                   description: Unique job identifier
-                  example: job-friend-20251013-143022
                 code:
                   type: string
                   description: JSON string containing code artifacts to check
                 architecture:
-                  type: object
-                  description: Architecture design to validate
+                  type: string
+                  description: JSON string containing architecture design to validate
       responses:
         '200':
           description: Compliance check completed
@@ -171,32 +137,19 @@ paths:
             application/json:
               schema:
                 type: object
-                required:
-                - job_name
-                - compliant
-                - violations
                 properties:
                   job_name:
                     type: string
+                    description: Job identifier
                   compliant:
                     type: boolean
                     description: Whether code meets compliance standards
                   violations:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        standard:
-                          type: string
-                          description: Which standard was violated
-                        rule:
-                          type: string
-                        description:
-                          type: string
-                        severity:
-                          type: string
-                        recommendation:
-                          type: string
+                    type: string
+                    description: JSON string containing list of compliance violations found
+                  status:
+                    type: string
+                    description: Status of operation
         '400':
           description: Invalid request
         '500':

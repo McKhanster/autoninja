@@ -1,0 +1,8 @@
+openapi: 3.0.0
+info:
+  title: {{AGENT_TITLE}} Action Group API
+  description: {{AGENT_DESCRIPTION}}
+  version: 1.0.0
+
+paths:
+{{AGENT_PATHS}}

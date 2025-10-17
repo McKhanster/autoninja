@@ -250,6 +250,23 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 8. WHEN code is validated THEN it SHALL use linters and static analysis tools to detect errors and warnings
 9. WHEN a task fails quality gates THEN it SHALL NOT be marked as complete until all issues are resolved
 
+### Requirement 19: Implementation Consistency and Pattern Adherence
+
+**User Story:** As a developer implementing Lambda functions, I want a clear reference implementation and explicit pattern to follow, so that all agents have consistent structure and behavior without recurring mistakes.
+
+#### Acceptance Criteria
+
+1. WHEN implementing a new Lambda function THEN it SHALL use the Requirements Analyst handler as the canonical reference implementation
+2. WHEN the spec says "copy EXACT structure" THEN it SHALL mean: copy the control flow pattern (event parsing → routing → action handlers → error handling), NOT the business logic
+3. WHEN implementing action handlers THEN they SHALL follow the 3-phase pattern: (1) log input, (2) execute business logic, (3) log output and save artifacts
+4. WHEN calling log_inference_input() THEN it SHALL create a new DynamoDB record and return a timestamp
+5. WHEN calling log_inference_output() THEN it SHALL UPDATE the existing record (not create a new one) using the timestamp from log_inference_input()
+6. WHEN extracting parameters from Bedrock Agent events THEN it SHALL use the exact same parsing logic as Requirements Analyst
+7. WHEN returning responses THEN it SHALL use the exact same response format as Requirements Analyst
+8. WHEN handling errors THEN it SHALL use the exact same error handling pattern as Requirements Analyst
+9. WHEN writing tests THEN it SHALL follow the same test structure as Requirements Analyst tests
+10. WHEN verifying DynamoDB logging THEN it SHALL expect 1 record per action (not 2), with both prompt and response fields populated
+
 ### Requirement 18: Project Structure and File Organization
 
 **User Story:** As a developer, I want all files organized in their appropriate directories, so that the project structure is clean and maintainable.

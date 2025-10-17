@@ -57,5 +57,5 @@ echo ""
 echo "✅ Deployment complete!"
 echo ""
 echo "To test the function, run:"
-echo "  python tests/solution_architect/test_solution_architect_agent.py"
+echo "  python tests/solution-architect/test_solution-architect_agent.py"
 

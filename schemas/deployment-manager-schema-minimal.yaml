@@ -1,0 +1,41 @@
+openapi: 3.0.0
+info:
+  title: Deployment Manager Action Group API
+  description: API for generating CloudFormation templates
+  version: 1.0.0
+
+paths:
+  /generate-cloudformation:
+    post:
+      summary: Generate complete CloudFormation template
+      description: Creates comprehensive CloudFormation template
+      operationId: generateCloudformation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - job_name
+              properties:
+                job_name:
+                  type: string
+                  description: Unique job identifier
+      responses:
+        '200':
+          description: CloudFormation template successfully generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_name:
+                    type: string
+                    description: Job identifier
+                  cloudformation_template:
+                    type: string
+                    description: Complete CloudFormation template
+                  status:
+                    type: string
+                    description: Status of operation

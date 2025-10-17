@@ -57,4 +57,5 @@ echo ""
 echo "✅ Deployment complete!"
 echo ""
 echo "To test the function, run:"
-echo "  python lambda/requirements-analyst/test_handler.py"
+echo "  python tests/requirements-analyst/test_requirements-analyst_agent.py"
+

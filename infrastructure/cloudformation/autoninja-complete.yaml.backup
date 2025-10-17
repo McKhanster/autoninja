@@ -228,15 +228,6 @@ Resources:
             Condition:
               StringNotEquals:
                 "s3:x-amz-server-side-encryption": "aws:kms"
-
-  # Bucket policy for deployment artifacts bucket (schemas are stored here)
-  DeploymentArtifactsBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
           - Sid: AllowBedrockAgentReadSchemas
             Effect: Allow
             Principal:
@@ -245,11 +236,8 @@ Resources:
               - "s3:GetObject"
               - "s3:ListBucket"
             Resource:
-              - !Sub "arn:aws:s3:::autoninja-deployment-artifacts-${AWS::Region}"
-              - !Sub "arn:aws:s3:::autoninja-deployment-artifacts-${AWS::Region}/*"
-            Condition:
-              StringEquals:
-                "aws:SourceAccount": !Ref AWS::AccountId
+              - !GetAtt ArtifactsBucket.Arn
+              - !Sub "${ArtifactsBucket.Arn}/*"
 
   # ============================================================================
   # Lambda Layer for Shared Libraries
@@ -662,6 +650,7 @@ Resources:
   # ============================================================================
   # Lambda Permissions (Allow Bedrock to Invoke)
   # ============================================================================
+  # Note: Source ARNs will be added after Bedrock Agents are created
 
   RequirementsAnalystInvokePermission:
     Type: AWS::Lambda::Permission
@@ -670,7 +659,6 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: bedrock.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
-      SourceArn: !GetAtt RequirementsAnalystAgent.AgentArn
 
   CodeGeneratorInvokePermission:
     Type: AWS::Lambda::Permission
@@ -679,7 +667,6 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: bedrock.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
-      SourceArn: !GetAtt CodeGeneratorAgent.AgentArn
 
   SolutionArchitectInvokePermission:
     Type: AWS::Lambda::Permission
@@ -688,7 +675,6 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: bedrock.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
-      SourceArn: !GetAtt SolutionArchitectAgent.AgentArn
 
   QualityValidatorInvokePermission:
     Type: AWS::Lambda::Permission
@@ -697,7 +683,6 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: bedrock.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
-      SourceArn: !GetAtt QualityValidatorAgent.AgentArn
 
   DeploymentManagerInvokePermission:
     Type: AWS::Lambda::Permission
@@ -706,7 +691,6 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: bedrock.amazonaws.com
       SourceAccount: !Ref AWS::AccountId
-      SourceArn: !GetAtt DeploymentManagerAgent.AgentArn
 
   # ============================================================================
   # IAM Roles for Bedrock Agents
@@ -745,22 +729,6 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
                   - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-              - Sid: ReadSchemasFromS3
-                Effect: Allow
-                Action:
-                  - s3:GetObject
-                Resource: !Sub "arn:aws:s3:::autoninja-deployment-artifacts-${AWS::Region}/schemas/*"
-                Condition:
-                  StringEquals:
-                    "aws:ResourceAccount": !Ref AWS::AccountId
-              - Sid: ListSchemasBucket
-                Effect: Allow
-                Action:
-                  - s3:ListBucket
-                Resource: !Sub "arn:aws:s3:::autoninja-deployment-artifacts-${AWS::Region}"
-                Condition:
-                  StringEquals:
-                    "aws:ResourceAccount": !Ref AWS::AccountId
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -800,22 +768,6 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
                   - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-              - Sid: ReadSchemasFromS3
-                Effect: Allow
-                Action:
-                  - s3:GetObject
-                Resource: !Sub "arn:aws:s3:::autoninja-deployment-artifacts-${AWS::Region}/schemas/*"
-                Condition:
-                  StringEquals:
-                    "aws:ResourceAccount": !Ref AWS::AccountId
-              - Sid: ListSchemasBucket
-                Effect: Allow
-                Action:
-                  - s3:ListBucket
-                Resource: !Sub "arn:aws:s3:::autoninja-deployment-artifacts-${AWS::Region}"
-                Condition:
-                  StringEquals:
-                    "aws:ResourceAccount": !Ref AWS::AccountId
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -855,22 +807,6 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
                   - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-              - Sid: ReadSchemasFromS3
-                Effect: Allow
-                Action:
-                  - s3:GetObject
-                Resource: !Sub "arn:aws:s3:::autoninja-deployment-artifacts-${AWS::Region}/schemas/*"
-                Condition:
-                  StringEquals:
-                    "aws:ResourceAccount": !Ref AWS::AccountId
-              - Sid: ListSchemasBucket
-                Effect: Allow
-                Action:
-                  - s3:ListBucket
-                Resource: !Sub "arn:aws:s3:::autoninja-deployment-artifacts-${AWS::Region}"
-                Condition:
-                  StringEquals:
-                    "aws:ResourceAccount": !Ref AWS::AccountId
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -910,22 +846,6 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
                   - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-              - Sid: ReadSchemasFromS3
-                Effect: Allow
-                Action:
-                  - s3:GetObject
-                Resource: !Sub "arn:aws:s3:::autoninja-deployment-artifacts-${AWS::Region}/schemas/*"
-                Condition:
-                  StringEquals:
-                    "aws:ResourceAccount": !Ref AWS::AccountId
-              - Sid: ListSchemasBucket
-                Effect: Allow
-                Action:
-                  - s3:ListBucket
-                Resource: !Sub "arn:aws:s3:::autoninja-deployment-artifacts-${AWS::Region}"
-                Condition:
-                  StringEquals:
-                    "aws:ResourceAccount": !Ref AWS::AccountId
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -965,22 +885,6 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
                   - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-              - Sid: ReadSchemasFromS3
-                Effect: Allow
-                Action:
-                  - s3:GetObject
-                Resource: !Sub "arn:aws:s3:::autoninja-deployment-artifacts-${AWS::Region}/schemas/*"
-                Condition:
-                  StringEquals:
-                    "aws:ResourceAccount": !Ref AWS::AccountId
-              - Sid: ListSchemasBucket
-                Effect: Allow
-                Action:
-                  - s3:ListBucket
-                Resource: !Sub "arn:aws:s3:::autoninja-deployment-artifacts-${AWS::Region}"
-                Condition:
-                  StringEquals:
-                    "aws:ResourceAccount": !Ref AWS::AccountId
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -1035,10 +939,6 @@ Resources:
   # Requirements Analyst Bedrock Agent
   RequirementsAnalystAgent:
     Type: AWS::Bedrock::Agent
-    DependsOn:
-      - RequirementsAnalystFunction
-      - RequirementsAnalystAgentRole
-      - DeploymentArtifactsBucketPolicy
     Properties:
       AgentName: !Sub "autoninja-requirements-analyst-${Environment}"
       Description: Requirements Analyst agent - extracts and validates requirements from user requests
@@ -1068,9 +968,79 @@ Resources:
             Lambda: !GetAtt RequirementsAnalystFunction.Arn
           Description: Actions for requirements analysis
           ApiSchema:
-            S3:
-              S3BucketName: !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-              S3ObjectKey: schemas/requirements-analyst-schema.yaml
+            Payload: |
+              openapi: 3.0.0
+              info:
+                title: Requirements Analyst API
+                version: 1.0.0
+                description: API for requirements analysis
+              paths:
+                /extract-requirements:
+                  post:
+                    summary: Extract requirements
+                    description: Extract requirements
+                    operationId: extractRequirements
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                requirements:
+                                  type: string
+                                  description: Requirements
+                                status:
+                                  type: string
+                                  description: Status
+                /analyze-complexity:
+                  post:
+                    summary: Analyze complexity
+                    description: Analyze complexity
+                    operationId: analyzeComplexity
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                complexity_score:
+                                  type: string
+                                  description: Complexity score
+                                status:
+                                  type: string
+                                  description: Status
+                /validate-requirements:
+                  post:
+                    summary: Validate requirements
+                    description: Validate requirements
+                    operationId: validateRequirements
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                is_valid:
+                                  type: boolean
+                                  description: Is valid
+                                status:
+                                  type: string
+                                  description: Status
       Tags:
         Environment: !Ref Environment
         Application: AutoNinja
@@ -1078,10 +1048,6 @@ Resources:
   # Code Generator Bedrock Agent
   CodeGeneratorAgent:
     Type: AWS::Bedrock::Agent
-    DependsOn:
-      - CodeGeneratorFunction
-      - CodeGeneratorAgentRole
-      - DeploymentArtifactsBucketPolicy
     Properties:
       AgentName: !Sub "autoninja-code-generator-${Environment}"
       Description: Code Generator agent - generates Lambda code, agent configs, and OpenAPI schemas
@@ -1110,9 +1076,79 @@ Resources:
             Lambda: !GetAtt CodeGeneratorFunction.Arn
           Description: Actions for code generation
           ApiSchema:
-            S3:
-              S3BucketName: !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-              S3ObjectKey: schemas/code-generator-schema.yaml
+            Payload: |
+              openapi: 3.0.0
+              info:
+                title: Code Generator API
+                version: 1.0.0
+                description: API for generating Lambda code, agent configurations, and OpenAPI schemas
+              paths:
+                /generate-lambda-code:
+                  post:
+                    summary: Generate Lambda code
+                    description: Generate Lambda function code
+                    operationId: generateLambdaCode
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                lambda_code:
+                                  type: string
+                                  description: Generated code
+                                status:
+                                  type: string
+                                  description: Status
+                /generate-agent-config:
+                  post:
+                    summary: Generate agent configuration
+                    description: Generate Bedrock Agent configuration
+                    operationId: generateAgentConfig
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                agent_config:
+                                  type: string
+                                  description: Agent configuration
+                                status:
+                                  type: string
+                                  description: Status
+                /generate-openapi-schema:
+                  post:
+                    summary: Generate OpenAPI schema
+                    description: Generate OpenAPI schema for action groups
+                    operationId: generateOpenapiSchema
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                openapi_schema:
+                                  type: string
+                                  description: OpenAPI schema
+                                status:
+                                  type: string
+                                  description: Status
       Tags:
         Environment: !Ref Environment
         Application: AutoNinja
@@ -1120,10 +1156,6 @@ Resources:
   # Solution Architect Bedrock Agent
   SolutionArchitectAgent:
     Type: AWS::Bedrock::Agent
-    DependsOn:
-      - SolutionArchitectFunction
-      - SolutionArchitectAgentRole
-      - DeploymentArtifactsBucketPolicy
     Properties:
       AgentName: !Sub "autoninja-solution-architect-${Environment}"
       Description: Solution Architect agent - designs AWS architecture and generates IaC
@@ -1153,9 +1185,79 @@ Resources:
             Lambda: !GetAtt SolutionArchitectFunction.Arn
           Description: Actions for architecture design
           ApiSchema:
-            S3:
-              S3BucketName: !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-              S3ObjectKey: schemas/solution-architect-schema.yaml
+            Payload: |
+              openapi: 3.0.0
+              info:
+                title: Solution Architect API
+                version: 1.0.0
+                description: API for designing AWS architecture
+              paths:
+                /design-architecture:
+                  post:
+                    summary: Design architecture
+                    description: Design AWS architecture
+                    operationId: designArchitecture
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                architecture:
+                                  type: string
+                                  description: Architecture design
+                                status:
+                                  type: string
+                                  description: Status
+                /select-services:
+                  post:
+                    summary: Select AWS services
+                    description: Select appropriate AWS services
+                    operationId: selectServices
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                services:
+                                  type: string
+                                  description: Selected services
+                                status:
+                                  type: string
+                                  description: Status
+                /generate-iac:
+                  post:
+                    summary: Generate IaC templates
+                    description: Generate infrastructure-as-code
+                    operationId: generateIac
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                cloudformation_template:
+                                  type: string
+                                  description: CloudFormation template
+                                status:
+                                  type: string
+                                  description: Status
       Tags:
         Environment: !Ref Environment
         Application: AutoNinja
@@ -1163,10 +1265,6 @@ Resources:
   # Quality Validator Bedrock Agent
   QualityValidatorAgent:
     Type: AWS::Bedrock::Agent
-    DependsOn:
-      - QualityValidatorFunction
-      - QualityValidatorAgentRole
-      - DeploymentArtifactsBucketPolicy
     Properties:
       AgentName: !Sub "autoninja-quality-validator-${Environment}"
       Description: Quality Validator agent - validates code quality, security, and compliance
@@ -1195,9 +1293,82 @@ Resources:
             Lambda: !GetAtt QualityValidatorFunction.Arn
           Description: Actions for quality validation
           ApiSchema:
-            S3:
-              S3BucketName: !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-              S3ObjectKey: schemas/quality-validator-schema.yaml
+            Payload: |
+              openapi: 3.0.0
+              info:
+                title: Quality Validator API
+                version: 1.0.0
+                description: API for validating code quality
+              paths:
+                /validate-code:
+                  post:
+                    summary: Validate code
+                    description: Validate code quality
+                    operationId: validateCode
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                is_valid:
+                                  type: boolean
+                                  description: Validation result
+                                issues:
+                                  type: string
+                                  description: Quality issues
+                                status:
+                                  type: string
+                                  description: Status
+                /security-scan:
+                  post:
+                    summary: Security scan
+                    description: Perform security scanning
+                    operationId: securityScan
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                vulnerabilities:
+                                  type: string
+                                  description: Security vulnerabilities
+                                status:
+                                  type: string
+                                  description: Status
+                /compliance-check:
+                  post:
+                    summary: Compliance check
+                    description: Check compliance
+                    operationId: complianceCheck
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                violations:
+                                  type: string
+                                  description: Compliance violations
+                                status:
+                                  type: string
+                                  description: Status
       Tags:
         Environment: !Ref Environment
         Application: AutoNinja
@@ -1205,10 +1376,6 @@ Resources:
   # Deployment Manager Bedrock Agent
   DeploymentManagerAgent:
     Type: AWS::Bedrock::Agent
-    DependsOn:
-      - DeploymentManagerFunction
-      - DeploymentManagerAgentRole
-      - DeploymentArtifactsBucketPolicy
     Properties:
       AgentName: !Sub "autoninja-deployment-manager-${Environment}"
       Description: Deployment Manager agent - deploys validated agents to AWS
@@ -1239,9 +1406,104 @@ Resources:
             Lambda: !GetAtt DeploymentManagerFunction.Arn
           Description: Actions for deployment management
           ApiSchema:
-            S3:
-              S3BucketName: !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-              S3ObjectKey: schemas/deployment-manager-schema.yaml
+            Payload: |
+              openapi: 3.0.0
+              info:
+                title: Deployment Manager API
+                version: 1.0.0
+                description: API for deployment management
+              paths:
+                /generate-cloudformation:
+                  post:
+                    summary: Generate CloudFormation template
+                    description: Generate CloudFormation template
+                    operationId: generateCloudformation
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                cloudformation_template:
+                                  type: string
+                                  description: CloudFormation template
+                                status:
+                                  type: string
+                                  description: Status
+                /deploy-stack:
+                  post:
+                    summary: Deploy stack
+                    description: Deploy CloudFormation stack
+                    operationId: deployStack
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                stack_id:
+                                  type: string
+                                  description: Stack ID
+                                status:
+                                  type: string
+                                  description: Status
+                /configure-agent:
+                  post:
+                    summary: Configure agent
+                    description: Configure Bedrock Agent
+                    operationId: configureAgent
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                agent_id:
+                                  type: string
+                                  description: Agent ID
+                                status:
+                                  type: string
+                                  description: Status
+                /test-deployment:
+                  post:
+                    summary: Test deployment
+                    description: Test deployed agent
+                    operationId: testDeployment
+                    responses:
+                      '200':
+                        description: Success
+                        content:
+                          'application/json':
+                            schema:
+                              type: object
+                              properties:
+                                job_name:
+                                  type: string
+                                  description: Job identifier
+                                test_results:
+                                  type: string
+                                  description: Test results
+                                is_successful:
+                                  type: boolean
+                                  description: Is successful
+                                status:
+                                  type: string
+                                  description: Status
       Tags:
         Environment: !Ref Environment
         Application: AutoNinja
@@ -1306,8 +1568,6 @@ Resources:
 
   SupervisorAgent:
     Type: AWS::Bedrock::Agent
-    DependsOn:
-      - DeploymentArtifactsBucketPolicy
     Properties:
       AgentName: !Sub "autoninja-supervisor-${Environment}"
       Description: Supervisor agent - orchestrates the complete workflow from user request to deployed agent
