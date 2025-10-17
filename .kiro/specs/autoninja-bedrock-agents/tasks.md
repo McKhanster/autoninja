@@ -673,148 +673,196 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Verify DynamoDB records created for BEDROCK Agent invocations
     - Verify S3 artifacts saved correctly
 
-- [ ] 11. Create CloudFormation template for AutoNinja system
+  - [ ] 10.10 Comprehensive E2E test for each Bedrock Agent
+    - [ ] 10.10.1 Test Requirements Analyst Agent E2E
+      - Invoke agent via InvokeAgent API with realistic user request
+      - Verify extract_requirements action returns structured requirements
+      - Verify analyze_complexity action returns complexity assessment
+      - Verify validate_requirements action returns validation results
+      - Verify all DynamoDB records created with both prompt and response
+      - Verify all S3 artifacts saved correctly
+      - _Requirements: 15.4, 17.1, 17.2, 17.3_
+    
+    - [ ] 10.10.2 Test Code Generator Agent E2E
+      - Invoke agent via InvokeAgent API with requirements from previous test
+      - Verify generate_lambda_code action returns Python code
+      - Verify generate_agent_config action returns Bedrock Agent config
+      - Verify generate_openapi_schema action returns valid OpenAPI schema
+      - Verify all DynamoDB records created with both prompt and response
+      - Verify all S3 artifacts saved correctly
+      - _Requirements: 15.4, 17.1, 17.2, 17.3_
+    
+    - [ ] 10.10.3 Test Solution Architect Agent E2E
+      - Invoke agent via InvokeAgent API with requirements and code references
+      - Verify design_architecture action returns architecture design
+      - Verify select_services action returns AWS service selection
+      - Verify generate_iac action returns CloudFormation template
+      - Verify all DynamoDB records created with both prompt and response
+      - Verify all S3 artifacts saved correctly
+      - _Requirements: 15.4, 17.1, 17.2, 17.3_
+    
+    - [ ] 10.10.4 Test Quality Validator Agent E2E
+      - Invoke agent via InvokeAgent API with code, architecture, and requirements
+      - Verify validate_code action returns quality report
+      - Verify security_scan action returns security findings
+      - Verify compliance_check action returns compliance report
+      - Verify all DynamoDB records created with both prompt and response
+      - Verify all S3 artifacts saved correctly
+      - _Requirements: 15.4, 17.1, 17.2, 17.3_
+    
+    - [ ] 10.10.5 Test Deployment Manager Agent E2E
+      - Invoke agent via InvokeAgent API with all artifacts and validation green light
+      - Verify generate_cloudformation action returns complete CFN template
+      - Verify deploy_stack action deploys stack successfully (or simulates)
+      - Verify configure_agent action returns agent configuration
+      - Verify test_deployment action returns test results
+      - Verify all DynamoDB records created with both prompt and response
+      - Verify all S3 artifacts saved correctly
+      - _Requirements: 15.4, 17.1, 17.2, 17.3_
 
-  - [ ] 11.1 Define template parameters
+- [ ] 11. Implement Orchestrator/Supervisor Agent
 
-    - Environment (production/staging/dev)
-    - BedrockModel (foundation model ID)
-    - DynamoDBBillingMode (PAY_PER_REQUEST or PROVISIONED)
-    - S3BucketName (optional custom bucket name)
-    - LogRetentionDays (CloudWatch log retention)
-    - _Requirements: 9.1, 9.10_
+  **IMPORTANT**: Read AWS Bedrock Agent multi-agent collaboration documentation before starting:
+  - Multi-agent collaboration overview: https://docs.aws.amazon.com/bedrock/latest/userguide/agents-multi-agent-collaboration.html
+  - Creating multi-agent collaboration: https://docs.aws.amazon.com/bedrock/latest/userguide/create-multi-agent-collaboration.html
+  - InvokeAgent API reference: https://docs.aws.amazon.com/bedrock/latest/APIReference/API_agent-runtime_InvokeAgent.html
+  - Custom orchestration (optional advanced feature): https://docs.aws.amazon.com/bedrock/latest/userguide/agents-custom-orchestration.html
 
-  - [ ] 10.2 Define DynamoDB table resource
+  **Key AWS Concepts**:
+  - Supervisor agent coordinates responses from collaborator agents OR routes to appropriate collaborator
+  - Maximum 10 collaborator agents per supervisor
+  - Each collaborator must have an alias (not just agent ID)
+  - Collaboration instructions tell supervisor when to use each collaborator
+  - Conversation history sharing is optional per collaborator
+  - Supervisor uses `agentCollaboration: SUPERVISOR` or `SUPERVISOR_ROUTER`
+  - Collaborators use `agentCollaboration: DISABLED`
 
-    - Table name: autoninja-inference-records
-    - Partition key: job_name (String)
-    - Sort key: timestamp (String)
-    - GSI on session_id
-    - GSI on agent_name + timestamp
-    - On-demand billing mode
-    - Point-in-time recovery enabled
-    - KMS encryption enabled
-    - _Requirements: 9.4, 9.8_
+  - [ ] 11.1 Design supervisor agent orchestration logic
 
-  - [ ] 10.3 Define S3 bucket resource
+    - Read AWS documentation on multi-agent collaboration patterns
+    - Define supervisor agent instructions that:
+      - Generate unique job_name from user request (format: job-{keyword}-{YYYYMMDD-HHMMSS})
+      - Pass job_name to ALL collaborators in every request
+      - Understand the pipeline order: Requirements → Code → Architecture → Validation → Deployment
+      - Delegate to Requirements Analyst first to generate requirements for ALL sub-agents
+      - Distribute requirements to all downstream agents
+      - Coordinate responses from collaborators
+      - Handle validation gates (Quality Validator must approve before Deployment Manager)
+    - Define collaboration instructions for each collaborator (when to use them)
+    - Decide on conversation history sharing strategy per collaborator
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 9.2_
 
-    - Bucket name: autoninja-artifacts-{account-id}
-    - Versioning enabled
-    - KMS encryption enabled
-    - Bucket policy for Lambda access
-    - Lifecycle policy for archival
-    - _Requirements: 9.4, 9.9_
+  - [ ] 11.2 Implement supervisor agent Lambda function (if using custom orchestration)
 
-  - [ ] 10.4 Define Lambda Layer resource
+    **NOTE**: This task is OPTIONAL. AWS Bedrock provides built-in orchestration for supervisor agents.
+    Only implement custom orchestration if you need complex workflow logic beyond AWS's built-in capabilities.
 
-    - Layer name: autoninja-shared-layer
-    - Include shared persistence, models, and utils code
-    - Compatible with Python 3.9+
-    - _Requirements: 9.4, 9.10_
+    - Read AWS documentation on custom orchestration
+    - Create `lambda/supervisor-orchestrator/handler.py`
+    - Implement state machine for orchestration:
+      - START → Invoke Requirements Analyst
+      - Requirements complete → Invoke Code Generator with requirements
+      - Code complete → Invoke Solution Architect with requirements + code
+      - Architecture complete → Invoke Quality Validator with all artifacts
+      - Validation pass → Invoke Deployment Manager with all artifacts + green light
+      - Validation fail → Return error to user
+    - Implement job_name generation and distribution logic
+    - Implement error handling and retry logic
+    - Log all orchestration decisions to DynamoDB
+    - _Requirements: 1.2, 1.3, 1.4, 7.1, 10.1, 10.2_
 
-  - [ ] 10.5 Define IAM roles for Lambda functions
+  - [ ] 11.3 Update CloudFormation template with supervisor agent
 
-    - Create 5 Lambda execution roles (one per collaborator agent)
-    - Attach policies for CloudWatch Logs, DynamoDB, S3, X-Ray
-    - Deployment Manager role includes additional CloudFormation, Bedrock, IAM permissions
-    - Follow least-privilege principles
-    - _Requirements: 9.5, 9.6, 13.2, 13.3_
+    - Read existing CloudFormation template at `infrastructure/cloudformation/autoninja-complete.yaml`
+    - Verify all 5 collaborator agents are already defined (from task 2.9)
+    - Verify all 5 collaborator agent aliases are already defined (from task 2.10)
+    - Update supervisor agent resource (already exists from task 2.11) with:
+      - Comprehensive orchestration instructions
+      - Foundation model: anthropic.claude-sonnet-4-5-20250929-v1:0
+      - agentCollaboration: SUPERVISOR (or SUPERVISOR_ROUTER for lower latency)
+      - IAM role with permissions to invoke collaborator agents
+      - Optional: Custom orchestration Lambda ARN (if using custom orchestration)
+    - Update supervisor agent alias (already exists from task 2.12)
+    - Update agent collaborator associations (already exists from task 2.13) with:
+      - Associate all 5 collaborator agents using AssociateAgentCollaborator
+      - Provide collaboration instructions for each collaborator
+      - Configure conversation history sharing per collaborator
+    - Add IAM permissions for supervisor to invoke collaborator agents
+    - _Requirements: 9.2, 9.4, 9.11, 1.5_
 
-  - [ ] 10.6 Define Lambda function resources
+  - [ ] 11.4 Create supervisor agent invocation script
 
-    - Create 5 Lambda functions (requirements-analyst, code-generator, solution-architect, quality-validator, deployment-manager)
-    - Attach Lambda Layer
-    - Set environment variables (DYNAMODB_TABLE_NAME, S3_BUCKET_NAME, LOG_LEVEL)
-    - Enable X-Ray tracing
-    - Set appropriate memory and timeout
-    - _Requirements: 9.3, 9.4_
-
-  - [ ] 10.7 Define Lambda permissions
-
-    - Create resource-based policies allowing bedrock.amazonaws.com to invoke each Lambda
-    - Specify source ARN for each Bedrock Agent
-    - _Requirements: 9.7, 13.3_
-
-  - [ ] 10.8 Define IAM roles for Bedrock Agents
-
-    - Create 6 Bedrock Agent execution roles (1 supervisor + 5 collaborators)
-    - Attach policies for InvokeModel and InvokeFunction
-    - Follow least-privilege principles
-    - _Requirements: 9.5, 9.6, 13.1_
-
-  - [ ] 10.9 Define Bedrock collaborator agent resources
-
-    - Create 5 collaborator agents (requirements-analyst, code-generator, solution-architect, quality-validator, deployment-manager)
-    - Set foundation model, instructions, and IAM role
-    - Configure action groups with Lambda ARNs and OpenAPI schemas
-    - Set agentCollaboration to DISABLED (collaborators don't coordinate)
-    - _Requirements: 9.2, 9.4_
-
-  - [ ] 10.10 Define Bedrock collaborator agent aliases
-
-    - Create production alias for each of the 5 collaborator agents
-    - _Requirements: 9.2, 9.4_
-
-  - [ ] 10.11 Define Bedrock supervisor agent resource
-
-    - Create supervisor agent with foundation model and instructions
-    - Set agentCollaboration to SUPERVISOR
-    - No action groups (coordination only)
-    - Set IAM role
-    - _Requirements: 9.2, 9.4_
-
-  - [ ] 10.12 Define Bedrock supervisor agent alias
-
-    - Create production alias for supervisor agent
-    - _Requirements: 9.2, 9.4_
-
-  - [ ] 10.13 Define agent collaborator associations
-
-    - Associate 5 collaborator agents with supervisor agent
-    - Configure collaboration instructions for each collaborator
-    - Enable conversation history sharing (optional per collaborator)
-    - _Requirements: 9.4, 9.11_
-
-  - [ ] 10.14 Define CloudWatch log groups
-
-    - Create log groups for 6 Bedrock Agents
-    - Create log groups for 5 Lambda functions
-    - Set retention period (default 30 days)
-    - _Requirements: 8.2, 9.4, 9.10_
-
-  - [ ] 10.15 Define stack outputs
-    - Output supervisor agent ID, ARN, and alias ID
-    - Output all 5 collaborator agent IDs
-    - Output DynamoDB table name
-    - Output S3 bucket name
-    - Output invocation command for testing
-    - _Requirements: 9.10_
-
-- [ ] 11. Create example scripts and documentation
-
-  - [ ] 11.1 Create invoke_supervisor.py script
-
-    - Script to invoke supervisor agent with user request
-    - Parse command-line arguments (agent-id, alias-id, request)
-    - Use boto3 to call InvokeAgent API
-    - Display response
+    - Create `examples/invoke_supervisor.py` script
+    - Use boto3 bedrock-agent-runtime client
+    - Implement InvokeAgent API call with:
+      - agentId: supervisor agent ID
+      - agentAliasId: supervisor agent alias ID
+      - sessionId: unique session ID (or reuse for conversation)
+      - inputText: user request
+      - enableTrace: true (for debugging)
+    - Handle streaming response from InvokeAgent
+    - Parse and display agent responses
+    - Display trace information for debugging
     - _Requirements: 16.5_
 
-  - [ ] 11.2 Create query_inference.py script
+  - [ ] 11.5 Test supervisor agent orchestration
+
+    - Deploy updated CloudFormation template with supervisor agent
+    - Invoke supervisor agent with test request: "I would like a friend agent"
+    - Verify supervisor generates job_name correctly
+    - Verify supervisor delegates to Requirements Analyst first
+    - Verify supervisor distributes requirements to downstream agents
+    - Verify supervisor coordinates responses from all collaborators
+    - Verify supervisor handles validation gates correctly
+    - Verify all DynamoDB records created with job_name
+    - Verify all S3 artifacts saved under job_name prefix
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 15.4_
+
+  - [ ] 11.6 Implement end-to-end integration test
+
+    - Create `tests/integration/test_supervisor_e2e.py`
+    - Test complete workflow from user request to deployed agent:
+      - Invoke supervisor with realistic user request
+      - Wait for Requirements Analyst to complete
+      - Wait for Code Generator to complete
+      - Wait for Solution Architect to complete
+      - Wait for Quality Validator to complete
+      - Wait for Deployment Manager to complete (or simulate)
+    - Verify all agents invoked in correct order
+    - Verify job_name used consistently across all agents
+    - Verify all DynamoDB records created
+    - Verify all S3 artifacts saved
+    - Verify final response contains deployed agent ARN
+    - _Requirements: 15.4, 17.1, 17.2, 17.3_
+
+  - [ ] 11.7 Document supervisor agent architecture
+
+    - Create `docs/supervisor-agent-architecture.md`
+    - Document supervisor agent design decisions
+    - Document orchestration workflow and state transitions
+    - Document collaboration instructions for each collaborator
+    - Document job_name generation and distribution strategy
+    - Document error handling and retry logic
+    - Include architecture diagrams (use Mermaid)
+    - _Requirements: 16.1, 16.2_
+
+- [ ] 12. Create example scripts and documentation
+
+  - [ ] 12.1 Create query_inference.py script
 
     - Script to query DynamoDB for inference records by job_name
     - Display all inferences in chronological order
     - Show tokens used, cost, duration for each inference
     - _Requirements: 16.6_
 
-  - [ ] 11.3 Create analyze_artifacts.py script
+  - [ ] 12.2 Create analyze_artifacts.py script
 
     - Script to list and download artifacts from S3 for a given job_name
     - Display artifact structure
     - Option to download specific artifacts
     - _Requirements: 16.6_
 
-  - [ ] 11.4 Create deployment guide documentation
+  - [ ] 12.3 Create deployment guide documentation
 
     - Document CloudFormation deployment steps
     - Document prerequisites (AWS account, Bedrock access, CLI configuration)
@@ -822,7 +870,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Document how to get stack outputs
     - _Requirements: 16.2_
 
-  - [ ] 11.5 Create usage examples documentation
+  - [ ] 12.4 Create usage examples documentation
 
     - Document how to invoke the supervisor agent
     - Provide example user requests
@@ -830,14 +878,14 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Document how to retrieve artifacts
     - _Requirements: 16.5, 16.6_
 
-  - [ ] 11.6 Create troubleshooting guide
+  - [ ] 12.5 Create troubleshooting guide
     - Document common issues and solutions
     - Document how to check CloudWatch logs
     - Document how to view X-Ray traces
     - Document how to debug failed deployments
     - _Requirements: 16.4_
 
-- [ ]\* 12. Implement unit tests for shared libraries
+- [ ]\* 13. Implement unit tests for shared libraries
 
   - Write unit tests for DynamoDB client operations (NO MOCKING - test against real DynamoDB)
   - Write unit tests for S3 client operations (NO MOCKING - test against real S3)
@@ -846,7 +894,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
   - Use pytest for testing framework
   - _Requirements: 15.1, 17.5_
 
-- [ ]\* 13. Implement integration tests for Lambda functions
+- [ ]\* 14. Implement integration tests for Lambda functions
 
   - Write integration tests for Requirements Analyst Lambda (NO MOCKING - real LLM calls)
   - Write integration tests for Code Generator Lambda (NO MOCKING - real LLM calls)
@@ -857,7 +905,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
   - Deploy to test environment and verify end-to-end flow
   - _Requirements: 15.2, 17.5_
 
-- [ ]\* 14. Implement end-to-end tests
+- [ ]\* 15. Implement end-to-end tests
   - Test complete workflow from user request to deployed agent (NO MOCKING - real LLM calls)
   - Verify all inference records are saved to DynamoDB
   - Verify all artifacts are saved to S3
