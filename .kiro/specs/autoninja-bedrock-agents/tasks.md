@@ -666,6 +666,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Create/update alias to point to new version
 
   - [x] 10.9 Test Deployment Manager BEDROCK Agent end-to-end
+
     - Create test script `tests/deployment-manager/test_deployment_manager_agent.py`
     - Invoke BEDROCK Agent with test code samples
     - Verify all 3 actions work
@@ -674,7 +675,9 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Verify S3 artifacts saved correctly
 
   - [x] 10.10 Comprehensive E2E test for each Bedrock Agent
+
     - [ ] 10.10.1 Test Requirements Analyst Agent E2E
+
       - Invoke agent via InvokeAgent API with realistic user request
       - Verify extract_requirements action returns structured requirements
       - Verify analyze_complexity action returns complexity assessment
@@ -682,8 +685,9 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
       - Verify all DynamoDB records created with both prompt and response
       - Verify all S3 artifacts saved correctly
       - _Requirements: 15.4, 17.1, 17.2, 17.3_
-    
+
     - [ ] 10.10.2 Test Code Generator Agent E2E
+
       - Invoke agent via InvokeAgent API with requirements from previous test
       - Verify generate_lambda_code action returns Python code
       - Verify generate_agent_config action returns Bedrock Agent config
@@ -691,8 +695,9 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
       - Verify all DynamoDB records created with both prompt and response
       - Verify all S3 artifacts saved correctly
       - _Requirements: 15.4, 17.1, 17.2, 17.3_
-    
+
     - [ ] 10.10.3 Test Solution Architect Agent E2E
+
       - Invoke agent via InvokeAgent API with requirements and code references
       - Verify design_architecture action returns architecture design
       - Verify select_services action returns AWS service selection
@@ -700,8 +705,9 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
       - Verify all DynamoDB records created with both prompt and response
       - Verify all S3 artifacts saved correctly
       - _Requirements: 15.4, 17.1, 17.2, 17.3_
-    
+
     - [ ] 10.10.4 Test Quality Validator Agent E2E
+
       - Invoke agent via InvokeAgent API with code, architecture, and requirements
       - Verify validate_code action returns quality report
       - Verify security_scan action returns security findings
@@ -709,7 +715,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
       - Verify all DynamoDB records created with both prompt and response
       - Verify all S3 artifacts saved correctly
       - _Requirements: 15.4, 17.1, 17.2, 17.3_
-    
+
     - [ ] 10.10.5 Test Deployment Manager Agent E2E
       - Invoke agent via InvokeAgent API with all artifacts and validation green light
       - Verify generate_cloudformation action returns complete CFN template
@@ -720,130 +726,299 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
       - Verify all S3 artifacts saved correctly
       - _Requirements: 15.4, 17.1, 17.2, 17.3_
 
-- [ ] 11. Implement Orchestrator/Supervisor Agent
+- [-] 11. Implement Orchestrator/Supervisor Agent with AgentCore Runtime
 
-  **IMPORTANT**: Read AWS Bedrock Agent multi-agent collaboration documentation before starting:
-  - Multi-agent collaboration overview: https://docs.aws.amazon.com/bedrock/latest/userguide/agents-multi-agent-collaboration.html
-  - Creating multi-agent collaboration: https://docs.aws.amazon.com/bedrock/latest/userguide/create-multi-agent-collaboration.html
-  - InvokeAgent API reference: https://docs.aws.amazon.com/bedrock/latest/APIReference/API_agent-runtime_InvokeAgent.html
-  - Custom orchestration (optional advanced feature): https://docs.aws.amazon.com/bedrock/latest/userguide/agents-custom-orchestration.html
+  **CRITICAL EXECUTION RULES**:
 
-  **Key AWS Concepts**:
-  - Supervisor agent coordinates responses from collaborator agents OR routes to appropriate collaborator
-  - Maximum 10 collaborator agents per supervisor
-  - Each collaborator must have an alias (not just agent ID)
-  - Collaboration instructions tell supervisor when to use each collaborator
-  - Conversation history sharing is optional per collaborator
-  - Supervisor uses `agentCollaboration: SUPERVISOR` or `SUPERVISOR_ROUTER`
-  - Collaborators use `agentCollaboration: DISABLED`
+  - **ALWAYS** read ALL spec documents (requirements.md, design.md, tasks.md) at the start of EVERY task
+  - **ALWAYS** audit existing code in infrastructure/cloudformation/autoninja-complete.yaml for compatibility
+  - **IF** an error occurs that is not simple, use AWS Documentation MCP to find solution
+  - **IF** there are ANY errors, the task CANNOT be marked as complete until resolved
+  - **NEVER** mark a task complete if errors exist
 
-  - [ ] 11.1 Design supervisor agent orchestration logic
+  **IMPORTANT**: Read AWS documentation before starting:
 
-    - Read AWS documentation on multi-agent collaboration patterns
-    - Define supervisor agent instructions that:
-      - Generate unique job_name from user request (format: job-{keyword}-{YYYYMMDD-HHMMSS})
-      - Pass job_name to ALL collaborators in every request
-      - Understand the pipeline order: Requirements → Code → Architecture → Validation → Deployment
-      - Delegate to Requirements Analyst first to generate requirements for ALL sub-agents
-      - Distribute requirements to all downstream agents
-      - Coordinate responses from collaborators
-      - Handle validation gates (Quality Validator must approve before Deployment Manager)
-    - Define collaboration instructions for each collaborator (when to use them)
-    - Decide on conversation history sharing strategy per collaborator
+  - **AgentCore Runtime**: https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agents-tools-runtime.html
+  - **AgentCore Starter Toolkit**: https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-toolkit.html
+  - Multi-agent collaboration: https://docs.aws.amazon.com/bedrock/latest/userguide/agents-multi-agent-collaboration.html
+  - InvokeAgentRuntime API: https://docs.aws.amazon.com/bedrock-agentcore/latest/APIReference/API_InvokeAgentRuntime.html
+
+  **Architecture Overview**:
+
+  - **Supervisor Agent**: Deployed to AgentCore Runtime (for hackathon requirement)
+  - **5 Collaborator Agents**: Regular Bedrock Agents with Lambda action groups (existing)
+  - **Orchestration**: Logical sequential workflow (Requirements → Code → Architecture → Validation → Deployment)
+  - **Custom Orchestration**: Applied to collaborators for rate limiting (existing)
+  - **Integration**: Supervisor invokes collaborator Bedrock Agents via InvokeAgent API
+  - **Existing Code**: Supervisor Bedrock Agent already defined in infrastructure/cloudformation/autoninja-complete.yaml but NOT integrated with AgentCore yet
+
+  **Key Benefits of AgentCore Runtime for Supervisor**:
+
+  - Extended execution time (up to 8 hours for complex workflows)
+  - Framework flexibility (can use LangGraph, Strands, or custom logic)
+  - Better session isolation and security
+  - Built-in observability and tracing
+  - Consumption-based pricing
+
+  - [x] 11.0 Read all spec documents and audit existing code
+
+    - **MANDATORY FIRST STEP**: Read ALL spec documents before proceeding
+    - Read `.kiro/specs/autoninja-bedrock-agents/requirements.md` completely
+    - Read `.kiro/specs/autoninja-bedrock-agents/design.md` completely
+    - Read `.kiro/specs/autoninja-bedrock-agents/tasks.md` completely
+    - Read `infrastructure/cloudformation/autoninja-complete.yaml` to understand existing supervisor agent definition
+    - Audit existing supervisor agent configuration for compatibility with AgentCore integration
+    - Identify what needs to be removed/updated in CloudFormation template
+    - Document findings and compatibility issues
+    - **IF** any compatibility issues found, use AWS Documentation MCP to research solutions
+    - _Requirements: 1.1, 2.1, 2.2_
+
+  - [x] 11.1 Design supervisor orchestration logic with AgentCore
+
+    - Read AWS documentation on AgentCore Runtime and multi-agent collaboration
+    - Design supervisor agent that:
+      - Generates unique job_name from user request (format: job-{keyword}-{YYYYMMDD-HHMMSS})
+      - Implements logical sequential orchestration (not intelligent routing)
+      - Follows pipeline order: Requirements → Code → Architecture → Validation → Deployment
+      - Invokes each collaborator Bedrock Agent via boto3 InvokeAgent API
+      - Passes job_name to ALL collaborators in every request
+      - Waits for each collaborator to complete before proceeding to next
+      - Handles validation gates (Quality Validator must approve before Deployment Manager)
+      - Aggregates results from all collaborators
+      - Returns final deployed agent ARN to user
+    - Define collaboration instructions for each collaborator (when to invoke them)
+    - Plan error handling and retry logic
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 9.2_
 
-  - [ ] 11.2 Implement supervisor agent Lambda function (if using custom orchestration)
+  - [x] 11.2 Implement supervisor agent code for AgentCore Runtime
 
-    **NOTE**: This task is OPTIONAL. AWS Bedrock provides built-in orchestration for supervisor agents.
-    Only implement custom orchestration if you need complex workflow logic beyond AWS's built-in capabilities.
+    - **MANDATORY**: Read all spec documents (requirements.md, design.md, tasks.md) before starting
+    - **MANDATORY**: Review existing supervisor agent in infrastructure/cloudformation/autoninja-complete.yaml
+    - Install AgentCore dependencies: `pip install bedrock-agentcore strands-agents bedrock-agentcore-starter-toolkit`
+    - Create `lambda/supervisor-agentcore/supervisor_agent.py`
+    - Implement supervisor agent using AgentCore SDK:
 
-    - Read AWS documentation on custom orchestration
-    - Create `lambda/supervisor-orchestrator/handler.py`
-    - Implement state machine for orchestration:
-      - START → Invoke Requirements Analyst
-      - Requirements complete → Invoke Code Generator with requirements
-      - Code complete → Invoke Solution Architect with requirements + code
-      - Architecture complete → Invoke Quality Validator with all artifacts
-      - Validation pass → Invoke Deployment Manager with all artifacts + green light
-      - Validation fail → Return error to user
-    - Implement job_name generation and distribution logic
-    - Implement error handling and retry logic
-    - Log all orchestration decisions to DynamoDB
+      ```python
+      from bedrock_agentcore import BedrockAgentCoreApp
+      import boto3
+      import json
+
+      app = BedrockAgentCoreApp()
+      bedrock_agent_runtime = boto3.client('bedrock-agent-runtime')
+
+      @app.entrypoint
+      def invoke(payload):
+          # Extract user request
+          # Generate job_name
+          # Sequential orchestration logic:
+          # 1. Invoke Requirements Analyst
+          # 2. Invoke Code Generator with requirements
+          # 3. Invoke Solution Architect with requirements + code
+          # 4. Invoke Quality Validator with all artifacts
+          # 5. If validation passes, invoke Deployment Manager
+          # 6. Return final result
+      ```
+
+    - Implement helper functions:
+      - `generate_job_name(user_request)` - Extract keyword and create job_name
+      - `invoke_collaborator(agent_id, alias_id, session_id, input_text)` - Call InvokeAgent API
+      - `wait_for_completion(response)` - Handle streaming response
+      - `extract_result(response)` - Parse collaborator response
+    - Implement error handling for each collaborator invocation
+    - Log all orchestration steps to CloudWatch
+    - **ERROR HANDLING**: If any errors occur, use AWS Documentation MCP to research solutions
+    - **VERIFICATION**: Run getDiagnostics to check for syntax/type errors
+    - **COMPLETION CRITERIA**: NO errors or warnings before marking complete
     - _Requirements: 1.2, 1.3, 1.4, 7.1, 10.1, 10.2_
 
-  - [ ] 11.3 Update CloudFormation template with supervisor agent
+  - [x] 11.3 Create requirements.txt and configuration for supervisor
 
-    - Read existing CloudFormation template at `infrastructure/cloudformation/autoninja-complete.yaml`
-    - Verify all 5 collaborator agents are already defined (from task 2.9)
-    - Verify all 5 collaborator agent aliases are already defined (from task 2.10)
-    - Update supervisor agent resource (already exists from task 2.11) with:
-      - Comprehensive orchestration instructions
-      - Foundation model: anthropic.claude-sonnet-4-5-20250929-v1:0
-      - agentCollaboration: SUPERVISOR (or SUPERVISOR_ROUTER for lower latency)
-      - IAM role with permissions to invoke collaborator agents
-      - Optional: Custom orchestration Lambda ARN (if using custom orchestration)
-    - Update supervisor agent alias (already exists from task 2.12)
-    - Update agent collaborator associations (already exists from task 2.13) with:
-      - Associate all 5 collaborator agents using AssociateAgentCollaborator
-      - Provide collaboration instructions for each collaborator
-      - Configure conversation history sharing per collaborator
-    - Add IAM permissions for supervisor to invoke collaborator agents
+    - Create `lambda/supervisor-agentcore/requirements.txt`:
+      ```
+      bedrock-agentcore
+      strands-agents
+      boto3
+      ```
+    - Create `.bedrock_agentcore.yaml` configuration (or use agentcore CLI)
+    - Configure deployment region (default: us-west-2)
+    - Configure IAM execution role with permissions:
+      - bedrock-agent:InvokeAgent (to invoke collaborator agents)
+      - bedrock-agent-runtime:InvokeAgent (to invoke collaborator agents)
+      - dynamodb:PutItem, dynamodb:UpdateItem (for logging)
+      - s3:PutObject, s3:GetObject (for artifacts)
+      - logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents
+    - _Requirements: 9.5, 9.6, 13.2_
+
+  - [x] 11.4 Test supervisor agent locally
+
+    - **MANDATORY**: Read all spec documents before starting
+    - Start supervisor agent locally: `python supervisor_agent.py`
+    - **ERROR HANDLING**: If startup fails, use AWS Documentation MCP to research solutions
+    - Test with curl:
+      ```bash
+      curl -X POST http://localhost:8080/invocations \
+        -H "Content-Type: application/json" \
+        -d '{"prompt": "I would like a friend agent"}'
+      ```
+    - Verify job_name generation works correctly
+    - Verify orchestration logic flows correctly (mock collaborator responses for local testing)
+    - **ERROR HANDLING**: If tests fail, use AWS Documentation MCP to research solutions
+    - **COMPLETION CRITERIA**: ALL tests must pass with NO errors before marking complete
+    - Fix any errors before deployment
+    - _Requirements: 17.1, 17.2_
+
+  - [x] 11.5 Deploy supervisor agent to AgentCore Runtime
+
+    - **MANDATORY**: Read all spec documents before starting
+    - Configure deployment: `agentcore configure -e supervisor_agent.py -r us-east-2`
+    - Deploy to AgentCore Runtime: `agentcore launch`
+    - **ERROR HANDLING**: If deployment fails, check CloudWatch logs and use AWS Documentation MCP to research solutions
+    - Note the AgentCore Runtime ARN from output
+    - Verify deployment in AWS Console (AgentCore Runtime section)
+    - Check CloudWatch logs for any deployment errors
+    - **COMPLETION CRITERIA**: Deployment must succeed with NO errors before marking complete
+    - _Requirements: 9.1, 9.10_
+
+  - [x] 11.6 Update CloudFormation template to reference AgentCore supervisor
+
+    - **MANDATORY**: Read all spec documents before starting
+    - **MANDATORY**: Audit existing CloudFormation template at `infrastructure/cloudformation/autoninja-complete.yaml`
+    - **AUDIT**: Identify existing supervisor Bedrock Agent resource (from task 2.11)
+    - **AUDIT**: Identify existing supervisor agent alias (from task 2.12)
+    - **AUDIT**: Identify existing agent collaborator associations (from task 2.13)
+    - **REMOVE** the old supervisor Bedrock Agent resource
+    - **REMOVE** the old supervisor agent alias
+    - **REMOVE** the old agent collaborator associations
+    - **ADD** CloudFormation outputs for AgentCore supervisor:
+      - SupervisorAgentCoreRuntimeArn: ARN of deployed AgentCore Runtime agent
+      - SupervisorInvocationCommand: Command to invoke supervisor
+    - **UPDATE** IAM permissions:
+      - Grant AgentCore execution role permissions to invoke all 5 collaborator agents
+      - Grant AgentCore execution role permissions to access DynamoDB and S3
+    - Verify all 5 collaborator agents still defined (from task 2.9)
+    - Verify all 5 collaborator agent aliases still defined (from task 2.10)
+    - **VALIDATION**: Use cfn-lint to validate template syntax
+    - **ERROR HANDLING**: If validation fails, use AWS Documentation MCP to research solutions
+    - **COMPLETION CRITERIA**: Template must validate with NO errors before marking complete
     - _Requirements: 9.2, 9.4, 9.11, 1.5_
 
-  - [ ] 11.4 Create supervisor agent invocation script
+  - [-] 11.7 Configure custom orchestration for collaborator agents
 
-    - Create `examples/invoke_supervisor.py` script
-    - Use boto3 bedrock-agent-runtime client
-    - Implement InvokeAgent API call with:
-      - agentId: supervisor agent ID
-      - agentAliasId: supervisor agent alias ID
-      - sessionId: unique session ID (or reuse for conversation)
-      - inputText: user request
-      - enableTrace: true (for debugging)
-    - Handle streaming response from InvokeAgent
-    - Parse and display agent responses
-    - Display trace information for debugging
-    - _Requirements: 16.5_
+    - **MANDATORY**: Read all spec documents before starting
+    - Verify `lambda/custom-orchestration/handler.py` exists (for rate limiting)
+    - Verify `scripts/configure_custom_orchestration.sh` exists
+    - Deploy CloudFormation stack: `./scripts/deploy_all.sh`
+    - **ERROR HANDLING**: If deployment fails, check CloudWatch logs and use AWS Documentation MCP to research solutions
+    - **AFTER** stack deployment completes, run: `./scripts/configure_custom_orchestration.sh`
+    - This applies custom orchestration to the 5 collaborator agents (NOT the supervisor)
+    - Verify each collaborator agent has orchestrationType: CUSTOM_ORCHESTRATION
+    - **COMPLETION CRITERIA**: All collaborators must have custom orchestration configured with NO errors
+    - _Requirements: 9.2, 9.4_
 
-  - [ ] 11.5 Test supervisor agent orchestration
+  - [ ] 11.8 Test end-to-end supervisor orchestration
 
-    - Deploy updated CloudFormation template with supervisor agent
-    - Invoke supervisor agent with test request: "I would like a friend agent"
+    - **MANDATORY**: Read all spec documents before starting
+    - Invoke supervisor agent via AgentCore Runtime: `agentcore invoke '{"prompt": "I would like a friend agent"}'`
+    - **ERROR HANDLING**: If invocation fails, check CloudWatch logs and use AWS Documentation MCP to research solutions
     - Verify supervisor generates job_name correctly
-    - Verify supervisor delegates to Requirements Analyst first
-    - Verify supervisor distributes requirements to downstream agents
-    - Verify supervisor coordinates responses from all collaborators
-    - Verify supervisor handles validation gates correctly
+    - Verify supervisor invokes Requirements Analyst collaborator
+    - Verify supervisor invokes Code Generator collaborator
+    - Verify supervisor invokes Solution Architect collaborator
+    - Verify supervisor invokes Quality Validator collaborator
+    - Verify supervisor invokes Deployment Manager collaborator (if validation passes)
     - Verify all DynamoDB records created with job_name
     - Verify all S3 artifacts saved under job_name prefix
+    - Verify final response contains deployed agent ARN
+    - **COMPLETION CRITERIA**: Full end-to-end workflow must complete successfully with NO errors
+    - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 2.5_
+
+  - [ ] 11.8 Create supervisor agent invocation script
+
+    - Create `examples/invoke_supervisor_agentcore.py` script
+    - Use boto3 bedrock-agentcore client (NOT bedrock-agent-runtime)
+    - Implement InvokeAgentRuntime API call with:
+      - agentRuntimeArn: AgentCore Runtime ARN (from deployment)
+      - runtimeSessionId: unique session ID (UUID)
+      - payload: JSON with user prompt
+      - qualifier: "DEFAULT"
+    - Handle streaming response from InvokeAgentRuntime
+    - Parse and display orchestration steps
+    - Display final result with deployed agent ARN
+    - Example:
+
+      ```python
+      import boto3
+      import json
+      import uuid
+
+      client = boto3.client('bedrock-agentcore')
+      response = client.invoke_agent_runtime(
+          agentRuntimeArn='arn:aws:bedrock-agentcore:...',
+          runtimeSessionId=str(uuid.uuid4()),
+          payload=json.dumps({"prompt": "I would like a friend agent"}).encode(),
+          qualifier="DEFAULT"
+      )
+      ```
+
+    - _Requirements: 16.5_
+
+  - [ ] 11.9 Test supervisor agent orchestration end-to-end
+
+    - Invoke supervisor AgentCore Runtime with test request: "I would like a friend agent"
+    - Verify supervisor generates job_name correctly
+    - Verify supervisor invokes Requirements Analyst first (via InvokeAgent API)
+    - Verify supervisor waits for Requirements Analyst to complete
+    - Verify supervisor invokes Code Generator with requirements
+    - Verify supervisor invokes Solution Architect with requirements + code
+    - Verify supervisor invokes Quality Validator with all artifacts
+    - Verify supervisor checks validation result (pass/fail)
+    - Verify supervisor invokes Deployment Manager ONLY if validation passes
+    - Verify supervisor returns final deployed agent ARN
+    - Verify all DynamoDB records created with job_name
+    - Verify all S3 artifacts saved under job_name prefix
+    - Check CloudWatch logs for supervisor orchestration steps
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 15.4_
 
-  - [ ] 11.6 Implement end-to-end integration test
+  - [ ] 11.10 Implement end-to-end integration test
 
-    - Create `tests/integration/test_supervisor_e2e.py`
+    - Create `tests/integration/test_supervisor_agentcore_e2e.py`
     - Test complete workflow from user request to deployed agent:
-      - Invoke supervisor with realistic user request
-      - Wait for Requirements Analyst to complete
-      - Wait for Code Generator to complete
-      - Wait for Solution Architect to complete
-      - Wait for Quality Validator to complete
-      - Wait for Deployment Manager to complete (or simulate)
-    - Verify all agents invoked in correct order
+      - Invoke supervisor AgentCore Runtime with realistic user request
+      - Monitor CloudWatch logs for orchestration progress
+      - Verify Requirements Analyst invoked and completed
+      - Verify Code Generator invoked and completed
+      - Verify Solution Architect invoked and completed
+      - Verify Quality Validator invoked and completed
+      - Verify Deployment Manager invoked and completed (or simulated)
+    - Verify all agents invoked in correct sequential order
     - Verify job_name used consistently across all agents
     - Verify all DynamoDB records created
     - Verify all S3 artifacts saved
     - Verify final response contains deployed agent ARN
+    - Measure total execution time (should be < 8 hours)
     - _Requirements: 15.4, 17.1, 17.2, 17.3_
 
-  - [ ] 11.7 Document supervisor agent architecture
+  - [ ] 11.11 Document supervisor AgentCore architecture
 
-    - Create `docs/supervisor-agent-architecture.md`
+    - Create `docs/supervisor-agentcore-architecture.md`
+    - Document why AgentCore Runtime was chosen for supervisor
     - Document supervisor agent design decisions
-    - Document orchestration workflow and state transitions
-    - Document collaboration instructions for each collaborator
+    - Document sequential orchestration workflow:
+      - Step 1: Generate job_name
+      - Step 2: Invoke Requirements Analyst
+      - Step 3: Invoke Code Generator
+      - Step 4: Invoke Solution Architect
+      - Step 5: Invoke Quality Validator
+      - Step 6: Check validation result
+      - Step 7: Invoke Deployment Manager (if pass)
+      - Step 8: Return result
+    - Document how supervisor invokes collaborator Bedrock Agents
     - Document job_name generation and distribution strategy
     - Document error handling and retry logic
-    - Include architecture diagrams (use Mermaid)
+    - Document AgentCore Runtime benefits for this use case
+    - Include architecture diagrams (use Mermaid) showing:
+      - AgentCore supervisor invoking Bedrock Agent collaborators
+      - Sequential workflow with validation gate
     - _Requirements: 16.1, 16.2_
 
 - [ ] 12. Create example scripts and documentation

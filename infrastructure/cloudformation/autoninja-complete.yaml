@@ -100,8 +100,19 @@ Parameters:
       - 3653
     ConstraintDescription: Must be a valid CloudWatch Logs retention period
 
+  SupervisorAgentCoreRuntimeArn:
+    Type: String
+    Description: >
+      ARN of the deployed AgentCore Runtime supervisor agent. This is deployed separately
+      using the agentcore CLI. Example: arn:aws:bedrock-agentcore:us-east-2:123456789012:runtime/autoninja_supervisor-xxxxx
+    Default: ""
+    AllowedPattern: "^$|^arn:aws:bedrock-agentcore:[a-z0-9-]+:[0-9]{12}:runtime/[a-zA-Z0-9_-]+$"
+    ConstraintDescription: >
+      Must be a valid AgentCore Runtime ARN or empty string. Format: arn:aws:bedrock-agentcore:region:account:runtime/name
+
 Conditions:
   UseCustomBucketName: !Not [!Equals [!Ref S3BucketName, ""]]
+  HasSupervisorAgentCoreArn: !Not [!Equals [!Ref SupervisorAgentCoreRuntimeArn, ""]]
 
 Resources:
   # ============================================================================
@@ -1075,46 +1086,25 @@ Resources:
         - Key: Application
           Value: AutoNinja
 
-  # Supervisor Bedrock Agent Role
-  SupervisorAgentRole:
-    Type: AWS::IAM::Role
-    Properties:
-      RoleName: !Sub "AutoNinjaSupervisorAgentRole-${Environment}"
-      Description: Execution role for Supervisor Bedrock Agent (orchestrator)
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: bedrock.amazonaws.com
-            Action: sts:AssumeRole
-            Condition:
-              StringEquals:
-                "aws:SourceAccount": !Ref AWS::AccountId
-              ArnLike:
-                "aws:SourceArn": !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*"
-      Policies:
-        - PolicyName: BedrockAgentPermissions
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Sid: InvokeModel
-                Effect: Allow
-                Action:
-                  - bedrock:InvokeModel
-                Resource:
-                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/*"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*"
-              - Sid: InvokeCollaboratorAgents
-                Effect: Allow
-                Action:
-                  - bedrock:InvokeAgent
-                Resource: !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*"
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Application
-          Value: AutoNinja
+  # ============================================================================
+  # NOTE: Supervisor Agent IAM Role
+  # ============================================================================
+  # The supervisor agent is deployed to AgentCore Runtime using the agentcore CLI.
+  # Its IAM execution role is automatically created by the agentcore toolkit with the name:
+  # AmazonBedrockAgentCoreSDKRuntime-{region}-{random-id}
+  #
+  # This role needs the following permissions to invoke collaborator agents:
+  # - bedrock:InvokeAgent (for all 5 collaborator agents)
+  # - bedrock-agent-runtime:InvokeAgent (for all 5 collaborator agents)
+  # - dynamodb:PutItem, dynamodb:UpdateItem (for logging)
+  # - s3:PutObject, s3:GetObject (for artifacts)
+  # - logs:CreateLogGroup, logs:CreateLogStream, logs:PutLogEvents (for CloudWatch)
+  #
+  # To grant these permissions, attach a policy to the AgentCore execution role after deployment.
+  # Example policy ARN: arn:aws:iam::aws:policy/AmazonBedrockFullAccess (or create custom policy)
+  #
+  # The AgentCore execution role ARN can be found in the deployment output or by running:
+  # aws iam list-roles --query "Roles[?contains(RoleName, 'AmazonBedrockAgentCoreSDKRuntime')].Arn"
 
   # ============================================================================
   # Bedrock Collaborator Agents (5 agents)
@@ -1393,61 +1383,7 @@ Resources:
         Environment: !Ref Environment
         Application: AutoNinja
 
-  # ============================================================================
-  # Bedrock Supervisor Agent
-  # ============================================================================
 
-  SupervisorAgent:
-    Type: AWS::Bedrock::Agent
-    DependsOn:
-      - DeploymentArtifactsBucketPolicy
-    Properties:
-      AgentName: !Sub "autoninja-supervisor-${Environment}"
-      Description: Supervisor agent - orchestrates the complete workflow from user request to deployed agent
-      AgentResourceRoleArn: !GetAtt SupervisorAgentRole.Arn
-      FoundationModel: !Ref BedrockModel
-      AgentCollaboration: DISABLED
-      IdleSessionTTLInSeconds: 1800
-      AutoPrepare: true
-      Instruction: |
-        You are the AutoNinja orchestrator supervisor. Your role is to coordinate the complete workflow
-        from user request to deployed agent. For MVP deployment, you will provide guidance and orchestration
-        instructions without direct agent collaboration (which will be added in a future update).
-
-        For each user request:
-        1. Generate a unique job_name in format: job-{keyword}-{YYYYMMDD-HHMMSS}
-        2. Provide comprehensive guidance on the agent generation process
-        3. Explain the pipeline: Requirements → Code Generation → Architecture → Validation → Deployment
-        4. Return structured information about what would be generated
-
-        Note: Multi-agent collaboration will be enabled once action groups and schemas are implemented.
-      # AgentCollaborators will be added after action groups are implemented in task 5
-      # AgentCollaborators:
-      #   - CollaboratorName: requirements-analyst
-      #     AgentDescriptor:
-      #       AliasArn: !GetAtt RequirementsAnalystAgentAlias.AgentAliasArn
-      #     CollaborationInstruction: |
-      #       Use the Requirements Analyst when you need to extract and validate requirements from the user's request.
-      #       This agent generates comprehensive requirements for all downstream agents.
-      #       Always provide the job_name parameter.
-      #     RelayConversationHistory: TO_COLLABORATOR
-      Tags:
-        Environment: !Ref Environment
-        Application: AutoNinja
-
-  # ============================================================================
-  # Bedrock Supervisor Agent Alias
-  # ============================================================================
-
-  SupervisorAgentAlias:
-    Type: AWS::Bedrock::AgentAlias
-    Properties:
-      AgentId: !GetAtt SupervisorAgent.AgentId
-      AgentAliasName: production
-      Description: Production alias for Supervisor agent
-      Tags:
-        Environment: !Ref Environment
-        Application: AutoNinja
 
   # ============================================================================
   # CloudWatch Log Groups
@@ -1565,17 +1501,6 @@ Resources:
         - Key: Application
           Value: AutoNinja
 
-  SupervisorAgentLogGroup:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: !Sub "/aws/bedrock/agents/autoninja-supervisor-${Environment}"
-      RetentionInDays: !Ref LogRetentionDays
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Application
-          Value: AutoNinja
-
 Outputs:
   TemplateVersion:
     Description: CloudFormation template version
@@ -1585,30 +1510,18 @@ Outputs:
     Description: Deployment environment
     Value: !Ref Environment
 
-  # Supervisor Agent Outputs
-  SupervisorAgentId:
-    Description: Supervisor Agent ID
-    Value: !GetAtt SupervisorAgent.AgentId
+  # Supervisor Agent Outputs (AgentCore Runtime)
+  SupervisorAgentCoreRuntimeArn:
+    Description: >
+      ARN of the AgentCore Runtime supervisor agent. This agent is deployed separately using
+      the agentcore CLI and orchestrates all 5 collaborator agents. Use this ARN to invoke
+      the supervisor via the InvokeAgentRuntime API.
+    Value: !If
+      - HasSupervisorAgentCoreArn
+      - !Ref SupervisorAgentCoreRuntimeArn
+      - "NOT_DEPLOYED - Deploy supervisor using: agentcore launch"
     Export:
-      Name: !Sub "${AWS::StackName}-SupervisorAgentId"
-
-  SupervisorAgentArn:
-    Description: Supervisor Agent ARN
-    Value: !GetAtt SupervisorAgent.AgentArn
-    Export:
-      Name: !Sub "${AWS::StackName}-SupervisorAgentArn"
-
-  SupervisorAgentAliasId:
-    Description: Supervisor Agent Alias ID
-    Value: !GetAtt SupervisorAgentAlias.AgentAliasId
-    Export:
-      Name: !Sub "${AWS::StackName}-SupervisorAgentAliasId"
-
-  SupervisorAgentAliasArn:
-    Description: Supervisor Agent Alias ARN
-    Value: !GetAtt SupervisorAgentAlias.AgentAliasArn
-    Export:
-      Name: !Sub "${AWS::StackName}-SupervisorAgentAliasArn"
+      Name: !Sub "${AWS::StackName}-SupervisorAgentCoreRuntimeArn"
 
   # Collaborator Agent IDs
   RequirementsAnalystAgentId:
@@ -1649,21 +1562,29 @@ Outputs:
     Value: !GetAtt ArtifactsBucket.Arn
 
   # Invocation Command
-  InvocationCommand:
-    Description: AWS CLI command to invoke the supervisor agent
-    Value: !Sub |
-      aws bedrock-agent-runtime invoke-agent \
-        --agent-id ${SupervisorAgent.AgentId} \
-        --agent-alias-id ${SupervisorAgentAlias.AgentAliasId} \
-        --session-id $(uuidgen) \
-        --input-text "I would like a friend agent" \
-        --region ${AWS::Region} \
-        response.json
+  SupervisorInvocationCommand:
+    Description: Command to invoke the AgentCore Runtime supervisor agent
+    Value: !If
+      - HasSupervisorAgentCoreArn
+      - !Sub |
+          # Using agentcore CLI (recommended):
+          agentcore invoke '{"prompt": "I would like a friend agent"}'
+          
+          # Or using AWS SDK (Python):
+          # import boto3, json
+          # client = boto3.client('bedrock-agentcore', region_name='${AWS::Region}')
+          # response = client.invoke_agent_runtime(
+          #     agentRuntimeArn='${SupervisorAgentCoreRuntimeArn}',
+          #     runtimeSessionId='unique-session-id',
+          #     payload=json.dumps({"prompt": "I would like a friend agent"}).encode(),
+          #     qualifier="DEFAULT"
+          # )
+      - "Deploy supervisor first using: agentcore launch"
 
   # Console URLs
-  SupervisorAgentConsoleUrl:
-    Description: AWS Console URL for Supervisor Agent
-    Value: !Sub "https://console.aws.amazon.com/bedrock/home?region=${AWS::Region}#/agents/${SupervisorAgent.AgentId}"
+  SupervisorAgentCoreConsoleUrl:
+    Description: AWS Console URL for AgentCore Runtime supervisor agent
+    Value: !Sub "https://console.aws.amazon.com/cloudwatch/home?region=${AWS::Region}#gen-ai-observability/agent-core"
 
   DynamoDBConsoleUrl:
     Description: AWS Console URL for DynamoDB table
