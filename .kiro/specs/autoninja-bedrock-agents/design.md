@@ -2,7 +2,11 @@
 
 ## Overview
 
-AutoNinja is a production-grade, serverless multi-agent system built entirely on AWS Bedrock Agents that transforms natural language requests into fully deployed AI agents. The system uses AWS Bedrock's native multi-agent collaboration feature (GA March 2025) to orchestrate 6 specialized agents in a supervisor-collaborator pattern.
+AutoNinja is a production-grade, serverless multi-agent system that transforms natural language requests into fully deployed AI agents. The system uses **Amazon Bedrock AgentCore Runtime** for the supervisor agent and **AWS Bedrock Agents** for 5 specialized collaborator agents in a supervisor-collaborator pattern.
+
+**Reference:** 
+- [Amazon Bedrock AgentCore Runtime](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agents-tools-runtime.html)
+- [Multi-Agent Collaboration](https://docs.aws.amazon.com/bedrock/latest/userguide/agents-multi-agent-collaboration.html)
 
 ### System Goals
 
@@ -11,6 +15,8 @@ AutoNinja is a production-grade, serverless multi-agent system built entirely on
 3. **AWS-Native Architecture**: Use only AWS managed services for zero infrastructure management
 4. **Production Quality**: Generate secure, tested, and deployable agents with proper IAM policies
 5. **Cost Efficiency**: Optimize for pay-per-use serverless pricing model
+6. **Extended Execution Time**: Leverage AgentCore Runtime for up to 8-hour workflows
+7. **Framework Flexibility**: Use AgentCore SDK for supervisor orchestration logic
 
 ### Key Design Principles
 
@@ -19,6 +25,8 @@ AutoNinja is a production-grade, serverless multi-agent system built entirely on
 - **Idempotency**: All operations can be safely retried with job_name tracking
 - **Least Privilege**: Every component has minimal IAM permissions required
 - **Observability**: Comprehensive logging, tracing, and metrics at every layer
+- **Hybrid Architecture**: AgentCore Runtime supervisor + Bedrock Agent collaborators
+- **Sequential Orchestration**: Logical workflow (Requirements → Code → Architecture → Validation → Deployment)
 
 ## Architecture
 
@@ -33,11 +41,15 @@ AutoNinja is a production-grade, serverless multi-agent system built entirely on
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                    Supervisor Bedrock Agent                          │
+│              Supervisor Agent (AgentCore Runtime)                    │
+│  - Deployed to Amazon Bedrock AgentCore Runtime                     │
 │  - Generates job_name: job-friend-20251013-143022                   │
-│  - Orchestrates workflow across 5 collaborators                     │
-│  - Distributes requirements to all downstream agents                │
-│  - Coordinates responses and consolidates results                   │
+│  - Implements sequential orchestration logic                        │
+│  - Invokes collaborator Bedrock Agents via InvokeAgent API          │
+│  - Passes job_name to ALL collaborators                             │
+│  - Aggregates results and returns final agent ARN                   │
+│  - Extended execution time (up to 8 hours)                          │
+│  - Isolated microVM session per invocation                          │
 └────────────────────────────┬────────────────────────────────────────┘
                              │
                              ▼
@@ -222,44 +234,163 @@ Every Lambda function IMMEDIATELY logs to both layers:
 
 ## Components and Interfaces
 
-### 1. Supervisor Bedrock Agent
+### 1. Supervisor Agent (AgentCore Runtime)
 
-**Purpose**: Orchestrate the complete workflow from user request to deployed agent
+**Purpose**: Orchestrate the complete workflow from user request to deployed agent using Amazon Bedrock AgentCore Runtime
 
-**Configuration**:
-- **Foundation Model**: `anthropic.claude-sonnet-4-5-20250929-v1:0`
-- **Collaboration Mode**: `SUPERVISOR`
-- **Action Groups**: None (coordination only)
-- **Instructions**:
+**Reference:**
+- [AgentCore Runtime Overview](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agents-tools-runtime.html)
+- [Get Started with AgentCore](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-toolkit.html)
+- [Invoke AgentCore Runtime](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-invoke-agent.html)
 
+**Implementation**:
+- **Framework**: Amazon Bedrock AgentCore Python SDK (`bedrock-agentcore`)
+- **Deployment**: Containerized via AgentCore starter toolkit
+- **Runtime**: Isolated microVM sessions in AgentCore Runtime
+- **Execution Time**: Up to 8 hours per session
+- **Foundation Model**: `anthropic.claude-sonnet-4-5-20250929-v1:0` (via boto3)
+- **Orchestration Type**: Sequential logical workflow (not intelligent routing)
+
+**Code Structure**:
+```python
+from bedrock_agentcore import BedrockAgentCoreApp
+import boto3
+import json
+from datetime import datetime
+
+app = BedrockAgentCoreApp()
+bedrock_agent_runtime = boto3.client('bedrock-agent-runtime')
+
+@app.entrypoint
+def invoke(payload):
+    """
+    Supervisor agent entrypoint for orchestrating collaborator agents.
+    
+    Args:
+        payload: Dict with 'prompt' key containing user request
+        
+    Returns:
+        Dict with final deployed agent ARN and results
+    """
+    user_request = payload.get("prompt", "")
+    
+    # Generate unique job_name
+    job_name = generate_job_name(user_request)
+    
+    # Sequential orchestration
+    results = {}
+    
+    # 1. Requirements Analyst
+    requirements = invoke_collaborator(
+        agent_id="requirements-analyst-id",
+        alias_id="requirements-analyst-alias",
+        session_id=job_name,
+        input_text=f"job_name: {job_name}\nrequest: {user_request}"
+    )
+    results['requirements'] = requirements
+    
+    # 2. Code Generator
+    code = invoke_collaborator(
+        agent_id="code-generator-id",
+        alias_id="code-generator-alias",
+        session_id=job_name,
+        input_text=f"job_name: {job_name}\nrequirements: {json.dumps(requirements)}"
+    )
+    results['code'] = code
+    
+    # 3. Solution Architect
+    architecture = invoke_collaborator(
+        agent_id="solution-architect-id",
+        alias_id="solution-architect-alias",
+        session_id=job_name,
+        input_text=f"job_name: {job_name}\nrequirements: {json.dumps(requirements)}\ncode: {json.dumps(code)}"
+    )
+    results['architecture'] = architecture
+    
+    # 4. Quality Validator
+    validation = invoke_collaborator(
+        agent_id="quality-validator-id",
+        alias_id="quality-validator-alias",
+        session_id=job_name,
+        input_text=f"job_name: {job_name}\ncode: {json.dumps(code)}\narchitecture: {json.dumps(architecture)}"
+    )
+    results['validation'] = validation
+    
+    # 5. Deployment Manager (only if validation passes)
+    if validation.get('is_valid', False):
+        deployment = invoke_collaborator(
+            agent_id="deployment-manager-id",
+            alias_id="deployment-manager-alias",
+            session_id=job_name,
+            input_text=f"job_name: {job_name}\nall_artifacts: {json.dumps(results)}"
+        )
+        results['deployment'] = deployment
+        
+        return {
+            "job_name": job_name,
+            "agent_arn": deployment.get('agent_arn'),
+            "status": "deployed",
+            "results": results
+        }
+    else:
+        return {
+            "job_name": job_name,
+            "status": "validation_failed",
+            "validation_issues": validation.get('issues', []),
+            "results": results
+        }
+
+def generate_job_name(user_request: str) -> str:
+    """Generate unique job_name from user request"""
+    # Extract keyword from request
+    keyword = extract_keyword(user_request)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return f"job-{keyword}-{timestamp}"
+
+def invoke_collaborator(agent_id: str, alias_id: str, session_id: str, input_text: str) -> dict:
+    """Invoke a collaborator Bedrock Agent via InvokeAgent API"""
+    response = bedrock_agent_runtime.invoke_agent(
+        agentId=agent_id,
+        agentAliasId=alias_id,
+        sessionId=session_id,
+        inputText=input_text,
+        enableTrace=True
+    )
+    
+    # Parse streaming response
+    result = ""
+    for event in response.get('completion', []):
+        if 'chunk' in event:
+            result += event['chunk']['bytes'].decode('utf-8')
+    
+    return json.loads(result)
 ```
-You are the AutoNinja orchestrator supervisor. Your role is to coordinate 5 specialist agents
-to generate production-ready AI agents from user descriptions.
 
-For each user request:
-1. Generate a unique job_name in format: job-{keyword}-{YYYYMMDD-HHMMSS}
-   Extract a short keyword from the user's request (e.g., "friend", "mortgage", "support")
-2. Pass the job_name to ALL collaborators in every request
-3. Delegate to Requirements Analyst to generate requirements for ALL sub-agents
-4. Distribute the requirements to all downstream agents
-5. Delegate to Code Generator to create system prompts, agent config, Lambda code, and OpenAPI schemas
-6. Delegate to Solution Architect to design AWS architecture and generate IaC (referencing code files)
-7. Delegate to Quality Validator to validate everything (low threshold for testing)
-8. ONLY IF validation passes, delegate to Deployment Manager to deploy to AWS
-9. Consolidate all outputs and provide the deployed agent ARN to the user
+**Deployment**:
+```bash
+# Configure
+agentcore configure -e supervisor_agent.py -r us-east-2
 
-Pipeline order is critical:
-Requirements → Code Generation → Architecture → Validation → Deployment
+# Deploy to AgentCore Runtime
+agentcore launch
 
-Always include the job_name in your delegation to collaborators.
+# Test
+agentcore invoke '{"prompt": "I would like a friend agent"}'
 ```
 
-**Collaborators** (in pipeline order):
-1. requirements-analyst
-2. code-generator
-3. solution-architect
-4. quality-validator
-5. deployment-manager
+**IAM Permissions**:
+- `bedrock-agent:InvokeAgent` - Invoke collaborator agents
+- `bedrock-agent-runtime:InvokeAgent` - Invoke collaborator agents
+- `dynamodb:PutItem`, `dynamodb:UpdateItem` - Logging
+- `s3:PutObject`, `s3:GetObject` - Artifacts
+- `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents` - CloudWatch
+
+**Collaborators** (invoked sequentially):
+1. requirements-analyst (Bedrock Agent)
+2. code-generator (Bedrock Agent)
+3. solution-architect (Bedrock Agent)
+4. quality-validator (Bedrock Agent)
+5. deployment-manager (Bedrock Agent)
 
 ### 2. Requirements Analyst Agent
 

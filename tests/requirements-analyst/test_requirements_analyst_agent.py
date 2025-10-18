@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
 from shared.utils.rate_limiter import BedrockRateLimiter
 
 # Configuration - Update these after deploying the Requirements Analyst agent
-AGENT_ID = "LPDQZRQAZM"  # Requirements Analyst Agent ID
+AGENT_ID = "OUH1MYYIBS"  # Requirements Analyst Agent ID
 AGENT_ALIAS_ID = "TSTALIASID"  # test alias pointing to DRAFT
 REGION = "us-east-2"
 

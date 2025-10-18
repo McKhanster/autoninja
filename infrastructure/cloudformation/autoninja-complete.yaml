@@ -660,6 +660,94 @@ Resources:
           Value: AutoNinja
 
   # ============================================================================
+  # Custom Orchestration Lambda Function
+  # ============================================================================
+
+  # Custom Orchestration Lambda Role
+  CustomOrchestrationLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "AutoNinjaCustomOrchestrationRole-${Environment}"
+      Description: Execution role for Custom Orchestration Lambda function
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BedrockConverseAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: InvokeBedrockModels
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:Converse
+                  - bedrock:ConverseStream
+                Resource:
+                  - !Sub "arn:aws:bedrock:*::foundation-model/*"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/*"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # Custom Orchestration Lambda Function
+  CustomOrchestrationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "autoninja-custom-orchestration-${Environment}"
+      Description: Custom orchestration handler for Bedrock Agents - enforces sequential tool execution with rate limiting
+      Runtime: python3.12
+      Handler: handler.lambda_handler
+      Role: !GetAtt CustomOrchestrationLambdaRole.Arn
+      Timeout: 600
+      MemorySize: 512
+      Architectures:
+        - x86_64
+      Environment:
+        Variables:
+          MIN_INTERVAL_SECONDS: "60"
+          LOG_LEVEL: INFO
+          ENVIRONMENT: !Ref Environment
+      TracingConfig:
+        Mode: Active
+      Code:
+        S3Bucket: !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+        S3Key: lambda/custom-orchestration.zip
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # CloudWatch Log Group for Custom Orchestration
+  CustomOrchestrationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/autoninja-custom-orchestration-${Environment}"
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # Lambda Permission for Custom Orchestration (Allow Bedrock Agents to Invoke)
+  CustomOrchestrationInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CustomOrchestrationFunction
+      Action: lambda:InvokeFunction
+      Principal: bedrock.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+  # ============================================================================
   # Lambda Permissions (Allow Bedrock to Invoke)
   # ============================================================================
 
@@ -1039,6 +1127,7 @@ Resources:
       - RequirementsAnalystFunction
       - RequirementsAnalystAgentRole
       - DeploymentArtifactsBucketPolicy
+      - CustomOrchestrationFunction
     Properties:
       AgentName: !Sub "autoninja-requirements-analyst-${Environment}"
       Description: Requirements Analyst agent - extracts and validates requirements from user requests
@@ -1082,6 +1171,7 @@ Resources:
       - CodeGeneratorFunction
       - CodeGeneratorAgentRole
       - DeploymentArtifactsBucketPolicy
+      - CustomOrchestrationFunction
     Properties:
       AgentName: !Sub "autoninja-code-generator-${Environment}"
       Description: Code Generator agent - generates Lambda code, agent configs, and OpenAPI schemas
@@ -1124,6 +1214,7 @@ Resources:
       - SolutionArchitectFunction
       - SolutionArchitectAgentRole
       - DeploymentArtifactsBucketPolicy
+      - CustomOrchestrationFunction
     Properties:
       AgentName: !Sub "autoninja-solution-architect-${Environment}"
       Description: Solution Architect agent - designs AWS architecture and generates IaC
@@ -1167,6 +1258,7 @@ Resources:
       - QualityValidatorFunction
       - QualityValidatorAgentRole
       - DeploymentArtifactsBucketPolicy
+      - CustomOrchestrationFunction
     Properties:
       AgentName: !Sub "autoninja-quality-validator-${Environment}"
       Description: Quality Validator agent - validates code quality, security, and compliance
@@ -1209,6 +1301,7 @@ Resources:
       - DeploymentManagerFunction
       - DeploymentManagerAgentRole
       - DeploymentArtifactsBucketPolicy
+      - CustomOrchestrationFunction
     Properties:
       AgentName: !Sub "autoninja-deployment-manager-${Environment}"
       Description: Deployment Manager agent - deploys validated agents to AWS

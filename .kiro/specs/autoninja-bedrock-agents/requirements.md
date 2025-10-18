@@ -4,26 +4,65 @@
 
 AutoNinja is a production-grade, serverless multi-agent system built on AWS Bedrock Agents that transforms natural language requests into fully deployed AI agents. The system leverages AWS Bedrock's native multi-agent collaboration (GA March 2025) to orchestrate 6 specialized agents working together to design, generate, validate, and deploy production-ready AI agents from simple natural language descriptions.
 
-The system follows a supervisor-collaborator pattern where one orchestrator agent coordinates 5 specialist agents (Requirements Analyst, Solution Architect, Code Generator, Quality Validator, and Deployment Manager) to handle the complete lifecycle from user request to deployed agent. All interactions are persisted to DynamoDB and S3 for complete audit trails, with CloudWatch logging and X-Ray tracing for observability.
+The system follows a supervisor-collaborator pattern where one orchestrator agent (deployed to **Amazon Bedrock AgentCore Runtime**) coordinates 5 specialist agents (Requirements Analyst, Solution Architect, Code Generator, Quality Validator, and Deployment Manager) to handle the complete lifecycle from user request to deployed agent. The supervisor agent uses AgentCore Runtime for extended execution time, better session isolation, and framework flexibility, while collaborator agents use traditional Bedrock Agents with Lambda action groups. All interactions are persisted to DynamoDB and S3 for complete audit trails, with CloudWatch logging and X-Ray tracing for observability.
+
+**Reference:** [Amazon Bedrock AgentCore Runtime Documentation](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agents-tools-runtime.html)
 
 ## Requirements
 
-### Requirement 1: Multi-Agent Architecture with Supervisor Orchestration
+### Requirement 1: Multi-Agent Architecture with Supervisor Orchestration using AgentCore Runtime
 
-**User Story:** As a system architect, I want a supervisor-collaborator multi-agent architecture using AWS Bedrock Agents, so that complex agent generation tasks can be broken down and handled by specialized agents working in coordination.
+**User Story:** As a system architect, I want a supervisor-collaborator multi-agent architecture using AWS Bedrock AgentCore Runtime for the supervisor and AWS Bedrock Agents for collaborators, so that complex agent generation tasks can be broken down and handled by specialized agents working in coordination with extended execution time and better isolation.
+
+**Reference:** 
+- [AgentCore Runtime Overview](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agents-tools-runtime.html)
+- [Multi-Agent Collaboration](https://docs.aws.amazon.com/bedrock/latest/userguide/agents-multi-agent-collaboration.html)
 
 #### Acceptance Criteria
 
-1. WHEN the system is deployed THEN it SHALL create exactly 6 AWS Bedrock Agents (1 supervisor + 5 collaborators)
-2. WHEN the supervisor agent receives a user request THEN it SHALL delegate tasks to appropriate collaborator agents based on the workflow phase
-3. WHEN a collaborator agent completes its task THEN it SHALL return structured results to the supervisor agent
-4. WHEN multiple agents can work in parallel THEN the system SHALL execute them concurrently to optimize performance
-5. WHEN agents communicate THEN the system SHALL automatically share conversation history and context between agents
-6. WHEN an agent encounters an error THEN the system SHALL implement automatic retry logic with exponential backoff
+1. WHEN the system is deployed THEN it SHALL create exactly 1 AgentCore Runtime supervisor agent and 5 AWS Bedrock collaborator agents
+2. WHEN the supervisor agent is deployed THEN it SHALL use Amazon Bedrock AgentCore Runtime with support for up to 8-hour execution time
+3. WHEN the supervisor agent receives a user request THEN it SHALL invoke collaborator Bedrock Agents sequentially via the InvokeAgent API
+4. WHEN the supervisor agent orchestrates workflow THEN it SHALL implement logical sequential orchestration (Requirements → Code → Architecture → Validation → Deployment)
+5. WHEN a collaborator agent completes its task THEN it SHALL return structured results to the supervisor agent via the InvokeAgent response
+6. WHEN the supervisor agent invokes collaborators THEN it SHALL pass the job_name to ALL collaborators for tracking
+7. WHEN agents communicate THEN the supervisor SHALL aggregate results from all collaborators and return final deployed agent ARN
+8. WHEN an agent encounters an error THEN the system SHALL implement automatic retry logic with exponential backoff
+9. WHEN the supervisor agent is deployed THEN it SHALL use the AgentCore Python SDK (bedrock-agentcore) for implementation
+10. WHEN the supervisor agent is deployed THEN it SHALL be containerized and hosted in AgentCore Runtime with isolated microVM sessions
 
-### Requirement 2: Requirements Analyst Agent
+### Requirement 2: Supervisor Agent with AgentCore Runtime
+
+**User Story:** As a supervisor agent developer, I want to implement the orchestration logic using Amazon Bedrock AgentCore Runtime, so that I can leverage extended execution time, framework flexibility, and better session isolation for complex multi-agent workflows.
+
+**Reference:**
+- [Get Started with AgentCore Runtime](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-getting-started.html)
+- [AgentCore Starter Toolkit](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-toolkit.html)
+- [Invoke AgentCore Runtime](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-invoke-agent.html)
+
+#### Acceptance Criteria
+
+1. WHEN the supervisor agent is implemented THEN it SHALL use the bedrock-agentcore Python SDK
+2. WHEN the supervisor agent is implemented THEN it SHALL define an entrypoint function decorated with @app.entrypoint
+3. WHEN the supervisor agent receives a request THEN it SHALL extract the user prompt from the payload
+4. WHEN the supervisor agent processes a request THEN it SHALL generate a unique job_name in format "job-{keyword}-{YYYYMMDD-HHMMSS}"
+5. WHEN the supervisor agent orchestrates THEN it SHALL invoke collaborator agents sequentially using boto3 bedrock-agent-runtime client
+6. WHEN invoking a collaborator THEN it SHALL use the InvokeAgent API with agent_id, alias_id, session_id, and input_text
+7. WHEN invoking a collaborator THEN it SHALL wait for the complete response before proceeding to the next collaborator
+8. WHEN a collaborator returns a response THEN it SHALL extract the result and pass it to the next collaborator in the pipeline
+9. WHEN the Quality Validator returns results THEN it SHALL check if validation passed before invoking Deployment Manager
+10. WHEN all collaborators complete THEN it SHALL aggregate results and return the final deployed agent ARN
+11. WHEN the supervisor agent is deployed THEN it SHALL use the agentcore CLI toolkit for configuration and deployment
+12. WHEN the supervisor agent is deployed THEN it SHALL be containerized automatically by the AgentCore starter toolkit
+13. WHEN the supervisor agent is deployed THEN it SHALL have an IAM execution role with permissions to invoke all 5 collaborator agents
+14. WHEN the supervisor agent is deployed THEN it SHALL have permissions to access DynamoDB and S3 for logging and artifacts
+15. WHEN the supervisor agent is invoked THEN it SHALL be accessible via the InvokeAgentRuntime API with the AgentCore Runtime ARN
+
+### Requirement 3: Requirements Analyst Agent
 
 **User Story:** As a requirements analyst agent, I want to extract and validate requirements from natural language user requests, so that downstream agents have clear specifications to work with.
+
+**Reference:** [Bedrock Agents Action Groups](https://docs.aws.amazon.com/bedrock/latest/userguide/agents-action-create.html)
 
 #### Acceptance Criteria
 
@@ -34,7 +73,7 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 5. WHEN processing completes THEN it SHALL save all artifacts to S3 under the job-specific prefix
 6. WHEN the agent is invoked THEN it SHALL expose Lambda actions: extract_requirements, analyze_complexity, validate_requirements
 
-### Requirement 3: Solution Architect Agent
+### Requirement 4: Solution Architect Agent
 
 **User Story:** As a solution architect agent, I want to design AWS architecture for the requested agent, so that the implementation follows AWS best practices and uses appropriate services.
 
@@ -47,7 +86,7 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 5. WHEN processing completes THEN it SHALL save all architecture artifacts to S3 under the architecture/ prefix
 6. WHEN the agent is invoked THEN it SHALL expose Lambda actions: design_architecture, select_services, generate_iac
 
-### Requirement 4: Code Generator Agent
+### Requirement 5: Code Generator Agent
 
 **User Story:** As a code generator agent, I want to generate production-ready Lambda functions and Bedrock Agent configurations, so that the designed agent can be deployed to AWS.
 
@@ -60,7 +99,7 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 5. WHEN processing completes THEN it SHALL save all generated code to DynamoDB and S3 under the code/ prefix
 6. WHEN the agent is invoked THEN it SHALL expose Lambda actions: generate_lambda_code, generate_agent_config, generate_openapi_schema, generate_system_prompts
 
-### Requirement 5: Quality Validator Agent
+### Requirement 6: Quality Validator Agent
 
 **User Story:** As a quality validator agent, I want to validate generated code for quality, security, and compliance, so that only production-ready code is deployed.
 
@@ -73,7 +112,7 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 5. WHEN processing completes THEN it SHALL save validation results to DynamoDB and S3 under the validation/ prefix
 6. WHEN the agent is invoked THEN it SHALL expose Lambda actions: validate_code, security_scan, compliance_check
 
-### Requirement 6: Deployment Manager Agent
+### Requirement 7: Deployment Manager Agent
 
 **User Story:** As a deployment manager agent, I want to deploy generated agents to AWS and verify successful deployment, so that users receive fully functional deployed agents.
 
@@ -86,7 +125,7 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 5. WHEN processing completes THEN it SHALL save deployment results and agent ARN to DynamoDB and S3 under the deployment/ prefix
 6. WHEN the agent is invoked THEN it SHALL expose Lambda actions: generate_cloudformation, deploy_stack, configure_agent, test_deployment
 
-### Requirement 7: Complete Persistence and Audit Trail
+### Requirement 8: Complete Persistence and Audit Trail
 
 **User Story:** As a system administrator, I want every inference and artifact to be persisted with job tracking, so that I have complete audit trails and can debug issues.
 
@@ -103,7 +142,7 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 9. WHEN artifacts are stored THEN the DynamoDB record SHALL include the S3 URI in the artifacts_s3_uri field
 10. WHEN any data is generated THEN it SHALL be persisted with NO exceptions - all prompts, responses, and artifacts MUST be saved
 
-### Requirement 8: CloudWatch Logging and X-Ray Tracing
+### Requirement 9: CloudWatch Logging and X-Ray Tracing
 
 **User Story:** As a DevOps engineer, I want comprehensive logging and tracing across all agents and Lambda functions, so that I can monitor system health and debug issues.
 
@@ -116,24 +155,26 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 5. WHEN viewing X-Ray traces THEN they SHALL be tagged with job_name for filtering
 6. WHEN log retention is configured THEN it SHALL default to 30 days with configurable retention periods
 
-### Requirement 9: Infrastructure as Code Deployment
+### Requirement 10: Infrastructure as Code Deployment
 
 **User Story:** As a DevOps engineer, I want to deploy the entire AutoNinja system using CloudFormation, so that I can provision all resources consistently and repeatably.
 
 #### Acceptance Criteria
 
-1. WHEN deploying the system THEN it SHALL provide a single CloudFormation template that creates all resources
-2. WHEN the template is deployed THEN it SHALL create 6 Bedrock Agents with proper configurations
+1. WHEN deploying the system THEN it SHALL provide a single CloudFormation template that creates all Bedrock Agent resources
+2. WHEN the template is deployed THEN it SHALL create 5 Bedrock collaborator agents with proper configurations
 3. WHEN the template is deployed THEN it SHALL create 5 Lambda functions with proper IAM roles and permissions
 4. WHEN the template is deployed THEN it SHALL create DynamoDB table with partition key job_name and sort key timestamp
 5. WHEN the template is deployed THEN it SHALL create S3 bucket with encryption enabled and proper bucket policies
 6. WHEN the template is deployed THEN it SHALL create all IAM roles and policies following least-privilege principles
 7. WHEN the template is deployed THEN it SHALL create CloudWatch log groups with configurable retention
 8. WHEN the template is deployed THEN it SHALL create Lambda layers for shared code
-9. WHEN the template is deployed THEN it SHALL establish agent collaborator associations between supervisor and collaborators
-10. WHEN deployment completes THEN it SHALL output the supervisor agent ID, ARN, and invocation command
+9. WHEN the template is deployed THEN it SHALL create custom orchestration Lambda for rate limiting on collaborators
+10. WHEN the supervisor agent is deployed THEN it SHALL be deployed separately using the agentcore CLI toolkit
+11. WHEN the supervisor agent is deployed THEN it SHALL have IAM permissions to invoke all 5 collaborator agents
+12. WHEN deployment completes THEN it SHALL output the collaborator agent IDs, ARNs, and the AgentCore Runtime supervisor ARN
 
-### Requirement 10: Lambda Function Implementation
+### Requirement 11: Lambda Function Implementation
 
 **User Story:** As a developer, I want Lambda functions for each collaborator agent that implement the business logic, so that agents can perform their specialized tasks.
 
@@ -152,7 +193,7 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 11. WHEN an error occurs THEN it SHALL log the error to DynamoDB and return a structured error response
 12. WHEN any data is generated THEN it SHALL be persisted with NO exceptions
 
-### Requirement 11: Shared Libraries Lambda Layer
+### Requirement 12: Shared Libraries Lambda Layer
 
 **User Story:** As a developer, I want shared libraries packaged as a Lambda Layer, so that common code is reused across all Lambda functions without duplication.
 
@@ -167,7 +208,7 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 7. WHEN Lambda functions use the layer THEN they SHALL import shared modules from /opt/python/
 8. WHEN persistence utilities are used THEN they SHALL enforce that ALL data is persisted with NO exceptions
 
-### Requirement 12: OpenAPI Schemas for Action Groups
+### Requirement 13: OpenAPI Schemas for Action Groups
 
 **User Story:** As a system integrator, I want OpenAPI schemas that define the interface between Bedrock Agents and Lambda functions, so that agents know what actions are available and how to invoke them.
 
@@ -180,7 +221,7 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 5. WHEN the schema is defined THEN it SHALL include descriptions for all actions, parameters, and responses
 6. WHEN Bedrock Agent uses the schema THEN it SHALL be able to invoke Lambda functions with properly formatted requests
 
-### Requirement 13: Security and IAM Configuration
+### Requirement 14: Security and IAM Configuration
 
 **User Story:** As a security engineer, I want all IAM roles and policies to follow least-privilege principles, so that the system is secure and compliant.
 
@@ -194,7 +235,7 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 6. WHEN API calls are made THEN they SHALL use TLS 1.3 for encryption in transit
 7. WHEN CloudTrail is enabled THEN all API calls SHALL be logged for audit purposes
 
-### Requirement 14: Cost Optimization and Monitoring
+### Requirement 15: Cost Optimization and Monitoring
 
 **User Story:** As a finance manager, I want to track costs per generation and optimize resource usage, so that the system operates cost-effectively.
 
@@ -207,7 +248,7 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 5. WHEN S3 lifecycle policies are configured THEN they SHALL archive old artifacts to cheaper storage tiers
 6. WHEN CloudWatch metrics are available THEN they SHALL include cost per generation and monthly cost projections
 
-### Requirement 15: Testing and Validation
+### Requirement 16: Testing and Validation
 
 **User Story:** As a QA engineer, I want comprehensive testing capabilities for the system, so that I can verify functionality before and after deployment.
 
@@ -220,7 +261,7 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 5. WHEN testing completes THEN it SHALL verify that all artifacts are saved to DynamoDB and S3
 6. WHEN testing completes THEN it SHALL verify that the deployed agent responds correctly to test inputs
 
-### Requirement 16: Documentation and Examples
+### Requirement 17: Documentation and Examples
 
 **User Story:** As a new user, I want comprehensive documentation and examples, so that I can understand and use the system effectively.
 
@@ -234,7 +275,7 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 6. WHEN examples are provided THEN they SHALL include scripts to query DynamoDB and S3 for results
 7. WHEN examples are provided THEN they SHALL include CloudWatch Insights queries for monitoring
 
-### Requirement 17: Task Completion and Quality Gates
+### Requirement 18: Task Completion and Quality Gates
 
 **User Story:** As a project manager, I want clear criteria for task completion with quality gates, so that I know when a task block is truly complete and ready for production.
 
@@ -250,24 +291,7 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 8. WHEN code is validated THEN it SHALL use linters and static analysis tools to detect errors and warnings
 9. WHEN a task fails quality gates THEN it SHALL NOT be marked as complete until all issues are resolved
 
-### Requirement 19: Implementation Consistency and Pattern Adherence
-
-**User Story:** As a developer implementing Lambda functions, I want a clear reference implementation and explicit pattern to follow, so that all agents have consistent structure and behavior without recurring mistakes.
-
-#### Acceptance Criteria
-
-1. WHEN implementing a new Lambda function THEN it SHALL use the Requirements Analyst handler as the canonical reference implementation
-2. WHEN the spec says "copy EXACT structure" THEN it SHALL mean: copy the control flow pattern (event parsing → routing → action handlers → error handling), NOT the business logic
-3. WHEN implementing action handlers THEN they SHALL follow the 3-phase pattern: (1) log input, (2) execute business logic, (3) log output and save artifacts
-4. WHEN calling log_inference_input() THEN it SHALL create a new DynamoDB record and return a timestamp
-5. WHEN calling log_inference_output() THEN it SHALL UPDATE the existing record (not create a new one) using the timestamp from log_inference_input()
-6. WHEN extracting parameters from Bedrock Agent events THEN it SHALL use the exact same parsing logic as Requirements Analyst
-7. WHEN returning responses THEN it SHALL use the exact same response format as Requirements Analyst
-8. WHEN handling errors THEN it SHALL use the exact same error handling pattern as Requirements Analyst
-9. WHEN writing tests THEN it SHALL follow the same test structure as Requirements Analyst tests
-10. WHEN verifying DynamoDB logging THEN it SHALL expect 1 record per action (not 2), with both prompt and response fields populated
-
-### Requirement 18: Project Structure and File Organization
+### Requirement 19: Project Structure and File Organization
 
 **User Story:** As a developer, I want all files organized in their appropriate directories, so that the project structure is clean and maintainable.
 
@@ -284,3 +308,23 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 9. WHEN example scripts are created THEN they SHALL be placed in examples/ directory
 10. WHEN files are in the root directory THEN they SHALL only be project-level files (README.md, pyproject.toml, LICENSE, .gitignore)
 11. WHEN the project structure is reviewed THEN there SHALL be NO files in the root directory that belong in subdirectories
+12. WHEN the supervisor agent is created THEN it SHALL be placed in lambda/supervisor-agentcore/ directory
+
+### Requirement 20: Implementation Consistency and Pattern Adherence
+
+**User Story:** As a developer implementing Lambda functions, I want a clear reference implementation and explicit pattern to follow, so that all agents have consistent structure and behavior without recurring mistakes.
+
+#### Acceptance Criteria
+
+1. WHEN implementing a new Lambda function THEN it SHALL use the Requirements Analyst handler as the canonical reference implementation
+2. WHEN the spec says "copy EXACT structure" THEN it SHALL mean: copy the control flow pattern (event parsing → routing → action handlers → error handling), NOT the business logic
+3. WHEN implementing action handlers THEN they SHALL follow the 3-phase pattern: (1) log input, (2) execute business logic, (3) log output and save artifacts
+4. WHEN calling log_inference_input() THEN it SHALL create a new DynamoDB record and return a timestamp
+5. WHEN calling log_inference_output() THEN it SHALL UPDATE the existing record (not create a new one) using the timestamp from log_inference_input()
+6. WHEN extracting parameters from Bedrock Agent events THEN it SHALL use the exact same parsing logic as Requirements Analyst
+7. WHEN returning responses THEN it SHALL use the exact same response format as Requirements Analyst
+8. WHEN handling errors THEN it SHALL use the exact same error handling pattern as Requirements Analyst
+9. WHEN writing tests THEN it SHALL follow the same test structure as Requirements Analyst tests
+10. WHEN verifying DynamoDB logging THEN it SHALL expect 1 record per action (not 2), with both prompt and response fields populated
+
+
