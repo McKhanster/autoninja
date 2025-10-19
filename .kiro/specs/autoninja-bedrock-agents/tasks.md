@@ -1089,7 +1089,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
   - All LLM calls must be real and persisted
   - _Requirements: 15.4, 17.5_
 
-- [-] 13. Fix CloudFormation Deployment Errors
+- [x] 13. Fix CloudFormation Deployment Errors
 
   - [x] 13.1 Fix IAM Role Policies syntax in 4 collaborator stacks
     - Fix code-generator.yaml, requirements-analyst.yaml, solution-architect.yaml, quality-validator.yaml (line 66-68)
@@ -1120,7 +1120,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Add after line 20
     - _Requirements: 21.5_
 
-  - [ ] 13.6 Deploy and verify
+  - [x] 13.6 Deploy and verify
     - Delete failed stack, wait for completion
     - Run `./scripts/deploy_supervisor.sh`
     - Verify all 9 nested stacks reach CREATE_COMPLETE
