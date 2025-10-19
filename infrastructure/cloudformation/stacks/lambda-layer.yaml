@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  AutoNinja Lambda Layer Stack - Shared Python libraries and base IAM policies
+  for Lambda functions.
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+    Default: production
+
+  DeploymentBucket:
+    Type: String
+    Description: S3 bucket containing Lambda deployment packages
+    Default: ""
+
+  InferenceRecordsTableArn:
+    Type: String
+    Description: ARN of the DynamoDB inference records table
+
+  ArtifactsBucketArn:
+    Type: String
+    Description: ARN of the S3 artifacts bucket
+
+Conditions:
+  UseDefaultDeploymentBucket: !Equals [!Ref DeploymentBucket, ""]
+
+Resources:
+  # ============================================================================
+  # Lambda Layer - Shared Libraries
+  # ============================================================================
+  SharedLibrariesLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: !Sub "autoninja-shared-layer-${Environment}"
+      Description: Shared Python libraries for AutoNinja Lambda functions
+      Content:
+        S3Bucket: !If
+          - UseDefaultDeploymentBucket
+          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+          - !Ref DeploymentBucket
+        S3Key: layers/autoninja-shared-layer.zip
+      CompatibleRuntimes:
+        - python3.9
+        - python3.10
+        - python3.11
+        - python3.12
+      CompatibleArchitectures:
+        - x86_64
+        - arm64
+
+  # ============================================================================
+  # IAM Managed Policy - Base Lambda Permissions
+  # ============================================================================
+  LambdaBaseManagedPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "AutoNinjaLambdaBasePolicy-${Environment}"
+      Description: Base permissions for all AutoNinja Lambda functions
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          # CloudWatch Logs permissions
+          - Sid: CloudWatchLogsAccess
+            Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource:
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/autoninja-*"
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/autoninja-*:*"
+
+          # X-Ray tracing permissions
+          - Sid: XRayAccess
+            Effect: Allow
+            Action:
+              - xray:PutTraceSegments
+              - xray:PutTelemetryRecords
+            Resource: "*"
+
+          # DynamoDB access for inference records
+          - Sid: DynamoDBInferenceRecordsAccess
+            Effect: Allow
+            Action:
+              - dynamodb:PutItem
+              - dynamodb:GetItem
+              - dynamodb:Query
+              - dynamodb:UpdateItem
+            Resource:
+              - !Ref InferenceRecordsTableArn
+              - !Sub "${InferenceRecordsTableArn}/index/*"
+
+          # S3 access for artifacts
+          - Sid: S3ArtifactsAccess
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:PutObject
+              - s3:DeleteObject
+              - s3:ListBucket
+            Resource:
+              - !Ref ArtifactsBucketArn
+              - !Sub "${ArtifactsBucketArn}/*"
+
+Outputs:
+  LayerArn:
+    Description: ARN of the shared Lambda layer
+    Value: !Ref SharedLibrariesLayer
+    Export:
+      Name: !Sub "${AWS::StackName}-LayerArn"
+
+  LayerVersionArn:
+    Description: Version ARN of the shared Lambda layer
+    Value: !Ref SharedLibrariesLayer
+    Export:
+      Name: !Sub "${AWS::StackName}-LayerVersionArn"
+
+  LambdaBasePolicyArn:
+    Description: ARN of the base Lambda managed policy
+    Value: !Ref LambdaBaseManagedPolicy
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaBasePolicyArn"

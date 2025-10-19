@@ -1,0 +1,32 @@
+graph TD
+    User["User Request<br/>(e.g., 'Build a friend agent')"] --> Supervisor["Supervisor Agent<br/>Bedrock AgentCore Runtime<br/>Python SDK + InvokeAgent API"]
+
+    Supervisor --> JobGen["Generate job_name<br/>(job-friend-20251017-224403)"]
+    JobGen --> RA["1. Requirements Analyst<br/>Bedrock Agent + Lambda<br/>Extract specs"]
+    RA --> CG["2. Code Generator<br/>Bedrock Agent + Lambda<br/>Lambda code, configs, schemas<br/>Save to S3"]
+    CG --> SA["3. Solution Architect<br/>Bedrock Agent + Lambda<br/>Architecture + IaC (CFN)<br/>Reference S3 artifacts"]
+    SA --> QV["4. Quality Validator<br/>Bedrock Agent + Lambda<br/>Quality/Security/Compliance scan"]
+    QV --> Gate{Validation Gate<br/>is_valid?}
+    Gate -->|No| Error["Return validation issues"]
+    Gate -->|Yes| DM["5. Deployment Manager<br/>Bedrock Agent + Lambda<br/>Deploy CFN stack<br/>Configure agent/alias<br/>Test & return ARN"]
+    DM --> Supervisor
+    Supervisor --> Output["NEW DEPLOYED AGENT<br/>Bedrock Agent ARN<br/>Ready to use autonomously"]
+
+    subgraph Persistence ["Shared Layer"]
+        DynamoDB["DynamoDB<br/>Raw prompts/responses<br/>Job_name partitioned"]
+        S3["S3<br/>Artifacts (code, IaC, reports)<br/>Encrypted + Versioned"]
+    end
+
+    RA -.-> DynamoDB
+    RA -.-> S3
+    CG -.-> DynamoDB
+    CG -.-> S3
+    SA -.-> DynamoDB
+    SA -.-> S3
+    QV -.-> DynamoDB
+    QV -.-> S3
+    DM -.-> DynamoDB
+    DM -.-> S3
+
+    style Supervisor fill:#ff9999
+    style Persistence fill:#99ff99

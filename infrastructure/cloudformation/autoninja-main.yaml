@@ -1,0 +1,413 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  AutoNinja Main Stack - Production-grade serverless multi-agent system orchestrator.
+  Deploys 1 supervisor + 5 collaborator Bedrock Agents with complete infrastructure.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Environment Configuration
+        Parameters:
+          - Environment
+      - Label:
+          default: Bedrock Configuration
+        Parameters:
+          - BedrockModel
+      - Label:
+          default: Storage Configuration
+        Parameters:
+          - DynamoDBBillingMode
+          - S3BucketName
+      - Label:
+          default: Deployment Configuration
+        Parameters:
+          - DeploymentBucket
+      - Label:
+          default: Logging Configuration
+        Parameters:
+          - LogRetentionDays
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+    Default: production
+    AllowedValues:
+      - production
+      - staging
+      - development
+
+  BedrockModel:
+    Type: String
+    Description: Foundation model ID for Bedrock Agents
+    Default: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+    AllowedValues:
+      - us.anthropic.claude-sonnet-4-5-20250929-v1:0
+
+  DynamoDBBillingMode:
+    Type: String
+    Description: Billing mode for DynamoDB tables
+    Default: PAY_PER_REQUEST
+    AllowedValues:
+      - PAY_PER_REQUEST
+      - PROVISIONED
+
+  S3BucketName:
+    Type: String
+    Description: Optional custom name for S3 artifacts bucket
+    Default: ""
+    AllowedPattern: "^$|^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+
+  DeploymentBucket:
+    Type: String
+    Description: S3 bucket containing Lambda deployment packages and CloudFormation templates
+    Default: ""
+
+  LogRetentionDays:
+    Type: Number
+    Description: CloudWatch log retention period in days
+    Default: 30
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653]
+
+Conditions:
+  UseDefaultDeploymentBucket: !Equals [!Ref DeploymentBucket, ""]
+
+Resources:
+  # ============================================================================
+  # Storage Stack - DynamoDB + S3 + Rate Limiter
+  # ============================================================================
+  StorageStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub
+        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/storage.yaml"
+        - Bucket: !If
+            - UseDefaultDeploymentBucket
+            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+            - !Ref DeploymentBucket
+      Parameters:
+        Environment: !Ref Environment
+        DynamoDBBillingMode: !Ref DynamoDBBillingMode
+        S3BucketName: !Ref S3BucketName
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
+  # Lambda Layer Stack - Shared Libraries + Base IAM Policy
+  # ============================================================================
+  LambdaLayerStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: StorageStack
+    Properties:
+      TemplateURL: !Sub
+        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/lambda-layer.yaml"
+        - Bucket: !If
+            - UseDefaultDeploymentBucket
+            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+            - !Ref DeploymentBucket
+      Parameters:
+        Environment: !Ref Environment
+        DeploymentBucket: !If
+          - UseDefaultDeploymentBucket
+          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+          - !Ref DeploymentBucket
+        InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
+        ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
+  # Custom Orchestration Stack - Rate Limiting Lambda
+  # ============================================================================
+  CustomOrchestrationStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub
+        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/custom-orchestration.yaml"
+        - Bucket: !If
+            - UseDefaultDeploymentBucket
+            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+            - !Ref DeploymentBucket
+      Parameters:
+        Environment: !Ref Environment
+        DeploymentBucket: !If
+          - UseDefaultDeploymentBucket
+          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+          - !Ref DeploymentBucket
+        LogRetentionDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
+  # Collaborator Agent Stacks (5 agents)
+  # ============================================================================
+  RequirementsAnalystStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - StorageStack
+      - LambdaLayerStack
+    Properties:
+      TemplateURL: !Sub
+        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/requirements-analyst.yaml"
+        - Bucket: !If
+            - UseDefaultDeploymentBucket
+            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+            - !Ref DeploymentBucket
+      Parameters:
+        Environment: !Ref Environment
+        BedrockModel: !Ref BedrockModel
+        DeploymentBucket: !If
+          - UseDefaultDeploymentBucket
+          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+          - !Ref DeploymentBucket
+        InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
+        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
+        LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
+        LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
+        LogRetentionDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  CodeGeneratorStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - StorageStack
+      - LambdaLayerStack
+    Properties:
+      TemplateURL: !Sub
+        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/code-generator.yaml"
+        - Bucket: !If
+            - UseDefaultDeploymentBucket
+            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+            - !Ref DeploymentBucket
+      Parameters:
+        Environment: !Ref Environment
+        BedrockModel: !Ref BedrockModel
+        DeploymentBucket: !If
+          - UseDefaultDeploymentBucket
+          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+          - !Ref DeploymentBucket
+        InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
+        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
+        LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
+        LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
+        LogRetentionDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  SolutionArchitectStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - StorageStack
+      - LambdaLayerStack
+    Properties:
+      TemplateURL: !Sub
+        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/solution-architect.yaml"
+        - Bucket: !If
+            - UseDefaultDeploymentBucket
+            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+            - !Ref DeploymentBucket
+      Parameters:
+        Environment: !Ref Environment
+        BedrockModel: !Ref BedrockModel
+        DeploymentBucket: !If
+          - UseDefaultDeploymentBucket
+          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+          - !Ref DeploymentBucket
+        InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
+        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
+        LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
+        LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
+        LogRetentionDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  QualityValidatorStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - StorageStack
+      - LambdaLayerStack
+    Properties:
+      TemplateURL: !Sub
+        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/quality-validator.yaml"
+        - Bucket: !If
+            - UseDefaultDeploymentBucket
+            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+            - !Ref DeploymentBucket
+      Parameters:
+        Environment: !Ref Environment
+        BedrockModel: !Ref BedrockModel
+        DeploymentBucket: !If
+          - UseDefaultDeploymentBucket
+          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+          - !Ref DeploymentBucket
+        InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
+        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
+        LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
+        LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
+        LogRetentionDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  DeploymentManagerStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - StorageStack
+      - LambdaLayerStack
+    Properties:
+      TemplateURL: !Sub
+        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/deployment-manager.yaml"
+        - Bucket: !If
+            - UseDefaultDeploymentBucket
+            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+            - !Ref DeploymentBucket
+      Parameters:
+        Environment: !Ref Environment
+        BedrockModel: !Ref BedrockModel
+        DeploymentBucket: !If
+          - UseDefaultDeploymentBucket
+          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+          - !Ref DeploymentBucket
+        InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
+        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
+        LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
+        LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
+        LogRetentionDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
+  # Supervisor Agent Stack
+  # ============================================================================
+  SupervisorStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - RequirementsAnalystStack
+      - CodeGeneratorStack
+      - SolutionArchitectStack
+      - QualityValidatorStack
+      - DeploymentManagerStack
+    Properties:
+      TemplateURL: !Sub
+        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/supervisor.yaml"
+        - Bucket: !If
+            - UseDefaultDeploymentBucket
+            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+            - !Ref DeploymentBucket
+      Parameters:
+        Environment: !Ref Environment
+        BedrockModel: !Ref BedrockModel
+        RequirementsAnalystAgentArn: !GetAtt RequirementsAnalystStack.Outputs.AgentArn
+        RequirementsAnalystAgentId: !GetAtt RequirementsAnalystStack.Outputs.AgentId
+        RequirementsAnalystAliasId: !GetAtt RequirementsAnalystStack.Outputs.AgentAliasId
+        CodeGeneratorAgentArn: !GetAtt CodeGeneratorStack.Outputs.AgentArn
+        CodeGeneratorAgentId: !GetAtt CodeGeneratorStack.Outputs.AgentId
+        CodeGeneratorAliasId: !GetAtt CodeGeneratorStack.Outputs.AgentAliasId
+        SolutionArchitectAgentArn: !GetAtt SolutionArchitectStack.Outputs.AgentArn
+        SolutionArchitectAgentId: !GetAtt SolutionArchitectStack.Outputs.AgentId
+        SolutionArchitectAliasId: !GetAtt SolutionArchitectStack.Outputs.AgentAliasId
+        QualityValidatorAgentArn: !GetAtt QualityValidatorStack.Outputs.AgentArn
+        QualityValidatorAgentId: !GetAtt QualityValidatorStack.Outputs.AgentId
+        QualityValidatorAliasId: !GetAtt QualityValidatorStack.Outputs.AgentAliasId
+        DeploymentManagerAgentArn: !GetAtt DeploymentManagerStack.Outputs.AgentArn
+        DeploymentManagerAgentId: !GetAtt DeploymentManagerStack.Outputs.AgentId
+        DeploymentManagerAliasId: !GetAtt DeploymentManagerStack.Outputs.AgentAliasId
+        LogRetentionDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+Outputs:
+  # Supervisor Agent Outputs
+  SupervisorAgentId:
+    Description: Supervisor Agent ID
+    Value: !GetAtt SupervisorStack.Outputs.AgentId
+    Export:
+      Name: !Sub "${AWS::StackName}-SupervisorAgentId"
+
+  SupervisorAgentAliasId:
+    Description: Supervisor Agent Alias ID
+    Value: !GetAtt SupervisorStack.Outputs.AgentAliasId
+    Export:
+      Name: !Sub "${AWS::StackName}-SupervisorAgentAliasId"
+
+  # Collaborator Agent IDs
+  RequirementsAnalystAgentId:
+    Description: Requirements Analyst Agent ID
+    Value: !GetAtt RequirementsAnalystStack.Outputs.AgentId
+
+  CodeGeneratorAgentId:
+    Description: Code Generator Agent ID
+    Value: !GetAtt CodeGeneratorStack.Outputs.AgentId
+
+  SolutionArchitectAgentId:
+    Description: Solution Architect Agent ID
+    Value: !GetAtt SolutionArchitectStack.Outputs.AgentId
+
+  QualityValidatorAgentId:
+    Description: Quality Validator Agent ID
+    Value: !GetAtt QualityValidatorStack.Outputs.AgentId
+
+  DeploymentManagerAgentId:
+    Description: Deployment Manager Agent ID
+    Value: !GetAtt DeploymentManagerStack.Outputs.AgentId
+
+  # Storage Outputs
+  InferenceRecordsTableName:
+    Description: DynamoDB inference records table name
+    Value: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+
+  RateLimiterTableName:
+    Description: DynamoDB rate limiter table name
+    Value: !GetAtt StorageStack.Outputs.RateLimiterTableName
+
+  ArtifactsBucketName:
+    Description: S3 artifacts bucket name
+    Value: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+
+  # Invocation Command
+  SupervisorInvocationCommand:
+    Description: Command to invoke the supervisor agent
+    Value: !GetAtt SupervisorStack.Outputs.InvocationCommand
+
+  # Environment
+  Environment:
+    Description: Deployment environment
+    Value: !Ref Environment

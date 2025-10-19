@@ -1,0 +1,271 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  AutoNinja Code Generator Stack - Bedrock Agent, Lambda function, and IAM roles
+  for generating Lambda code, agent configs, and OpenAPI schemas.
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+    Default: production
+
+  BedrockModel:
+    Type: String
+    Description: Foundation model ID for Bedrock Agent
+    Default: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+
+  DeploymentBucket:
+    Type: String
+    Description: S3 bucket containing Lambda deployment packages
+
+  InferenceRecordsTableName:
+    Type: String
+    Description: Name of the DynamoDB inference records table
+
+  ArtifactsBucketName:
+    Type: String
+    Description: Name of the S3 artifacts bucket
+
+  RateLimiterTableName:
+    Type: String
+    Description: Name of the DynamoDB rate limiter table
+
+  RateLimiterTableArn:
+    Type: String
+    Description: ARN of the DynamoDB rate limiter table
+
+  LambdaLayerArn:
+    Type: String
+    Description: ARN of the shared Lambda layer
+
+  LambdaBasePolicyArn:
+    Type: String
+    Description: ARN of the base Lambda managed policy
+
+  LogRetentionDays:
+    Type: Number
+    Description: CloudWatch log retention period
+    Default: 30
+
+Resources:
+  # ============================================================================
+  # IAM Role - Lambda Execution
+  # ============================================================================
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref LambdaBasePolicyArn
+      Policies:
+        - PolicyName: RateLimiterAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                Resource: !Ref RateLimiterTableArn
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
+  # Lambda Function
+  # ============================================================================
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "autoninja-code-generator-${Environment}"
+      Description: Code Generator Lambda function for AutoNinja
+      Runtime: python3.12
+      Handler: handler.lambda_handler
+      Code:
+        S3Bucket: !Ref DeploymentBucket
+        S3Key: lambda/code-generator.zip
+      Role: !GetAtt LambdaRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Environment:
+        Variables:
+          DYNAMODB_TABLE_NAME: !Ref InferenceRecordsTableName
+          S3_BUCKET_NAME: !Ref ArtifactsBucketName
+          RATE_LIMITER_TABLE: !Ref RateLimiterTableName
+          LOG_LEVEL: INFO
+          ENVIRONMENT: !Ref Environment
+      Layers:
+        - !Ref LambdaLayerArn
+      TracingConfig:
+        Mode: Active
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
+  # CloudWatch Log Group - Lambda
+  # ============================================================================
+  LambdaLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/autoninja-code-generator-${Environment}"
+      RetentionInDays: !Ref LogRetentionDays
+
+  # ============================================================================
+  # IAM Role - Bedrock Agent
+  # ============================================================================
+  AgentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                "aws:SourceAccount": !Ref AWS::AccountId
+              ArnLike:
+                "aws:SourceArn": !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*"
+      Policies:
+        - PolicyName: BedrockAgentPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
+              - Effect: Allow
+                Action:
+                  - bedrock:GetInferenceProfile
+                  - bedrock:GetFoundationModel
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub "arn:aws:s3:::${DeploymentBucket}/schemas/*"
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::${DeploymentBucket}"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
+  # Bedrock Agent
+  # ============================================================================
+  Agent:
+    Type: AWS::Bedrock::Agent
+    DependsOn:
+      - LambdaFunction
+      - AgentRole
+    Properties:
+      AgentName: !Sub "autoninja-code-generator-${Environment}"
+      Description: Code Generator agent - extracts and validates requirements from user requests
+      AgentResourceRoleArn: !GetAtt AgentRole.Arn
+      FoundationModel: !Ref BedrockModel
+      AgentCollaboration: DISABLED
+      IdleSessionTTLInSeconds: 1800
+      AutoPrepare: true
+      Instruction: |
+        You are a requirements analyst for the AutoNinja system. Your role is to extract structured
+        requirements from user requests for AI agents. You generate requirements for ALL sub-agents
+        in the pipeline (Code Generator, Solution Architect, Quality Validator, Deployment Manager).
+
+        When you receive a request:
+        1. Extract the job_name parameter from the request
+        2. Analyze the user's description to identify agent purpose, capabilities, interactions, data needs, and integrations
+        3. Generate comprehensive requirements document covering what each downstream agent needs
+        4. Assess complexity (simple/moderate/complex)
+        5. Validate completeness of requirements
+        6. Return structured requirements in JSON format
+
+        Always use the job_name provided by the supervisor for tracking.
+      ActionGroups:
+        - ActionGroupName: code-generator-actions
+          ActionGroupState: ENABLED
+          ActionGroupExecutor:
+            Lambda: !GetAtt LambdaFunction.Arn
+          Description: Actions for requirements analysis
+          ApiSchema:
+            S3:
+              S3BucketName: !Ref DeploymentBucket
+              S3ObjectKey: schemas/code-generator-schema.yaml
+      Tags:
+        Environment: !Ref Environment
+        Application: AutoNinja
+
+  # ============================================================================
+  # Lambda Invoke Permission
+  # ============================================================================
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: bedrock.amazonaws.com
+      SourceArn: !GetAtt Agent.AgentArn
+
+  # ============================================================================
+  # Bedrock Agent Alias
+  # ============================================================================
+  AgentAlias:
+    Type: AWS::Bedrock::AgentAlias
+    Properties:
+      AgentId: !GetAtt Agent.AgentId
+      AgentAliasName: production
+      Description: Production alias for Code Generator agent
+
+  # ============================================================================
+  # CloudWatch Log Group - Bedrock Agent
+  # ============================================================================
+  AgentLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/bedrock/agents/autoninja-code-generator-${Environment}"
+      RetentionInDays: !Ref LogRetentionDays
+
+Outputs:
+  AgentId:
+    Description: Code Generator Agent ID
+    Value: !GetAtt Agent.AgentId
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentId"
+
+  AgentArn:
+    Description: Code Generator Agent ARN
+    Value: !GetAtt Agent.AgentArn
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentArn"
+
+  AgentAliasId:
+    Description: Code Generator Agent Alias ID
+    Value: !GetAtt AgentAlias.AgentAliasId
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentAliasId"
+
+  LambdaFunctionArn:
+    Description: Code Generator Lambda Function ARN
+    Value: !GetAtt LambdaFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaFunctionArn"

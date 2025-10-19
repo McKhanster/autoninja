@@ -14,6 +14,14 @@
         "search_documentation",
         "read_documentation"
       ]
+    },  "awslabs.nova-canvas-mcp-server": {
+      "command": "uvx",
+      "args": ["awslabs.bedrock-kb-retrieval-mcp-server@latest"],
+      "env": {
+        "AWS_PROFILE": "AdministratorAccess-784327326356",
+        "AWS_REGION": "us-east-2",
+        "FASTMCP_LOG_LEVEL": "ERROR"
+      }
     }
   }
 }

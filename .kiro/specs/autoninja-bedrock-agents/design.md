@@ -2,11 +2,12 @@
 
 ## Overview
 
-AutoNinja is a production-grade, serverless multi-agent system that transforms natural language requests into fully deployed AI agents. The system uses **Amazon Bedrock AgentCore Runtime** for the supervisor agent and **AWS Bedrock Agents** for 5 specialized collaborator agents in a supervisor-collaborator pattern.
+AutoNinja is a production-grade, serverless multi-agent system that transforms natural language requests into fully deployed AI agents. The system uses **AWS Bedrock Agents' native multi-agent collaboration** with a supervisor-collaborator pattern where one supervisor agent (configured with `AgentCollaboration: SUPERVISOR`) coordinates 5 specialized collaborator agents.
 
 **Reference:** 
-- [Amazon Bedrock AgentCore Runtime](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agents-tools-runtime.html)
 - [Multi-Agent Collaboration](https://docs.aws.amazon.com/bedrock/latest/userguide/agents-multi-agent-collaboration.html)
+- [Create Multi-Agent Collaboration](https://docs.aws.amazon.com/bedrock/latest/userguide/create-multi-agent-collaboration.html)
+- [CloudFormation Agent Resource](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-bedrock-agent.html)
 
 ### System Goals
 
@@ -15,8 +16,8 @@ AutoNinja is a production-grade, serverless multi-agent system that transforms n
 3. **AWS-Native Architecture**: Use only AWS managed services for zero infrastructure management
 4. **Production Quality**: Generate secure, tested, and deployable agents with proper IAM policies
 5. **Cost Efficiency**: Optimize for pay-per-use serverless pricing model
-6. **Extended Execution Time**: Leverage AgentCore Runtime for up to 8-hour workflows
-7. **Framework Flexibility**: Use AgentCore SDK for supervisor orchestration logic
+6. **Modular Infrastructure**: Use nested CloudFormation stacks for maintainable deployment
+7. **AWS-Managed Orchestration**: Leverage Bedrock's native supervisor capabilities
 
 ### Key Design Principles
 
@@ -25,8 +26,9 @@ AutoNinja is a production-grade, serverless multi-agent system that transforms n
 - **Idempotency**: All operations can be safely retried with job_name tracking
 - **Least Privilege**: Every component has minimal IAM permissions required
 - **Observability**: Comprehensive logging, tracing, and metrics at every layer
-- **Hybrid Architecture**: AgentCore Runtime supervisor + Bedrock Agent collaborators
+- **AWS-Native Multi-Agent**: Supervisor agent with `AgentCollaboration: SUPERVISOR` + 5 collaborator agents
 - **Sequential Orchestration**: Logical workflow (Requirements → Code → Architecture → Validation → Deployment)
+- **Nested Stacks**: Modular CloudFormation deployment with separate stacks per component
 
 ## Architecture
 
@@ -41,15 +43,15 @@ AutoNinja is a production-grade, serverless multi-agent system that transforms n
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│              Supervisor Agent (AgentCore Runtime)                    │
-│  - Deployed to Amazon Bedrock AgentCore Runtime                     │
+│              Supervisor Agent (Bedrock Agent)                        │
+│  - AWS Bedrock Agent with AgentCollaboration: SUPERVISOR            │
 │  - Generates job_name: job-friend-20251013-143022                   │
-│  - Implements sequential orchestration logic                        │
-│  - Invokes collaborator Bedrock Agents via InvokeAgent API          │
+│  - AWS-managed orchestration and routing                            │
+│  - Routes requests to collaborator agents automatically             │
 │  - Passes job_name to ALL collaborators                             │
 │  - Aggregates results and returns final agent ARN                   │
-│  - Extended execution time (up to 8 hours)                          │
-│  - Isolated microVM session per invocation                          │
+│  - Deployed via nested CloudFormation stack                         │
+│  - Associated with 5 collaborators via AgentCollaborators property  │
 └────────────────────────────┬────────────────────────────────────────┘
                              │
                              ▼

@@ -2,61 +2,68 @@
 
 ## Introduction
 
-AutoNinja is a production-grade, serverless multi-agent system built on AWS Bedrock Agents that transforms natural language requests into fully deployed AI agents. The system leverages AWS Bedrock's native multi-agent collaboration (GA March 2025) to orchestrate 6 specialized agents working together to design, generate, validate, and deploy production-ready AI agents from simple natural language descriptions.
+AutoNinja is a production-grade, serverless multi-agent system built on AWS Bedrock Agents that transforms natural language requests into fully deployed AI agents. The system uses **AWS-native multi-agent collaboration** with a supervisor-collaborator pattern where one supervisor agent coordinates 5 specialist agents (Requirements Analyst, Code Generator, Solution Architect, Quality Validator, and Deployment Manager) to handle the complete lifecycle from user request to deployed agent.
 
-The system follows a supervisor-collaborator pattern where one orchestrator agent (deployed to **Amazon Bedrock AgentCore Runtime**) coordinates 5 specialist agents (Requirements Analyst, Solution Architect, Code Generator, Quality Validator, and Deployment Manager) to handle the complete lifecycle from user request to deployed agent. The supervisor agent uses AgentCore Runtime for extended execution time, better session isolation, and framework flexibility, while collaborator agents use traditional Bedrock Agents with Lambda action groups. All interactions are persisted to DynamoDB and S3 for complete audit trails, with CloudWatch logging and X-Ray tracing for observability.
+The system architecture uses:
+- **Supervisor Agent**: AWS Bedrock Agent with `AgentCollaboration: SUPERVISOR` for orchestration
+- **5 Collaborator Agents**: AWS Bedrock Agents with Lambda action groups for specialized tasks
+- **Nested CloudFormation Stacks**: Modular infrastructure deployment with separate stacks for each component
+- **Rate Limiting**: DynamoDB-backed 30-second spacing between model invocations
+- **Complete Persistence**: All interactions logged to DynamoDB and S3 for audit trails
+- **Full Observability**: CloudWatch logging and X-Ray tracing at every layer
 
-**Reference:** [Amazon Bedrock AgentCore Runtime Documentation](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agents-tools-runtime.html)
+**Implementation Reference:** See `docs/FINAL_IMPLEMENTATION.md` for complete architecture details
+
+**AWS Documentation References:**
+- [Multi-Agent Collaboration](https://docs.aws.amazon.com/bedrock/latest/userguide/agents-multi-agent-collaboration.html)
+- [Bedrock Agents](https://docs.aws.amazon.com/bedrock/latest/userguide/agents.html)
+- [CloudFormation Nested Stacks](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-nested-stacks.html)
 
 ## Requirements
 
-### Requirement 1: Multi-Agent Architecture with Supervisor Orchestration using AgentCore Runtime
+### Requirement 1: Multi-Agent Architecture with AWS-Native Supervisor Orchestration
 
-**User Story:** As a system architect, I want a supervisor-collaborator multi-agent architecture using AWS Bedrock AgentCore Runtime for the supervisor and AWS Bedrock Agents for collaborators, so that complex agent generation tasks can be broken down and handled by specialized agents working in coordination with extended execution time and better isolation.
+**User Story:** As a system architect, I want a supervisor-collaborator multi-agent architecture using AWS Bedrock Agents' native multi-agent collaboration, so that complex agent generation tasks can be broken down and handled by specialized agents working in coordination with AWS-managed orchestration.
 
 **Reference:** 
-- [AgentCore Runtime Overview](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/agents-tools-runtime.html)
 - [Multi-Agent Collaboration](https://docs.aws.amazon.com/bedrock/latest/userguide/agents-multi-agent-collaboration.html)
+- [Supervisor Agent Configuration](https://docs.aws.amazon.com/bedrock/latest/userguide/agents-supervisor.html)
 
 #### Acceptance Criteria
 
-1. WHEN the system is deployed THEN it SHALL create exactly 1 AgentCore Runtime supervisor agent and 5 AWS Bedrock collaborator agents
-2. WHEN the supervisor agent is deployed THEN it SHALL use Amazon Bedrock AgentCore Runtime with support for up to 8-hour execution time
-3. WHEN the supervisor agent receives a user request THEN it SHALL invoke collaborator Bedrock Agents sequentially via the InvokeAgent API
-4. WHEN the supervisor agent orchestrates workflow THEN it SHALL implement logical sequential orchestration (Requirements → Code → Architecture → Validation → Deployment)
-5. WHEN a collaborator agent completes its task THEN it SHALL return structured results to the supervisor agent via the InvokeAgent response
+1. WHEN the system is deployed THEN it SHALL create exactly 1 supervisor Bedrock Agent and 5 collaborator Bedrock Agents
+2. WHEN the supervisor agent is configured THEN it SHALL have `AgentCollaboration: SUPERVISOR` property set
+3. WHEN the supervisor agent receives a user request THEN it SHALL route requests to collaborator agents using AWS-managed orchestration
+4. WHEN the supervisor agent orchestrates workflow THEN it SHALL follow sequential logical workflow (Requirements → Code → Architecture → Validation → Deployment)
+5. WHEN a collaborator agent completes its task THEN it SHALL return structured results to the supervisor agent
 6. WHEN the supervisor agent invokes collaborators THEN it SHALL pass the job_name to ALL collaborators for tracking
 7. WHEN agents communicate THEN the supervisor SHALL aggregate results from all collaborators and return final deployed agent ARN
-8. WHEN an agent encounters an error THEN the system SHALL implement automatic retry logic with exponential backoff
-9. WHEN the supervisor agent is deployed THEN it SHALL use the AgentCore Python SDK (bedrock-agentcore) for implementation
-10. WHEN the supervisor agent is deployed THEN it SHALL be containerized and hosted in AgentCore Runtime with isolated microVM sessions
+8. WHEN an agent encounters an error THEN the system SHALL log the error to CloudWatch and DynamoDB
+9. WHEN the supervisor agent is deployed THEN it SHALL be associated with all 5 collaborator agents via AssociateAgentCollaborator API
+10. WHEN the system is deployed THEN it SHALL use nested CloudFormation stacks for modular infrastructure management
 
-### Requirement 2: Supervisor Agent with AgentCore Runtime
+### Requirement 2: Supervisor Agent with AWS-Native Orchestration
 
-**User Story:** As a supervisor agent developer, I want to implement the orchestration logic using Amazon Bedrock AgentCore Runtime, so that I can leverage extended execution time, framework flexibility, and better session isolation for complex multi-agent workflows.
+**User Story:** As a supervisor agent developer, I want to implement orchestration using AWS Bedrock Agent's native supervisor capabilities, so that AWS manages the routing and coordination of collaborator agents automatically.
 
 **Reference:**
-- [Get Started with AgentCore Runtime](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-getting-started.html)
-- [AgentCore Starter Toolkit](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-get-started-toolkit.html)
-- [Invoke AgentCore Runtime](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-invoke-agent.html)
+- [Supervisor Agent Configuration](https://docs.aws.amazon.com/bedrock/latest/userguide/agents-supervisor.html)
+- [Associate Agent Collaborators](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_agent_AssociateAgentCollaborator.html)
 
 #### Acceptance Criteria
 
-1. WHEN the supervisor agent is implemented THEN it SHALL use the bedrock-agentcore Python SDK
-2. WHEN the supervisor agent is implemented THEN it SHALL define an entrypoint function decorated with @app.entrypoint
-3. WHEN the supervisor agent receives a request THEN it SHALL extract the user prompt from the payload
-4. WHEN the supervisor agent processes a request THEN it SHALL generate a unique job_name in format "job-{keyword}-{YYYYMMDD-HHMMSS}"
-5. WHEN the supervisor agent orchestrates THEN it SHALL invoke collaborator agents sequentially using boto3 bedrock-agent-runtime client
-6. WHEN invoking a collaborator THEN it SHALL use the InvokeAgent API with agent_id, alias_id, session_id, and input_text
-7. WHEN invoking a collaborator THEN it SHALL wait for the complete response before proceeding to the next collaborator
-8. WHEN a collaborator returns a response THEN it SHALL extract the result and pass it to the next collaborator in the pipeline
-9. WHEN the Quality Validator returns results THEN it SHALL check if validation passed before invoking Deployment Manager
-10. WHEN all collaborators complete THEN it SHALL aggregate results and return the final deployed agent ARN
-11. WHEN the supervisor agent is deployed THEN it SHALL use the agentcore CLI toolkit for configuration and deployment
-12. WHEN the supervisor agent is deployed THEN it SHALL be containerized automatically by the AgentCore starter toolkit
-13. WHEN the supervisor agent is deployed THEN it SHALL have an IAM execution role with permissions to invoke all 5 collaborator agents
-14. WHEN the supervisor agent is deployed THEN it SHALL have permissions to access DynamoDB and S3 for logging and artifacts
-15. WHEN the supervisor agent is invoked THEN it SHALL be accessible via the InvokeAgentRuntime API with the AgentCore Runtime ARN
+1. WHEN the supervisor agent is created THEN it SHALL be configured as a standard Bedrock Agent with `AgentCollaboration: SUPERVISOR`
+2. WHEN the supervisor agent is created THEN it SHALL have comprehensive instructions for orchestrating the 5-step workflow
+3. WHEN the supervisor agent receives a request THEN it SHALL generate a unique job_name in format "job-{keyword}-{YYYYMMDD-HHMMSS}"
+4. WHEN the supervisor agent orchestrates THEN it SHALL route requests to collaborators based on its instructions
+5. WHEN invoking a collaborator THEN AWS SHALL handle the InvokeAgent API calls automatically
+6. WHEN a collaborator returns a response THEN AWS SHALL route the response back to the supervisor
+7. WHEN the Quality Validator returns results THEN the supervisor SHALL check if validation passed before routing to Deployment Manager
+8. WHEN all collaborators complete THEN the supervisor SHALL aggregate results and return the final deployed agent ARN
+9. WHEN the supervisor agent is deployed THEN it SHALL be associated with all 5 collaborator agents via CloudFormation or AWS CLI
+10. WHEN the supervisor agent is deployed THEN it SHALL have an IAM execution role with permissions to invoke all 5 collaborator agents
+11. WHEN the supervisor agent is deployed THEN it SHALL be deployed via nested CloudFormation stack (infrastructure/cloudformation/stacks/supervisor.yaml)
+12. WHEN the supervisor agent is invoked THEN it SHALL be accessible via the standard InvokeAgent API with agent_id and alias_id
 
 ### Requirement 3: Requirements Analyst Agent
 
@@ -328,3 +335,29 @@ The system follows a supervisor-collaborator pattern where one orchestrator agen
 10. WHEN verifying DynamoDB logging THEN it SHALL expect 1 record per action (not 2), with both prompt and response fields populated
 
 
+
+### Requirement 21: Full Understanding and Error-Free Task Completion
+
+**User Story:** As a project stakeholder, I want all tasks to be completed with full understanding and zero errors, so that the system is production-ready and maintainable.
+
+#### Acceptance Criteria
+
+1. WHEN beginning any task THEN there MUST be full understanding of the task requirements, architecture, and implementation approach
+2. WHEN understanding is incomplete THEN the implementer SHALL check AWS Documentation MCP and/or search the web before proceeding
+3. WHEN understanding is incomplete THEN the implementer SHALL NOT begin implementation until full understanding is achieved
+4. WHEN a task is marked as complete THEN ALL items in the task MUST be complete with zero errors
+5. WHEN a task is marked as complete THEN ALL code MUST be free of syntax errors, runtime errors, and logical errors
+6. WHEN a task is marked as complete THEN ALL CloudFormation templates MUST pass validation (aws cloudformation validate-template)
+7. WHEN a task is marked as complete THEN ALL tests MUST pass with no failures
+8. WHEN a task is marked as complete THEN ALL deployment steps MUST succeed without errors
+9. WHEN errors are encountered THEN they MUST be investigated using AWS Documentation MCP for AWS-specific issues
+10. WHEN errors are encountered THEN they MUST be fully resolved before marking the task complete
+11. WHEN a task has dependencies THEN all dependency tasks MUST be complete and error-free before proceeding
+12. WHEN implementing AWS resources THEN the implementer SHALL verify the implementation against official AWS documentation
+13. WHEN using CloudFormation properties THEN the implementer SHALL verify the exact syntax and required fields from AWS CloudFormation documentation
+14. WHEN deploying infrastructure THEN the implementer SHALL verify successful deployment in AWS Console before marking complete
+15. WHEN a task involves multiple files THEN ALL files MUST be updated consistently and correctly
+
+**Reference:**
+- [AWS CloudFormation Template Reference](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/)
+- [AWS Bedrock Agents Documentation](https://docs.aws.amazon.com/bedrock/latest/userguide/agents.html)

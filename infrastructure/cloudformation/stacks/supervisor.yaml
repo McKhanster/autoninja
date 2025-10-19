@@ -1,0 +1,297 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  AutoNinja Supervisor Stack - Bedrock Supervisor Agent for multi-agent collaboration
+  orchestration across 5 collaborator agents.
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+    Default: production
+
+  BedrockModel:
+    Type: String
+    Description: Foundation model ID for Bedrock Supervisor Agent
+    Default: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+
+  RequirementsAnalystAgentArn:
+    Type: String
+    Description: ARN of Requirements Analyst Agent
+
+  RequirementsAnalystAgentId:
+    Type: String
+    Description: Agent ID of Requirements Analyst Agent
+
+  RequirementsAnalystAliasId:
+    Type: String
+    Description: Alias ID of Requirements Analyst Agent
+
+  CodeGeneratorAgentArn:
+    Type: String
+    Description: ARN of Code Generator Agent
+
+  CodeGeneratorAgentId:
+    Type: String
+    Description: Agent ID of Code Generator Agent
+
+  CodeGeneratorAliasId:
+    Type: String
+    Description: Alias ID of Code Generator Agent
+
+  SolutionArchitectAgentArn:
+    Type: String
+    Description: ARN of Solution Architect Agent
+
+  SolutionArchitectAgentId:
+    Type: String
+    Description: Agent ID of Solution Architect Agent
+
+  SolutionArchitectAliasId:
+    Type: String
+    Description: Alias ID of Solution Architect Agent
+
+  QualityValidatorAgentArn:
+    Type: String
+    Description: ARN of Quality Validator Agent
+
+  QualityValidatorAgentId:
+    Type: String
+    Description: Agent ID of Quality Validator Agent
+
+  QualityValidatorAliasId:
+    Type: String
+    Description: Alias ID of Quality Validator Agent
+
+  DeploymentManagerAgentArn:
+    Type: String
+    Description: ARN of Deployment Manager Agent
+
+  DeploymentManagerAgentId:
+    Type: String
+    Description: Agent ID of Deployment Manager Agent
+
+  DeploymentManagerAliasId:
+    Type: String
+    Description: Alias ID of Deployment Manager Agent
+
+  LogRetentionDays:
+    Type: Number
+    Description: CloudWatch log retention period
+    Default: 30
+
+Resources:
+  # ============================================================================
+  # IAM Role - Supervisor Agent
+  # ============================================================================
+  AgentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                "aws:SourceAccount": !Ref AWS::AccountId
+              ArnLike:
+                "aws:SourceArn": !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*"
+      Policies:
+        - PolicyName: SupervisorPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: InvokeModel
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
+              - Sid: GetModelInfo
+                Effect: Allow
+                Action:
+                  - bedrock:GetInferenceProfile
+                  - bedrock:GetFoundationModel
+                Resource: "*"
+              - Sid: InvokeCollaborators
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeAgent
+                Resource:
+                  - !Ref RequirementsAnalystAgentArn
+                  - !Ref CodeGeneratorAgentArn
+                  - !Ref SolutionArchitectAgentArn
+                  - !Ref QualityValidatorAgentArn
+                  - !Ref DeploymentManagerAgentArn
+              - Sid: CollaboratorManagement
+                Effect: Allow
+                Action:
+                  - bedrock:AssociateAgentCollaborator
+                  - bedrock:DisassociateAgentCollaborator
+                  - bedrock:GetAgentCollaborator
+                  - bedrock:ListAgentCollaborators
+                  - bedrock:GetAgent
+                  - bedrock:GetAgentAlias
+                  - bedrock:ListAgents
+                  - bedrock:ListAgentAliases
+                Resource: "*"
+              - Sid: AgentAliasAccess
+                Effect: Allow
+                Action:
+                  - bedrock:GetAgentAlias
+                  - bedrock:InvokeAgent
+                Resource:
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${RequirementsAnalystAgentId}/${RequirementsAnalystAliasId}"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${CodeGeneratorAgentId}/${CodeGeneratorAliasId}"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${SolutionArchitectAgentId}/${SolutionArchitectAliasId}"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${QualityValidatorAgentId}/${QualityValidatorAliasId}"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${DeploymentManagerAgentId}/${DeploymentManagerAliasId}"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
+  # Bedrock Supervisor Agent
+  # ============================================================================
+  Agent:
+    Type: AWS::Bedrock::Agent
+    Properties:
+      AgentName: !Sub "autoninja-supervisor-${Environment}"
+      Description: Supervisor agent orchestrating 5 collaborator agents for generating Bedrock Agents from natural language
+      AgentResourceRoleArn: !GetAtt AgentRole.Arn
+      FoundationModel: !Ref BedrockModel
+      AgentCollaboration: SUPERVISOR
+      IdleSessionTTLInSeconds: 3600
+      AutoPrepare: true
+      Instruction: |
+        You are the AutoNinja supervisor agent. Your role is to orchestrate 5 collaborator agents
+        to generate fully deployed Bedrock Agents from natural language requests.
+
+        WORKFLOW:
+        1. Generate job_name from user request (format: job-{keyword}-{YYYYMMDD}-{HHMMSS})
+        2. Route to Requirements Analyst: Pass job_name + user_request
+           - Wait for requirements extraction
+        3. Route to Code Generator: Pass job_name + requirements
+           - Wait for code generation
+        4. Route to Solution Architect: Pass job_name + requirements + code references
+           - Wait for architecture design
+        5. Route to Quality Validator: Pass job_name + all artifacts
+           - Wait for validation report
+        6. VALIDATION GATE: If is_valid == false, STOP and return failures to user
+        7. If valid, route to Deployment Manager: Pass job_name + all artifacts
+           - Wait for deployment completion
+        8. Return deployed agent ARN, alias ID, and invocation commands to user
+
+        CRITICAL RULES:
+        - ALWAYS include job_name in every collaborator invocation
+        - NEVER invoke collaborators in parallel - ALWAYS wait for response before proceeding
+        - Rate limiting is handled automatically - DO NOT add delays
+        - Only invoke Deployment Manager if Quality Validator returns is_valid=true
+        - Relay full conversation history to each collaborator using TO_COLLABORATOR mode
+        - If any agent fails, return clear error message to user with agent name and error
+
+        COLLABORATOR AGENTS:
+        - Requirements Analyst: Extracts structured requirements
+        - Code Generator: Generates Lambda code, agent configs, OpenAPI schemas
+        - Solution Architect: Designs AWS architecture and CloudFormation templates
+        - Quality Validator: Validates code quality, security, compliance
+        - Deployment Manager: Deploys validated agent to AWS
+      AgentCollaborators:
+        - CollaboratorName: requirements-analyst
+          AgentDescriptor:
+            AliasArn: !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${RequirementsAnalystAgentId}/${RequirementsAnalystAliasId}"
+          CollaborationInstruction: |
+            Invoke this agent to extract and analyze requirements from user requests.
+            Pass the job_name and user_request to this agent.
+            Wait for structured requirements document before proceeding.
+          RelayConversationHistory: TO_COLLABORATOR
+        - CollaboratorName: code-generator
+          AgentDescriptor:
+            AliasArn: !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${CodeGeneratorAgentId}/${CodeGeneratorAliasId}"
+          CollaborationInstruction: |
+            Invoke this agent to generate Lambda code, agent configurations, and OpenAPI schemas.
+            Pass the job_name and requirements from Requirements Analyst.
+            Wait for code generation to complete before proceeding.
+          RelayConversationHistory: TO_COLLABORATOR
+        - CollaboratorName: solution-architect
+          AgentDescriptor:
+            AliasArn: !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${SolutionArchitectAgentId}/${SolutionArchitectAliasId}"
+          CollaborationInstruction: |
+            Invoke this agent to design AWS architecture and generate CloudFormation templates.
+            Pass the job_name, requirements, and code references.
+            Wait for architecture design to complete before proceeding.
+          RelayConversationHistory: TO_COLLABORATOR
+        - CollaboratorName: quality-validator
+          AgentDescriptor:
+            AliasArn: !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${QualityValidatorAgentId}/${QualityValidatorAliasId}"
+          CollaborationInstruction: |
+            Invoke this agent to validate code quality, security, and compliance.
+            Pass the job_name and all artifacts (requirements, code, architecture).
+            Wait for validation report. Check is_valid field before proceeding to deployment.
+          RelayConversationHistory: TO_COLLABORATOR
+        - CollaboratorName: deployment-manager
+          AgentDescriptor:
+            AliasArn: !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${DeploymentManagerAgentId}/${DeploymentManagerAliasId}"
+          CollaborationInstruction: |
+            Invoke this agent ONLY if Quality Validator returns is_valid=true.
+            Pass the job_name and all validated artifacts.
+            Wait for deployment to complete and return deployed agent ARN to user.
+          RelayConversationHistory: TO_COLLABORATOR
+      Tags:
+        Environment: !Ref Environment
+        Application: AutoNinja
+
+  # ============================================================================
+  # Bedrock Agent Alias
+  # ============================================================================
+  AgentAlias:
+    Type: AWS::Bedrock::AgentAlias
+    Properties:
+      AgentId: !GetAtt Agent.AgentId
+      AgentAliasName: production
+      Description: Production alias for Supervisor agent
+
+  # ============================================================================
+  # CloudWatch Log Group
+  # ============================================================================
+  AgentLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/bedrock/agents/autoninja-supervisor-${Environment}"
+      RetentionInDays: !Ref LogRetentionDays
+
+Outputs:
+  AgentId:
+    Description: Supervisor Agent ID
+    Value: !GetAtt Agent.AgentId
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentId"
+
+  AgentArn:
+    Description: Supervisor Agent ARN
+    Value: !GetAtt Agent.AgentArn
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentArn"
+
+  AgentAliasId:
+    Description: Supervisor Agent Alias ID
+    Value: !GetAtt AgentAlias.AgentAliasId
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentAliasId"
+
+  InvocationCommand:
+    Description: Command to invoke the supervisor agent
+    Value: !Sub |
+      aws bedrock-agent-runtime invoke-agent \
+        --agent-id ${Agent.AgentId} \
+        --agent-alias-id ${AgentAlias.AgentAliasId} \
+        --session-id job-$(date +%s) \
+        --input-text "Build a customer service agent for insurance claims" \
+        --enable-trace \
+        --region ${AWS::Region} \
+        output.json

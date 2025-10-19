@@ -241,7 +241,7 @@ def log_error(
 ):
     """
     Log error with context.
-    
+
     Args:
         logger: StructuredLogger instance
         error: Exception object
@@ -251,11 +251,66 @@ def log_error(
         'error_type': type(error).__name__,
         'error_message': str(error)
     }
-    
+
     if context:
         error_data.update(context)
-    
+
     logger.error(
         f"Error occurred: {str(error)}",
         **error_data
+    )
+
+
+def log_raw_request(
+    logger: StructuredLogger,
+    event: Dict[str, Any],
+    session_id: str
+):
+    """
+    Log raw Bedrock Agent request for debugging and auditing.
+
+    This creates a structured log entry with the full event payload,
+    which is automatically sent to CloudWatch Logs.
+
+    Args:
+        logger: StructuredLogger instance
+        event: Full Bedrock Agent event
+        session_id: Bedrock session ID
+    """
+    logger.info(
+        "RAW_REQUEST",
+        log_type="RAW_REQUEST",
+        session_id=session_id,
+        api_path=event.get('apiPath'),
+        http_method=event.get('httpMethod'),
+        action_group=event.get('actionGroup'),
+        event_payload=event
+    )
+
+
+def log_raw_response(
+    logger: StructuredLogger,
+    response: Dict[str, Any],
+    duration_ms: float,
+    session_id: str
+):
+    """
+    Log raw Bedrock Agent response for debugging and auditing.
+
+    This creates a structured log entry with the full response payload,
+    which is automatically sent to CloudWatch Logs.
+
+    Args:
+        logger: StructuredLogger instance
+        response: Full Bedrock Agent response
+        duration_ms: Request duration in milliseconds
+        session_id: Bedrock session ID
+    """
+    logger.info(
+        "RAW_RESPONSE",
+        log_type="RAW_RESPONSE",
+        session_id=session_id,
+        duration_ms=duration_ms,
+        status_code=response.get('response', {}).get('httpStatusCode'),
+        response_payload=response
     )

@@ -1,0 +1,234 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  AutoNinja Storage Stack - DynamoDB tables and S3 buckets for artifact storage
+  and rate limiting state management.
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+    Default: production
+    AllowedValues:
+      - production
+      - staging
+      - development
+
+  DynamoDBBillingMode:
+    Type: String
+    Description: Billing mode for DynamoDB tables
+    Default: PAY_PER_REQUEST
+    AllowedValues:
+      - PAY_PER_REQUEST
+      - PROVISIONED
+
+  S3BucketName:
+    Type: String
+    Description: Optional custom name for S3 artifacts bucket
+    Default: ""
+    AllowedPattern: "^$|^[a-z0-9][a-z0-9-]*[a-z0-9]$"
+
+Conditions:
+  UseCustomBucketName: !Not [!Equals [!Ref S3BucketName, ""]]
+
+Resources:
+  # ============================================================================
+  # DynamoDB Table for Inference Records
+  # ============================================================================
+  InferenceRecordsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "autoninja-inference-records-${Environment}"
+      BillingMode: !Ref DynamoDBBillingMode
+      AttributeDefinitions:
+        - AttributeName: job_name
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+        - AttributeName: session_id
+          AttributeType: S
+        - AttributeName: agent_name
+          AttributeType: S
+      KeySchema:
+        - AttributeName: job_name
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: SessionIdIndex
+          KeySchema:
+            - AttributeName: session_id
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+        - IndexName: AgentNameTimestampIndex
+          KeySchema:
+            - AttributeName: agent_name
+              KeyType: HASH
+            - AttributeName: timestamp
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # ============================================================================
+  # DynamoDB Table for Rate Limiter State
+  # ============================================================================
+  RateLimiterTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "autoninja-rate-limiter-${Environment}"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: job_name
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: job_name
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+      SSESpecification:
+        SSEEnabled: true
+        SSEType: KMS
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Purpose
+          Value: RateLimiting
+
+  # ============================================================================
+  # S3 Bucket for Artifacts Storage
+  # ============================================================================
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !If
+        - UseCustomBucketName
+        - !Ref S3BucketName
+        - !Sub "autoninja-artifacts-${AWS::AccountId}-${Environment}"
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ArchiveOldArtifacts
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 90
+                StorageClass: STANDARD_IA
+              - TransitionInDays: 180
+                StorageClass: GLACIER
+            NoncurrentVersionTransitions:
+              - TransitionInDays: 30
+                StorageClass: STANDARD_IA
+              - TransitionInDays: 90
+                StorageClass: GLACIER
+          - Id: DeleteOldVersions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 365
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  ArtifactsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ArtifactsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt ArtifactsBucket.Arn
+              - !Sub "${ArtifactsBucket.Arn}/*"
+            Condition:
+              Bool:
+                "aws:SecureTransport": false
+          - Sid: DenyUnencryptedObjectUploads
+            Effect: Deny
+            Principal: "*"
+            Action: "s3:PutObject"
+            Resource: !Sub "${ArtifactsBucket.Arn}/*"
+            Condition:
+              StringNotEquals:
+                "s3:x-amz-server-side-encryption": "aws:kms"
+
+Outputs:
+  InferenceRecordsTableName:
+    Description: Name of the DynamoDB table for inference records
+    Value: !Ref InferenceRecordsTable
+    Export:
+      Name: !Sub "${AWS::StackName}-InferenceRecordsTableName"
+
+  InferenceRecordsTableArn:
+    Description: ARN of the DynamoDB table for inference records
+    Value: !GetAtt InferenceRecordsTable.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-InferenceRecordsTableArn"
+
+  RateLimiterTableName:
+    Description: Name of the DynamoDB table for rate limiter state
+    Value: !Ref RateLimiterTable
+    Export:
+      Name: !Sub "${AWS::StackName}-RateLimiterTableName"
+
+  RateLimiterTableArn:
+    Description: ARN of the DynamoDB table for rate limiter state
+    Value: !GetAtt RateLimiterTable.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-RateLimiterTableArn"
+
+  ArtifactsBucketName:
+    Description: Name of the S3 bucket for artifacts
+    Value: !Ref ArtifactsBucket
+    Export:
+      Name: !Sub "${AWS::StackName}-ArtifactsBucketName"
+
+  ArtifactsBucketArn:
+    Description: ARN of the S3 bucket for artifacts
+    Value: !GetAtt ArtifactsBucket.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-ArtifactsBucketArn"
+
+  DeploymentBucketName:
+    Description: Name of the deployment artifacts bucket
+    Value: !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+    Export:
+      Name: !Sub "${AWS::StackName}-DeploymentBucketName"

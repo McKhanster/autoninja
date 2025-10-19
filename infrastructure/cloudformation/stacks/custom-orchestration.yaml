@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  AutoNinja Custom Orchestration Stack - Lambda function for custom agent orchestration
+  with rate limiting capabilities.
+
+Parameters:
+  Environment:
+    Type: String
+    Description: Deployment environment
+    Default: production
+
+  DeploymentBucket:
+    Type: String
+    Description: S3 bucket containing Lambda deployment packages
+
+  LogRetentionDays:
+    Type: Number
+    Description: CloudWatch log retention period
+    Default: 30
+
+Resources:
+  # ============================================================================
+  # IAM Role - Lambda Execution
+  # ============================================================================
+  LambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BedrockModelAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:Converse
+                Resource: "*"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
+  # Lambda Function
+  # ============================================================================
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "autoninja-custom-orchestration-${Environment}"
+      Description: Custom orchestration Lambda for Bedrock Agents with rate limiting
+      Runtime: python3.12
+      Handler: handler.lambda_handler
+      Code:
+        S3Bucket: !Ref DeploymentBucket
+        S3Key: lambda/custom-orchestration.zip
+      Role: !GetAtt LambdaRole.Arn
+      Timeout: 600
+      MemorySize: 512
+      Environment:
+        Variables:
+          MIN_INTERVAL_SECONDS: "60"
+          LOG_LEVEL: INFO
+          ENVIRONMENT: !Ref Environment
+      TracingConfig:
+        Mode: Active
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
+  # CloudWatch Log Group
+  # ============================================================================
+  LogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${LambdaFunction}"
+      RetentionInDays: !Ref LogRetentionDays
+
+  # ============================================================================
+  # Lambda Invoke Permission
+  # ============================================================================
+  InvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: bedrock.amazonaws.com
+
+Outputs:
+  FunctionArn:
+    Description: Custom Orchestration Lambda Function ARN
+    Value: !GetAtt LambdaFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-FunctionArn"
+
+  FunctionName:
+    Description: Custom Orchestration Lambda Function Name
+    Value: !Ref LambdaFunction
+    Export:
+      Name: !Sub "${AWS::StackName}-FunctionName"

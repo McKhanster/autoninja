@@ -1088,3 +1088,41 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
   - Test with multiple agent types (simple, complex, with knowledge bases)
   - All LLM calls must be real and persisted
   - _Requirements: 15.4, 17.5_
+
+- [-] 13. Fix CloudFormation Deployment Errors
+
+  - [x] 13.1 Fix IAM Role Policies syntax in 4 collaborator stacks
+    - Fix code-generator.yaml, requirements-analyst.yaml, solution-architect.yaml, quality-validator.yaml (line 66-68)
+    - Change `Policies: PolicyDocument:` to `Policies: - PolicyName: RateLimiterAccess PolicyDocument:`
+    - Validate with `aws cloudformation validate-template`
+    - _Requirements: 21.6, 21.13_
+
+  - [x] 13.2 Add AgentCollaborators to supervisor agent
+    - Update `stacks/supervisor.yaml` Agent resource
+    - Add `AgentCollaborators` property with 5 collaborators
+    - Include CollaboratorName, AgentDescriptor (AliasArn), CollaborationInstruction, RelayConversationHistory
+    - _Requirements: 1.9, 2.9, 21.13_
+
+  - [x] 13.3 Update supervisor stack to accept alias ARNs
+    - Modify supervisor.yaml parameters to accept alias information
+    - Construct alias ARNs using `!Sub` with AgentId and AliasId
+    - Format: `arn:aws:bedrock:region:account:agent-alias/AGENT_ID/ALIAS_ID`
+    - _Requirements: 21.13, 21.15_
+
+  - [x] 13.4 Update main stack to pass alias ARNs
+    - Modify autoninja-main.yaml SupervisorStack parameters
+    - Pass AgentId and AliasId from collaborator stack outputs
+    - Construct alias ARNs before passing to supervisor
+    - _Requirements: 21.13, 21.15_
+
+  - [x] 13.5 Fix deployment script
+    - Add `AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)` to deploy_nested_stacks.sh
+    - Add after line 20
+    - _Requirements: 21.5_
+
+  - [ ] 13.6 Deploy and verify
+    - Delete failed stack, wait for completion
+    - Run `./scripts/deploy_supervisor.sh`
+    - Verify all 9 nested stacks reach CREATE_COMPLETE
+    - Test supervisor agent invocation
+    - _Requirements: 21.8, 21.14_
