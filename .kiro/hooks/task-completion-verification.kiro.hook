@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "name": "Task Completion Verification",
+  "description": "When marking a task complete, the agent should verify all requirements are met, run diagnostics, and confirm AgentCore integration before allowing completion",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.md",
+      "**/*.py",
+      "**/*.yaml",
+      "**/*.json"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A task completion has been detected. Before allowing this task to be marked complete, please verify: 1) All requirements from the specification documents are met, 2) Run getDiagnostics to check for any errors or warnings, 3) Confirm proper AgentCore integration (Memory usage, Runtime configuration, rate limiting patterns), 4) Verify CloudFormation resources are enhanced not replaced, 5) Ensure all tests pass if applicable. Only allow completion after all verification steps are satisfied."
+  }
+}

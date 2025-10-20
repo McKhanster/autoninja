@@ -4,7 +4,8 @@
 
 This implementation plan enhances the existing AutoNinja system with AgentCore capabilities and resolves throttling issues. The approach uses **AgentCore Memory for distributed rate limiting** and **adds AgentCore Runtime as an enhanced supervisor** while keeping the existing 5 collaborator Bedrock Agents unchanged.
 
-**Key Strategy**: 
+**Key Strategy**:
+
 - Keep existing CloudFormation-based Bedrock supervisor agent unchanged
 - Enhance supervisor with AgentCore Memory for rate limiting
 - Add AgentCore Runtime capabilities via CloudFormation
@@ -13,7 +14,7 @@ This implementation plan enhances the existing AutoNinja system with AgentCore c
 
 ## Task List
 
-- [ ] 1. Add AgentCore Memory for Rate Limiting
+- [x] 1. Add AgentCore Memory for Rate Limiting
 
   - Add AWS::BedrockAgentCore::Memory resource to CloudFormation template
   - Configure Memory with 30-day event expiry for rate limiting data
@@ -21,9 +22,9 @@ This implementation plan enhances the existing AutoNinja system with AgentCore c
   - Add Memory ID to stack outputs for AgentCore Runtime access
   - _Requirements: 2.1, 2.2, 4.1, 4.2_
 
-- [ ] 2. Enhance Existing Supervisor with AgentCore Memory
+- [x] 2. Enhance Existing Supervisor with AgentCore Memory
 
-  - [ ] 2.1 Update existing supervisor Lambda function
+  - [x] 2.1 Update existing supervisor Lambda function
 
     - Modify lambda/supervisor/handler.py to use AgentCore Memory API for rate limiting
     - Replace DynamoDB rate limiting calls with AgentCore Memory API calls
@@ -32,7 +33,7 @@ This implementation plan enhances the existing AutoNinja system with AgentCore c
     - Update environment variables to include MEMORY_ID
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1, 2.2_
 
-  - [ ] 2.2 Implement Memory-based global rate limiting
+  - [x] 2.2 Implement Memory-based global rate limiting
 
     - Use bedrock-agentcore client to store/retrieve GLOBAL model invocation timestamps
     - Implement check_and_enforce_global_rate_limit() function using StoreMemoryRecord/RetrieveMemoryRecords APIs
@@ -43,7 +44,7 @@ This implementation plan enhances the existing AutoNinja system with AgentCore c
     - Remove existing DynamoDB rate limiting code from current implementation
     - _Requirements: 2.2, 2.3, 2.4, 2.5, 2.6, 4.1, 4.2, 4.4_
 
-  - [ ] 2.3 Update Lambda dependencies and configuration
+  - [x] 2.3 Update Lambda dependencies and configuration
 
     - Update existing Lambda requirements to include bedrock-agentcore SDK
     - Update CloudFormation template to add MEMORY_ID environment variable to supervisor Lambda
@@ -52,7 +53,7 @@ This implementation plan enhances the existing AutoNinja system with AgentCore c
 
 - [ ] 3. Add AgentCore CloudFormation Resources
 
-  - [ ] 3.1 Add AgentCore Memory resource
+  - [x] 3.1 Add AgentCore Memory resource
 
     - Add AWS::BedrockAgentCore::Memory resource to CloudFormation template
     - Configure Name: autoninja-rate-limiter-memory
@@ -74,7 +75,7 @@ This implementation plan enhances the existing AutoNinja system with AgentCore c
     - Create IAM role for AgentCore Memory access
     - Create IAM role for AgentCore Runtime execution
     - Add permissions for bedrock-agent:InvokeAgent on collaborators
-    - Add permissions for bedrock-agentcore:* on Memory resource
+    - Add permissions for bedrock-agentcore:\* on Memory resource
     - Add CloudWatch Logs permissions
     - _Requirements: 1.9, 7.1, 7.2_
 
@@ -148,9 +149,37 @@ This implementation plan enhances the existing AutoNinja system with AgentCore c
     - Validate performance under load
     - _Requirements: 5.5, 8.7, 8.9_
 
-- [ ] 7. Documentation and Hackathon Preparation
+- [ ] 7. Update CloudFormation Templates with Bedrock Model Permissions
 
-  - [ ] 7.1 Update architecture documentation
+  - [ ] 7.1 Update supervisor agent IAM role permissions
+
+    - Add Bedrock model invocation permissions from infrastructure/cloudformation/permission/permission.json
+    - Include bedrock:InvokeModel and bedrock:InvokeModelWithResponseStream actions
+    - Add permissions for Claude Sonnet 4.5 model (us.anthropic.claude-sonnet-4-5-20250929-v1:0)
+    - Include bedrock:GetInferenceProfile and bedrock:GetFoundationModel permissions
+    - Update supervisor CloudFormation template with enhanced IAM policy
+    - _Requirements: 1.9, 2.1, 7.1_
+
+  - [ ] 7.2 Update collaborator agent IAM role permissions
+
+    - Apply same Bedrock model permissions to all 5 collaborator agents (Requirements Analyst, Code Generator, Solution Architect, Quality Validator, Deployment Manager)
+    - Add S3 schema access permissions (s3:GetObject on autoninja-deployment-artifacts-us-east-2/schemas/*)
+    - Add S3 bucket listing permissions (s3:ListBucket on autoninja-deployment-artifacts-us-east-2)
+    - Update each collaborator's CloudFormation template with enhanced IAM policy
+    - Ensure consistent permissions across all agent roles
+    - _Requirements: 1.9, 2.1, 7.1_
+
+  - [ ] 7.3 Validate permission policy integration
+
+    - Test that all agents can successfully invoke Claude Sonnet 4.5 model
+    - Verify S3 schema access works for all agents
+    - Ensure no permission-related errors during agent invocation
+    - Validate CloudFormation deployment succeeds with updated policies
+    - _Requirements: 5.1, 5.2, 5.8_
+
+- [ ] 8. Documentation and Hackathon Preparation
+
+  - [ ] 8.1 Update architecture documentation
 
     - Document hybrid architecture approach
     - Highlight AgentCore Memory usage for rate limiting
@@ -158,7 +187,7 @@ This implementation plan enhances the existing AutoNinja system with AgentCore c
     - Create architecture diagram showing AgentCore components
     - _Requirements: 6.1, 6.2, 6.9_
 
-  - [ ] 7.2 Create demo materials
+  - [ ] 8.2 Create demo materials
 
     - Prepare demo script showing AgentCore invocation
     - Create video demonstrating AgentCore features
@@ -166,7 +195,7 @@ This implementation plan enhances the existing AutoNinja system with AgentCore c
     - Prepare code repository for submission
     - _Requirements: 6.4, 6.5, 6.6, 6.7_
 
-  - [ ] 7.3 Update deployment documentation
+  - [ ] 8.3 Update deployment documentation
 
     - Document AgentCore deployment process
     - Provide troubleshooting guide
@@ -183,6 +212,7 @@ This implementation plan enhances the existing AutoNinja system with AgentCore c
 ### AgentCore Memory for Rate Limiting
 
 Instead of using DynamoDB for rate limiting, we'll use AgentCore Memory which provides:
+
 - Built-in distributed storage for global rate limiting
 - Automatic expiry (30 days)
 - Native integration with AgentCore Runtime
@@ -190,6 +220,7 @@ Instead of using DynamoDB for rate limiting, we'll use AgentCore Memory which pr
 - Global consistency for the 30-second rule
 
 **Memory Structure**:
+
 ```python
 # Store GLOBAL rate limiting data in Memory
 memory_client.store_memory_record(

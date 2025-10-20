@@ -1,0 +1,22 @@
+{
+  "enabled": true,
+  "name": "Error Check Before Completion",
+  "description": "Monitors all code files for changes and ensures no errors exist before allowing task completion",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "**/*.py",
+      "**/*.yaml",
+      "**/*.yml",
+      "**/*.json",
+      "**/*.js",
+      "**/*.ts",
+      "**/*.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Check for any errors, warnings, or issues in the codebase using getDiagnostics. If there are still errors present, do not mark the current task as complete. Provide a summary of any remaining issues that need to be resolved before the task can be considered finished."
+  }
+}

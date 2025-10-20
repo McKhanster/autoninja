@@ -83,39 +83,7 @@ Resources:
         - Key: ManagedBy
           Value: CloudFormation
 
-  # ============================================================================
-  # DynamoDB Table for Rate Limiter State
-  # ============================================================================
-  RateLimiterTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: !Sub "autoninja-rate-limiter-${Environment}"
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: job_name
-          AttributeType: S
-        - AttributeName: timestamp
-          AttributeType: S
-      KeySchema:
-        - AttributeName: job_name
-          KeyType: HASH
-        - AttributeName: timestamp
-          KeyType: RANGE
-      TimeToLiveSpecification:
-        AttributeName: ttl
-        Enabled: true
-      SSESpecification:
-        SSEEnabled: true
-        SSEType: KMS
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Application
-          Value: AutoNinja
-        - Key: ManagedBy
-          Value: CloudFormation
-        - Key: Purpose
-          Value: RateLimiting
+
 
   # ============================================================================
   # S3 Bucket for Artifacts Storage
@@ -203,17 +171,7 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-InferenceRecordsTableArn"
 
-  RateLimiterTableName:
-    Description: Name of the DynamoDB table for rate limiter state
-    Value: !Ref RateLimiterTable
-    Export:
-      Name: !Sub "${AWS::StackName}-RateLimiterTableName"
 
-  RateLimiterTableArn:
-    Description: ARN of the DynamoDB table for rate limiter state
-    Value: !GetAtt RateLimiterTable.Arn
-    Export:
-      Name: !Sub "${AWS::StackName}-RateLimiterTableArn"
 
   ArtifactsBucketName:
     Description: Name of the S3 bucket for artifacts

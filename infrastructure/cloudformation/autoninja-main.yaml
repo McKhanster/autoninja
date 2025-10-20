@@ -75,7 +75,7 @@ Conditions:
 
 Resources:
   # ============================================================================
-  # Storage Stack - DynamoDB + S3 + Rate Limiter
+  # Storage Stack - DynamoDB + S3
   # ============================================================================
   StorageStack:
     Type: AWS::CloudFormation::Stack
@@ -172,8 +172,6 @@ Resources:
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
-        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
@@ -204,8 +202,6 @@ Resources:
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
-        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
@@ -236,8 +232,6 @@ Resources:
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
-        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
@@ -268,8 +262,6 @@ Resources:
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
-        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
@@ -300,8 +292,6 @@ Resources:
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
-        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
@@ -394,10 +384,6 @@ Outputs:
     Description: DynamoDB inference records table name
     Value: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
 
-  RateLimiterTableName:
-    Description: DynamoDB rate limiter table name
-    Value: !GetAtt StorageStack.Outputs.RateLimiterTableName
-
   ArtifactsBucketName:
     Description: S3 artifacts bucket name
     Value: !GetAtt StorageStack.Outputs.ArtifactsBucketName
@@ -406,6 +392,19 @@ Outputs:
   SupervisorInvocationCommand:
     Description: Command to invoke the supervisor agent
     Value: !GetAtt SupervisorStack.Outputs.InvocationCommand
+
+  # AgentCore Memory
+  AgentCoreMemoryId:
+    Description: AgentCore Memory ID for rate limiting
+    Value: !GetAtt SupervisorStack.Outputs.AgentCoreMemoryId
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentCoreMemoryId"
+
+  AgentCoreMemoryArn:
+    Description: AgentCore Memory ARN for rate limiting
+    Value: !GetAtt SupervisorStack.Outputs.AgentCoreMemoryArn
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentCoreMemoryArn"
 
   # Environment
   Environment:

@@ -1,0 +1,21 @@
+{
+  "enabled": true,
+  "name": "Spec-Driven Task Initialization",
+  "description": "Automatically prompts the agent to read specification documents (requirements.md, design.md, tasks.md) when starting any new task to ensure proper understanding before implementation.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "tasks.md",
+      "requirements.md",
+      "design.md",
+      ".kiro/specs/*/tasks.md",
+      ".kiro/specs/*/requirements.md",
+      ".kiro/specs/*/design.md"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "A specification document has been updated. Before proceeding with any implementation work, you must follow the spec-driven development workflow:\n\nSTEP 1: Read the requirements.md file to understand what needs to be built\nSTEP 2: Read the design.md file to understand how it should be built  \nSTEP 3: Read the tasks.md file to understand the implementation plan\nSTEP 4: Identify the specific task you need to execute\nSTEP 5: Reference relevant requirements and design decisions in your work\nSTEP 6: Execute only the requested task, then stop for user review\n\nDo not proceed with any implementation until you have read and understood all three specification documents. Always cite which requirements your implementation addresses and which design decisions guide your approach."
+  }
+}

@@ -81,6 +81,111 @@ Parameters:
 
 Resources:
   # ============================================================================
+  # AgentCore Memory for Rate Limiting
+  # ============================================================================
+  AgentCoreMemory:
+    Type: AWS::BedrockAgentCore::Memory
+    Properties:
+      Name: !Sub "autoninja-rate-limiter-memory-${Environment}"
+      EventExpiryDuration: 30
+      Description: "AgentCore Memory store for AutoNinja global rate limiting across all agents"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+        - Key: Purpose
+          Value: RateLimiting
+
+  # ============================================================================
+  # IAM Role - Supervisor Lambda Function
+  # ============================================================================
+  SupervisorLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: SupervisorLambdaPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: InvokeCollaborators
+                Effect: Allow
+                Action:
+                  - bedrock-agent-runtime:InvokeAgent
+                Resource:
+                  - !Ref RequirementsAnalystAgentArn
+                  - !Ref CodeGeneratorAgentArn
+                  - !Ref SolutionArchitectAgentArn
+                  - !Ref QualityValidatorAgentArn
+                  - !Ref DeploymentManagerAgentArn
+              - Sid: AgentCoreMemoryAccess
+                Effect: Allow
+                Action:
+                  - bedrock-agentcore:CreateEvent
+                  - bedrock-agentcore:RetrieveMemoryRecords
+                  - bedrock-agentcore:BatchCreateMemoryRecords
+                Resource:
+                  - !GetAtt AgentCoreMemory.MemoryArn
+              - Sid: CloudWatchLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/autoninja-supervisor-*"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
+  # Supervisor Lambda Function
+  # ============================================================================
+  SupervisorLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "autoninja-supervisor-${Environment}"
+      Runtime: python3.12
+      Handler: handler.lambda_handler
+      Role: !GetAtt SupervisorLambdaRole.Arn
+      Code:
+        ZipFile: |
+          # This will be replaced by deployment script
+          def lambda_handler(event, context):
+              return {"statusCode": 200, "body": "Placeholder"}
+      Environment:
+        Variables:
+          MEMORY_ID: !GetAtt AgentCoreMemory.MemoryId
+          REQUIREMENTS_ANALYST_AGENT_ID: !Ref RequirementsAnalystAgentId
+          REQUIREMENTS_ANALYST_ALIAS_ID: !Ref RequirementsAnalystAliasId
+          CODE_GENERATOR_AGENT_ID: !Ref CodeGeneratorAgentId
+          CODE_GENERATOR_ALIAS_ID: !Ref CodeGeneratorAliasId
+          SOLUTION_ARCHITECT_AGENT_ID: !Ref SolutionArchitectAgentId
+          SOLUTION_ARCHITECT_ALIAS_ID: !Ref SolutionArchitectAliasId
+          QUALITY_VALIDATOR_AGENT_ID: !Ref QualityValidatorAgentId
+          QUALITY_VALIDATOR_ALIAS_ID: !Ref QualityValidatorAliasId
+          DEPLOYMENT_MANAGER_AGENT_ID: !Ref DeploymentManagerAgentId
+          DEPLOYMENT_MANAGER_ALIAS_ID: !Ref DeploymentManagerAliasId
+      Timeout: 900
+      MemorySize: 512
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
   # IAM Role - Supervisor Agent
   # ============================================================================
   AgentRole:
@@ -149,6 +254,22 @@ Resources:
                   - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${SolutionArchitectAgentId}/${SolutionArchitectAliasId}"
                   - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${QualityValidatorAgentId}/${QualityValidatorAliasId}"
                   - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${DeploymentManagerAgentId}/${DeploymentManagerAliasId}"
+              - Sid: AgentCoreMemoryAccess
+                Effect: Allow
+                Action:
+                  - bedrock-agentcore:CreateEvent
+                  - bedrock-agentcore:RetrieveMemoryRecords
+                  - bedrock-agentcore:BatchCreateMemoryRecords
+                Resource:
+                  - !GetAtt AgentCoreMemory.MemoryArn
+              - Sid: CloudWatchLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/bedrock/agents/autoninja-supervisor-${Environment}*"
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -173,34 +294,84 @@ Resources:
         to generate fully deployed Bedrock Agents from natural language requests.
 
         WORKFLOW:
+        When a user provides a request, use the orchestrate_agents function to handle the complete workflow.
+        The orchestration function will:
         1. Generate job_name from user request (format: job-{keyword}-{YYYYMMDD}-{HHMMSS})
-        2. Route to Requirements Analyst: Pass job_name + user_request
-           - Wait for requirements extraction
-        3. Route to Code Generator: Pass job_name + requirements
-           - Wait for code generation
-        4. Route to Solution Architect: Pass job_name + requirements + code references
-           - Wait for architecture design
-        5. Route to Quality Validator: Pass job_name + all artifacts
-           - Wait for validation report
-        6. VALIDATION GATE: If is_valid == false, STOP and return failures to user
-        7. If valid, route to Deployment Manager: Pass job_name + all artifacts
-           - Wait for deployment completion
-        8. Return deployed agent ARN, alias ID, and invocation commands to user
+        2. Route to Requirements Analyst with AgentCore Memory rate limiting
+        3. Route to Code Generator with rate limiting
+        4. Route to Solution Architect with rate limiting
+        5. Route to Quality Validator with rate limiting
+        6. VALIDATION GATE: If is_valid == false, STOP and return failures
+        7. If valid, route to Deployment Manager with rate limiting
+        8. Return deployed agent ARN, alias ID, and invocation commands
 
         CRITICAL RULES:
-        - ALWAYS include job_name in every collaborator invocation
-        - NEVER invoke collaborators in parallel - ALWAYS wait for response before proceeding
-        - Rate limiting is handled automatically - DO NOT add delays
-        - Only invoke Deployment Manager if Quality Validator returns is_valid=true
-        - Relay full conversation history to each collaborator using TO_COLLABORATOR mode
-        - If any agent fails, return clear error message to user with agent name and error
+        - ALWAYS use the orchestrate_agents function for user requests
+        - The function handles all rate limiting automatically using AgentCore Memory
+        - The function ensures 30-second minimum intervals between ALL model invocations
+        - The function implements exponential backoff for throttling exceptions
+        - Return the complete results from the orchestration function to the user
 
-        COLLABORATOR AGENTS:
-        - Requirements Analyst: Extracts structured requirements
-        - Code Generator: Generates Lambda code, agent configs, OpenAPI schemas
-        - Solution Architect: Designs AWS architecture and CloudFormation templates
-        - Quality Validator: Validates code quality, security, compliance
-        - Deployment Manager: Deploys validated agent to AWS
+        EXAMPLE USAGE:
+        User: "Build a simple friend agent for emotional support"
+        Response: Use orchestrate_agents with user_request parameter, then return the results
+      ActionGroups:
+        - ActionGroupName: supervisor-orchestration
+          Description: Orchestrates collaborator agents with AgentCore Memory rate limiting
+          ActionGroupExecutor:
+            Lambda: !GetAtt SupervisorLambdaFunction.Arn
+          ApiSchema:
+            Payload: |
+              {
+                "openapi": "3.0.0",
+                "info": {
+                  "title": "Supervisor Orchestration API",
+                  "version": "1.0.0"
+                },
+                "paths": {
+                  "/orchestrate": {
+                    "post": {
+                      "summary": "Orchestrate agent collaboration workflow",
+                      "operationId": "orchestrate_agents",
+                      "requestBody": {
+                        "required": true,
+                        "content": {
+                          "application/json": {
+                            "schema": {
+                              "type": "object",
+                              "properties": {
+                                "user_request": {
+                                  "type": "string",
+                                  "description": "The user's request for agent creation"
+                                }
+                              },
+                              "required": ["user_request"]
+                            }
+                          }
+                        }
+                      },
+                      "responses": {
+                        "200": {
+                          "description": "Orchestration result",
+                          "content": {
+                            "application/json": {
+                              "schema": {
+                                "type": "object",
+                                "properties": {
+                                  "job_name": {"type": "string"},
+                                  "status": {"type": "string"},
+                                  "agent_arn": {"type": "string"},
+                                  "results": {"type": "object"}
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
       AgentCollaborators:
         - CollaboratorName: requirements-analyst
           AgentDescriptor:
@@ -257,6 +428,17 @@ Resources:
       Description: Production alias for Supervisor agent
 
   # ============================================================================
+  # Lambda Permission for Bedrock Agent
+  # ============================================================================
+  SupervisorLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref SupervisorLambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: bedrock.amazonaws.com
+      SourceArn: !GetAtt Agent.AgentArn
+
+  # ============================================================================
   # CloudWatch Log Group
   # ============================================================================
   AgentLogGroup:
@@ -283,6 +465,18 @@ Outputs:
     Value: !GetAtt AgentAlias.AgentAliasId
     Export:
       Name: !Sub "${AWS::StackName}-AgentAliasId"
+
+  AgentCoreMemoryId:
+    Description: AgentCore Memory ID for rate limiting
+    Value: !GetAtt AgentCoreMemory.MemoryId
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentCoreMemoryId"
+
+  AgentCoreMemoryArn:
+    Description: AgentCore Memory ARN for rate limiting
+    Value: !GetAtt AgentCoreMemory.MemoryArn
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentCoreMemoryArn"
 
   InvocationCommand:
     Description: Command to invoke the supervisor agent

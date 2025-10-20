@@ -26,13 +26,11 @@ Parameters:
     Type: String
     Description: Name of the S3 artifacts bucket
 
-  RateLimiterTableName:
+  AgentCoreMemoryId:
     Type: String
-    Description: Name of the DynamoDB rate limiter table
+    Description: ID of the AgentCore Memory for rate limiting
 
-  RateLimiterTableArn:
-    Type: String
-    Description: ARN of the DynamoDB rate limiter table
+
 
   LambdaLayerArn:
     Type: String
@@ -64,15 +62,17 @@ Resources:
       ManagedPolicyArns:
         - !Ref LambdaBasePolicyArn
       Policies:
-        - PolicyName: RateLimiterAccess
+        - PolicyName: AgentCoreMemoryAccess
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
-              - Effect: Allow
+              - Sid: AgentCoreMemoryOperations
+                Effect: Allow
                 Action:
-                  - dynamodb:PutItem
-                  - dynamodb:Query
-                Resource: !Ref RateLimiterTableArn
+                  - bedrock-agentcore:CreateEvent
+                  - bedrock-agentcore:RetrieveMemoryRecords
+                  - bedrock-agentcore:ListMemoryRecords
+                Resource: !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:memory/${AgentCoreMemoryId}"
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -99,7 +99,7 @@ Resources:
         Variables:
           DYNAMODB_TABLE_NAME: !Ref InferenceRecordsTableName
           S3_BUCKET_NAME: !Ref ArtifactsBucketName
-          RATE_LIMITER_TABLE: !Ref RateLimiterTableName
+          MEMORY_ID: !Ref AgentCoreMemoryId
           LOG_LEVEL: INFO
           ENVIRONMENT: !Ref Environment
       Layers:
