@@ -1,0 +1,38 @@
+openapi: 3.0.0
+info:
+  title: Supervisor Orchestration API
+  description: API for orchestrating multi-agent collaboration workflow
+  version: 1.0.0
+
+paths:
+  /orchestrate:
+    post:
+      summary: Orchestrate agent collaboration workflow
+      description: Orchestrates workflow across all 5 collaborator agents
+      operationId: orchestrateAgents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_request
+              properties:
+                user_request:
+                  type: string
+                  description: User request for agent creation
+      responses:
+        '200':
+          description: Orchestration completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_name:
+                    type: string
+                  status:
+                    type: string
+                  agent_arn:
+                    type: string

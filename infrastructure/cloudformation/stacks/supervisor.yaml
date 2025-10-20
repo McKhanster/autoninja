@@ -73,6 +73,21 @@ Parameters:
   DeploymentManagerAliasId:
     Type: String
     Description: Alias ID of Deployment Manager Agent
+  ArtifactsBucketName:
+    Type: String
+    Description: Name of the S3 artifacts bucket
+
+  InferenceRecordsTableArn:
+    Type: String
+    Description: ARN of the DynamoDB inference records table
+
+  ArtifactsBucketArn:
+    Type: String
+    Description: ARN of the S3 artifacts bucket
+
+  DeploymentBucket:
+    Type: String
+    Description: S3 bucket containing deployment artifacts and schemas
 
   LogRetentionDays:
     Type: Number
@@ -86,16 +101,13 @@ Resources:
   AgentCoreMemory:
     Type: AWS::BedrockAgentCore::Memory
     Properties:
-      Name: !Sub "autoninja-rate-limiter-memory-${Environment}"
+      Name: !Sub "autoninja_rate_limiter_${Environment}"
       EventExpiryDuration: 30
       Description: "AgentCore Memory store for AutoNinja global rate limiting across all agents"
       Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Application
-          Value: AutoNinja
-        - Key: Purpose
-          Value: RateLimiting
+        Environment: !Ref Environment
+        Application: AutoNinja
+        Purpose: RateLimiting
 
   # ============================================================================
   # IAM Role - Supervisor Lambda Function
@@ -112,11 +124,30 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
+
       Policies:
         - PolicyName: SupervisorLambdaPermissions
           PolicyDocument:
             Version: "2012-10-17"
             Statement:
+              - Sid: BedrockModelAccess
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                  - bedrock:GetInferenceProfile
+                  - bedrock:GetFoundationModel
+                Resource:
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}"
+                  - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
+              - Sid: BedrockGeneralAccess
+                Effect: Allow
+                Action:
+                  - bedrock:GetInferenceProfile
+                  - bedrock:GetFoundationModel
+                Resource: "*"
               - Sid: InvokeCollaborators
                 Effect: Allow
                 Action:
@@ -127,14 +158,6 @@ Resources:
                   - !Ref SolutionArchitectAgentArn
                   - !Ref QualityValidatorAgentArn
                   - !Ref DeploymentManagerAgentArn
-              - Sid: AgentCoreMemoryAccess
-                Effect: Allow
-                Action:
-                  - bedrock-agentcore:CreateEvent
-                  - bedrock-agentcore:RetrieveMemoryRecords
-                  - bedrock-agentcore:BatchCreateMemoryRecords
-                Resource:
-                  - !GetAtt AgentCoreMemory.MemoryArn
               - Sid: CloudWatchLogs
                 Effect: Allow
                 Action:
@@ -143,6 +166,26 @@ Resources:
                   - logs:PutLogEvents
                 Resource:
                   - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/autoninja-supervisor-*"
+              - Sid: DynamoDBAccess
+                Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:UpdateItem
+                Resource:
+                  - !Ref InferenceRecordsTableArn
+                  - !Sub "${InferenceRecordsTableArn}/index/*"
+              - Sid: S3Access
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Ref ArtifactsBucketArn
+                  - !Sub "${ArtifactsBucketArn}/*"
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -160,10 +203,8 @@ Resources:
       Handler: handler.lambda_handler
       Role: !GetAtt SupervisorLambdaRole.Arn
       Code:
-        ZipFile: |
-          # This will be replaced by deployment script
-          def lambda_handler(event, context):
-              return {"statusCode": 200, "body": "Placeholder"}
+        S3Bucket: !Ref DeploymentBucket
+        S3Key: lambda/supervisor-agentcore.zip
       Environment:
         Variables:
           MEMORY_ID: !GetAtt AgentCoreMemory.MemoryId
@@ -177,8 +218,12 @@ Resources:
           QUALITY_VALIDATOR_ALIAS_ID: !Ref QualityValidatorAliasId
           DEPLOYMENT_MANAGER_AGENT_ID: !Ref DeploymentManagerAgentId
           DEPLOYMENT_MANAGER_ALIAS_ID: !Ref DeploymentManagerAliasId
+          ARTIFACTS_BUCKET_NAME: !Ref ArtifactsBucketName
+          INFERENCE_RECORDS_TABLE_ARN: !Ref InferenceRecordsTableArn
       Timeout: 900
       MemorySize: 512
+      TracingConfig:
+        Mode: Active
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -262,6 +307,18 @@ Resources:
                   - bedrock-agentcore:BatchCreateMemoryRecords
                 Resource:
                   - !GetAtt AgentCoreMemory.MemoryArn
+              - Sid: ApiSchemaAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub "arn:aws:s3:::${DeploymentBucket}/schemas/supervisor-schema.yaml"
+              - Sid: KMSAccessForSchema
+                Effect: Allow
+                Action:
+                  - kms:Decrypt
+                Resource:
+                  - !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*"
               - Sid: CloudWatchLogs
                 Effect: Allow
                 Action:
@@ -321,57 +378,9 @@ Resources:
           ActionGroupExecutor:
             Lambda: !GetAtt SupervisorLambdaFunction.Arn
           ApiSchema:
-            Payload: |
-              {
-                "openapi": "3.0.0",
-                "info": {
-                  "title": "Supervisor Orchestration API",
-                  "version": "1.0.0"
-                },
-                "paths": {
-                  "/orchestrate": {
-                    "post": {
-                      "summary": "Orchestrate agent collaboration workflow",
-                      "operationId": "orchestrate_agents",
-                      "requestBody": {
-                        "required": true,
-                        "content": {
-                          "application/json": {
-                            "schema": {
-                              "type": "object",
-                              "properties": {
-                                "user_request": {
-                                  "type": "string",
-                                  "description": "The user's request for agent creation"
-                                }
-                              },
-                              "required": ["user_request"]
-                            }
-                          }
-                        }
-                      },
-                      "responses": {
-                        "200": {
-                          "description": "Orchestration result",
-                          "content": {
-                            "application/json": {
-                              "schema": {
-                                "type": "object",
-                                "properties": {
-                                  "job_name": {"type": "string"},
-                                  "status": {"type": "string"},
-                                  "agent_arn": {"type": "string"},
-                                  "results": {"type": "object"}
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
+            S3:
+              S3BucketName: !Ref DeploymentBucket
+              S3ObjectKey: schemas/supervisor-schema.yaml
       AgentCollaborators:
         - CollaboratorName: requirements-analyst
           AgentDescriptor:

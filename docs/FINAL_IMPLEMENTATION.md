@@ -3,6 +3,7 @@
 ## AWS Native Multi-Agent Collaboration + AgentCore Integration
 
 ### Architecture
+
 - **Supervisor Agent**: Bedrock Agent with `AgentCollaboration: SUPERVISOR`
 - **5 Collaborator Agents**: Existing Bedrock Agents with Lambda action groups
 - **AgentCore Integration**: AgentCore Memory for cross-job learning + observability
@@ -24,6 +25,7 @@
 **Solution**: Break into modular nested stacks.
 
 **New Structure:**
+
 ```
 infrastructure/cloudformation/
 ├── autoninja-main.yaml              # Main orchestration stack (~200 lines)
@@ -40,6 +42,7 @@ infrastructure/cloudformation/
 ```
 
 **Main Stack Template:**
+
 ```yaml
 # infrastructure/cloudformation/autoninja-main.yaml
 
@@ -230,6 +233,7 @@ Outputs:
 ```
 
 **Benefits:**
+
 - ✅ Each stack is <300 lines - easy to read and edit
 - ✅ Modular - can deploy/update individual agents
 - ✅ Maintainable - clear separation of concerns
@@ -237,6 +241,7 @@ Outputs:
 - ✅ CloudFormation updates nested stacks in parallel
 
 **Updated Deployment Script:**
+
 ```bash
 # scripts/deploy_all.sh - Add before CloudFormation deploy
 
@@ -271,6 +276,7 @@ aws cloudformation deploy \
 ### Step 1: Collaborator Agents (ALREADY DONE ✓)
 
 You already have 5 collaborator agents:
+
 - Requirements Analyst
 - Code Generator
 - Solution Architect
@@ -555,6 +561,7 @@ agentcore memory create \
 **5.2 Attach Memory to Supervisor**
 
 Update supervisor agent configuration to use AgentCore Memory for:
+
 - Storing successful agent patterns
 - Learning from validation failures
 - Improving code generation over time
@@ -589,6 +596,7 @@ export AUTO_DEPLOY=true
 ```
 
 This now:
+
 1. Deploys 5 collaborator agents
 2. Deploys supervisor agent
 3. Associates collaborators

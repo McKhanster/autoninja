@@ -40,16 +40,20 @@ echo ""
 
 # Ensure deployment bucket exists
 echo -e "${YELLOW}Step 1: Ensuring deployment bucket exists...${NC}"
-if aws s3 ls "s3://${DEPLOYMENT_BUCKET}" --region "$REGION" --profile "$PROFILE" 2>&1 | grep -q 'NoSuchBucket'; then
+if ! aws s3 ls "s3://${DEPLOYMENT_BUCKET}" --region "$REGION" --profile "$PROFILE" 2>&1 >/dev/null; then
     echo "Creating S3 bucket: $DEPLOYMENT_BUCKET"
-    aws s3 mb "s3://${DEPLOYMENT_BUCKET}" --region "$REGION" --profile "$PROFILE"
+    aws s3api create-bucket \
+        --bucket "$DEPLOYMENT_BUCKET" \
+        --region "$REGION" \
+        --profile "$PROFILE" \
+        --create-bucket-configuration LocationConstraint="$REGION"
 
     # Enable versioning
     aws s3api put-bucket-versioning \
         --bucket "$DEPLOYMENT_BUCKET" \
-        --versioning-configuration Status=Enabled \
         --region "$REGION" \
-        --profile "$PROFILE"
+        --profile "$PROFILE" \
+        --versioning-configuration Status=Enabled
 
     echo -e "${GREEN}✓ S3 bucket created and versioning enabled${NC}"
 else
@@ -77,20 +81,18 @@ echo ""
 # Upload Lambda deployment packages
 echo -e "${YELLOW}Step 3: Uploading Lambda deployment packages...${NC}"
 
-# Check if Lambda packages exist
-LAMBDA_PACKAGES_EXIST=true
+# Build Lambda packages if not exist
 for agent in requirements-analyst code-generator solution-architect quality-validator deployment-manager custom-orchestration; do
     if [ ! -f "build/${agent}.zip" ]; then
-        echo -e "${YELLOW}Warning: build/${agent}.zip not found${NC}"
-        LAMBDA_PACKAGES_EXIST=false
+        echo "Building $agent..."
+        cd "lambda/$agent"
+        if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt -t .
+        fi
+        zip -r "../../build/${agent}.zip" .
+        cd ../..
     fi
 done
-
-if [ "$LAMBDA_PACKAGES_EXIST" = false ]; then
-    echo -e "${YELLOW}Building Lambda packages...${NC}"
-    ./scripts/deploy_all.sh
-    echo ""
-fi
 
 # Upload Lambda packages
 for agent in requirements-analyst code-generator solution-architect quality-validator deployment-manager custom-orchestration; do
@@ -186,366 +188,38 @@ aws bedrock put-model-invocation-logging-configuration \
 echo -e "${GREEN}✓ Bedrock logging configuration attempted${NC}"
 echo ""
 
-# Create collaborators-only CloudFormation template
-echo -e "${YELLOW}Step 7: Creating collaborators-only template...${NC}"
-cat > infrastructure/cloudformation/autoninja-collaborators.yaml << 'EOF'
-AWSTemplateFormatVersion: "2010-09-09"
-Description: >
-  AutoNinja Collaborators Stack - 5 collaborator Bedrock Agents with complete infrastructure.
-  This is Step 1 of multi-agent collaboration setup.
-
-Parameters:
-  Environment:
-    Type: String
-    Description: Deployment environment
-    Default: production
-
-  BedrockModel:
-    Type: String
-    Description: Foundation model ID for Bedrock Agents
-    Default: us.anthropic.claude-sonnet-4-5-20250929-v1:0
-
-  DynamoDBBillingMode:
-    Type: String
-    Description: Billing mode for DynamoDB tables
-    Default: PAY_PER_REQUEST
-
-  S3BucketName:
-    Type: String
-    Description: Optional custom name for S3 artifacts bucket
-    Default: ""
-
-  DeploymentBucket:
-    Type: String
-    Description: S3 bucket containing Lambda deployment packages and CloudFormation templates
-    Default: ""
-
-  LogRetentionDays:
-    Type: Number
-    Description: CloudWatch log retention period in days
-    Default: 30
-
-Conditions:
-  UseDefaultDeploymentBucket: !Equals [!Ref DeploymentBucket, ""]
-
-Resources:
-  # Storage Stack - DynamoDB + S3 + Rate Limiter
-  StorageStack:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub
-        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/storage.yaml"
-        - Bucket: !If
-            - UseDefaultDeploymentBucket
-            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-            - !Ref DeploymentBucket
-      Parameters:
-        Environment: !Ref Environment
-        DynamoDBBillingMode: !Ref DynamoDBBillingMode
-        S3BucketName: !Ref S3BucketName
-
-  # Lambda Layer Stack - Shared Libraries + Base IAM Policy
-  LambdaLayerStack:
-    Type: AWS::CloudFormation::Stack
-    DependsOn: StorageStack
-    Properties:
-      TemplateURL: !Sub
-        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/lambda-layer.yaml"
-        - Bucket: !If
-            - UseDefaultDeploymentBucket
-            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-            - !Ref DeploymentBucket
-      Parameters:
-        Environment: !Ref Environment
-        DeploymentBucket: !If
-          - UseDefaultDeploymentBucket
-          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-          - !Ref DeploymentBucket
-        InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
-        ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
-
-  # Custom Orchestration Stack - Rate Limiting Lambda
-  CustomOrchestrationStack:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub
-        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/custom-orchestration.yaml"
-        - Bucket: !If
-            - UseDefaultDeploymentBucket
-            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-            - !Ref DeploymentBucket
-      Parameters:
-        Environment: !Ref Environment
-        DeploymentBucket: !If
-          - UseDefaultDeploymentBucket
-          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-          - !Ref DeploymentBucket
-        LogRetentionDays: !Ref LogRetentionDays
-
-  # Collaborator Agent Stacks (5 agents)
-  RequirementsAnalystStack:
-    Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - StorageStack
-      - LambdaLayerStack
-    Properties:
-      TemplateURL: !Sub
-        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/requirements-analyst.yaml"
-        - Bucket: !If
-            - UseDefaultDeploymentBucket
-            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-            - !Ref DeploymentBucket
-      Parameters:
-        Environment: !Ref Environment
-        BedrockModel: !Ref BedrockModel
-        DeploymentBucket: !If
-          - UseDefaultDeploymentBucket
-          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-          - !Ref DeploymentBucket
-        InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
-        ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
-        LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
-        LogRetentionDays: !Ref LogRetentionDays
-
-  CodeGeneratorStack:
-    Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - StorageStack
-      - LambdaLayerStack
-    Properties:
-      TemplateURL: !Sub
-        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/code-generator.yaml"
-        - Bucket: !If
-            - UseDefaultDeploymentBucket
-            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-            - !Ref DeploymentBucket
-      Parameters:
-        Environment: !Ref Environment
-        BedrockModel: !Ref BedrockModel
-        DeploymentBucket: !If
-          - UseDefaultDeploymentBucket
-          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-          - !Ref DeploymentBucket
-        InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
-        ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
-        LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
-        LogRetentionDays: !Ref LogRetentionDays
-
-  SolutionArchitectStack:
-    Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - StorageStack
-      - LambdaLayerStack
-    Properties:
-      TemplateURL: !Sub
-        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/solution-architect.yaml"
-        - Bucket: !If
-            - UseDefaultDeploymentBucket
-            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-            - !Ref DeploymentBucket
-      Parameters:
-        Environment: !Ref Environment
-        BedrockModel: !Ref BedrockModel
-        DeploymentBucket: !If
-          - UseDefaultDeploymentBucket
-          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-          - !Ref DeploymentBucket
-        InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
-        ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
-        LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
-        LogRetentionDays: !Ref LogRetentionDays
-
-  QualityValidatorStack:
-    Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - StorageStack
-      - LambdaLayerStack
-    Properties:
-      TemplateURL: !Sub
-        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/quality-validator.yaml"
-        - Bucket: !If
-            - UseDefaultDeploymentBucket
-            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-            - !Ref DeploymentBucket
-      Parameters:
-        Environment: !Ref Environment
-        BedrockModel: !Ref BedrockModel
-        DeploymentBucket: !If
-          - UseDefaultDeploymentBucket
-          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-          - !Ref DeploymentBucket
-        InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
-        ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
-        LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
-        LogRetentionDays: !Ref LogRetentionDays
-
-  DeploymentManagerStack:
-    Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - StorageStack
-      - LambdaLayerStack
-    Properties:
-      TemplateURL: !Sub
-        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/deployment-manager.yaml"
-        - Bucket: !If
-            - UseDefaultDeploymentBucket
-            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-            - !Ref DeploymentBucket
-      Parameters:
-        Environment: !Ref Environment
-        BedrockModel: !Ref BedrockModel
-        DeploymentBucket: !If
-          - UseDefaultDeploymentBucket
-          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-          - !Ref DeploymentBucket
-        InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
-        ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
-        LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
-        LogRetentionDays: !Ref LogRetentionDays
-
-Outputs:
-  # Collaborator Agent IDs and Alias IDs for supervisor setup
-  RequirementsAnalystAgentId:
-    Description: Requirements Analyst Agent ID
-    Value: !GetAtt RequirementsAnalystStack.Outputs.AgentId
-    Export:
-      Name: !Sub "${AWS::StackName}-RequirementsAnalystAgentId"
-
-  RequirementsAnalystAgentArn:
-    Description: Requirements Analyst Agent ARN
-    Value: !GetAtt RequirementsAnalystStack.Outputs.AgentArn
-    Export:
-      Name: !Sub "${AWS::StackName}-RequirementsAnalystAgentArn"
-
-  RequirementsAnalystAliasId:
-    Description: Requirements Analyst Agent Alias ID
-    Value: !GetAtt RequirementsAnalystStack.Outputs.AgentAliasId
-    Export:
-      Name: !Sub "${AWS::StackName}-RequirementsAnalystAliasId"
-
-  CodeGeneratorAgentId:
-    Description: Code Generator Agent ID
-    Value: !GetAtt CodeGeneratorStack.Outputs.AgentId
-    Export:
-      Name: !Sub "${AWS::StackName}-CodeGeneratorAgentId"
-
-  CodeGeneratorAgentArn:
-    Description: Code Generator Agent ARN
-    Value: !GetAtt CodeGeneratorStack.Outputs.AgentArn
-    Export:
-      Name: !Sub "${AWS::StackName}-CodeGeneratorAgentArn"
-
-  CodeGeneratorAliasId:
-    Description: Code Generator Agent Alias ID
-    Value: !GetAtt CodeGeneratorStack.Outputs.AgentAliasId
-    Export:
-      Name: !Sub "${AWS::StackName}-CodeGeneratorAliasId"
-
-  SolutionArchitectAgentId:
-    Description: Solution Architect Agent ID
-    Value: !GetAtt SolutionArchitectStack.Outputs.AgentId
-    Export:
-      Name: !Sub "${AWS::StackName}-SolutionArchitectAgentId"
-
-  SolutionArchitectAgentArn:
-    Description: Solution Architect Agent ARN
-    Value: !GetAtt SolutionArchitectStack.Outputs.AgentArn
-    Export:
-      Name: !Sub "${AWS::StackName}-SolutionArchitectAgentArn"
-
-  SolutionArchitectAliasId:
-    Description: Solution Architect Agent Alias ID
-    Value: !GetAtt SolutionArchitectStack.Outputs.AgentAliasId
-    Export:
-      Name: !Sub "${AWS::StackName}-SolutionArchitectAliasId"
-
-  QualityValidatorAgentId:
-    Description: Quality Validator Agent ID
-    Value: !GetAtt QualityValidatorStack.Outputs.AgentId
-    Export:
-      Name: !Sub "${AWS::StackName}-QualityValidatorAgentId"
-
-  QualityValidatorAgentArn:
-    Description: Quality Validator Agent ARN
-    Value: !GetAtt QualityValidatorStack.Outputs.AgentArn
-    Export:
-      Name: !Sub "${AWS::StackName}-QualityValidatorAgentArn"
-
-  QualityValidatorAliasId:
-    Description: Quality Validator Agent Alias ID
-    Value: !GetAtt QualityValidatorStack.Outputs.AgentAliasId
-    Export:
-      Name: !Sub "${AWS::StackName}-QualityValidatorAliasId"
-
-  DeploymentManagerAgentId:
-    Description: Deployment Manager Agent ID
-    Value: !GetAtt DeploymentManagerStack.Outputs.AgentId
-    Export:
-      Name: !Sub "${AWS::StackName}-DeploymentManagerAgentId"
-
-  DeploymentManagerAgentArn:
-    Description: Deployment Manager Agent ARN
-    Value: !GetAtt DeploymentManagerStack.Outputs.AgentArn
-    Export:
-      Name: !Sub "${AWS::StackName}-DeploymentManagerAgentArn"
-
-  DeploymentManagerAliasId:
-    Description: Deployment Manager Agent Alias ID
-    Value: !GetAtt DeploymentManagerStack.Outputs.AgentAliasId
-    Export:
-      Name: !Sub "${AWS::StackName}-DeploymentManagerAliasId"
-
-  # Storage Outputs
-  InferenceRecordsTableName:
-    Description: DynamoDB inference records table name
-    Value: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
-    Export:
-      Name: !Sub "${AWS::StackName}-InferenceRecordsTableName"
-
-
-  ArtifactsBucketName:
-    Description: S3 artifacts bucket name
-    Value: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-    Export:
-      Name: !Sub "${AWS::StackName}-ArtifactsBucketName"
-
-  Environment:
-    Description: Deployment environment
-    Value: !Ref Environment
-    Export:
-      Name: !Sub "${AWS::StackName}-Environment"
-EOF
-
-echo -e "${GREEN}✓ Collaborators template created${NC}"
+# Verify collaborators-only CloudFormation template exists
+echo -e "${YELLOW}Step 7: Verifying collaborators template exists...${NC}"
+if [ ! -f "infrastructure/cloudformation/autoninja-collaborators.yaml" ]; then
+    echo -e "${RED}Error: infrastructure/cloudformation/autoninja-collaborators.yaml not found${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ Collaborators template found${NC}"
 echo ""
 
-# Deploy collaborators CloudFormation stack
+# REMOVED: Template generation (lines 191-532)
+# The static template infrastructure/cloudformation/autoninja-collaborators.yaml is now the source of truth
+
+# OLD CODE (REMOVED):
+# cat > infrastructure/cloudformation/autoninja-collaborators.yaml << 'EOF'
+# AWSTemplateFormatVersion: "2010-09-09"
+
+# Deploy the collaborators CloudFormation stack
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════════════════════════${NC}"
 echo -e "${YELLOW}Step 8: Deploying collaborators CloudFormation stack...${NC}"
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════════════════════════${NC}"
 echo ""
 echo "This will create:"
-echo "  • 5 Collaborator Agents (Requirements Analyst, Code Generator, Solution Architect, Quality Validator, Deployment Manager)"
-echo "  • 5 Lambda functions"
-echo "  • 1 Lambda Layer"
-echo "  • 2 DynamoDB tables (inference records + rate limiter)"
-echo "  • 1 S3 bucket (artifacts)"
-echo "  • IAM roles and policies"
-echo "  • CloudWatch log groups"
+echo "  • 5 Bedrock Agents (Requirements Analyst, Code Generator, Solution Architect, Quality Validator, Deployment Manager)"
+echo "  • 5 Lambda Functions for action groups"
+echo "  • IAM roles and policies for agents and Lambdas"
+echo "  • CloudWatch log groups for monitoring"
 echo ""
 
 aws cloudformation deploy \
     --template-file infrastructure/cloudformation/autoninja-collaborators.yaml \
     --stack-name "$STACK_NAME" \
     --capabilities CAPABILITY_NAMED_IAM \
-    --parameter-overrides \
-        Environment="$ENVIRONMENT" \
-        DeploymentBucket="$DEPLOYMENT_BUCKET" \
     --region "$REGION" \
     --profile "$PROFILE" \
     --no-fail-on-empty-changeset
@@ -565,45 +239,33 @@ if [ $? -eq 0 ]; then
         --output table
 
     echo ""
+    echo -e "${GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║                  COLLABORATORS DEPLOYMENT COMPLETE!                           ║${NC}"
+    echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo "All 5 collaborator agents are now deployed!"
+    echo ""
     
-    # Verify CloudWatch log groups exist for collaborators
-    echo -e "${YELLOW}Verifying CloudWatch logging setup...${NC}"
+    # Verify CloudWatch log groups exist for each agent
+    echo -e "${YELLOW}Step 9: Verifying CloudWatch logging setup...${NC}"
     
-    # Check collaborator log groups
-    for agent in requirements-analyst code-generator solution-architect quality-validator deployment-manager; do
+    AGENTS=("requirements-analyst" "code-generator" "solution-architect" "quality-validator" "deployment-manager")
+    for agent in "${AGENTS[@]}"; do
         LOG_GROUP="/aws/bedrock/agents/autoninja-${agent}-${ENVIRONMENT}"
         if aws logs describe-log-groups --log-group-name-prefix "$LOG_GROUP" --region "$REGION" --profile "$PROFILE" --query 'logGroups[?logGroupName==`'$LOG_GROUP'`]' --output text 2>/dev/null | grep -q "$LOG_GROUP"; then
-            echo -e "    ${GREEN}✓${NC} ${agent} log group exists"
+            echo -e "    ${GREEN}✓${NC} $agent log group exists: $LOG_GROUP"
         else
-            echo -e "    ${YELLOW}Warning: ${agent} log group not found${NC}"
+            echo -e "    ${YELLOW}Warning: $agent log group not found: $LOG_GROUP${NC}"
         fi
     done
-    
-    # Check model invocation log group
-    MODEL_LOG_GROUP="/aws/bedrock/modelinvocations"
-    if aws logs describe-log-groups --log-group-name-prefix "$MODEL_LOG_GROUP" --region "$REGION" --profile "$PROFILE" --query 'logGroups[?logGroupName==`'$MODEL_LOG_GROUP'`]' --output text 2>/dev/null | grep -q "$MODEL_LOG_GROUP"; then
-        echo -e "    ${GREEN}✓${NC} Model invocation log group configured"
-    else
-        echo -e "    ${YELLOW}Warning: Model invocation log group not found${NC}"
-    fi
     
     echo -e "${GREEN}✓ Logging verification complete${NC}"
     echo ""
     
-    echo -e "${GREEN}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${GREEN}║                    COLLABORATORS DEPLOYMENT COMPLETE!                         ║${NC}"
-    echo -e "${GREEN}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
-    echo ""
     echo "Next steps:"
-    echo "  1. Run ./scripts/deploy_supervisor.sh to deploy supervisor agent"
-    echo "  2. The supervisor will be configured with multi-agent collaboration"
-    echo ""
-    echo "To monitor collaborator logs:"
-    echo "  # Requirements Analyst logs:"
-    echo "  aws logs tail /aws/bedrock/agents/autoninja-requirements-analyst-${ENVIRONMENT} --follow --region $REGION --profile $PROFILE"
-    echo ""
-    echo "  # Model invocation logs (all agents):"
-    echo "  aws logs tail /aws/bedrock/modelinvocations --follow --region $REGION --profile $PROFILE"
+    echo "  1. Run ./scripts/deploy_supervisor.sh to deploy the supervisor agent"
+    echo "  2. The supervisor will orchestrate all 5 collaborators"
+    echo "  3. Use the supervisor agent for end-to-end workflow execution"
     echo ""
 else
     echo ""

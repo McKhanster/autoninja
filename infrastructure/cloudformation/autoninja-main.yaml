@@ -75,6 +75,23 @@ Conditions:
 
 Resources:
   # ============================================================================
+  # AgentCore Memory for Rate Limiting (shared across all agents)
+  # ============================================================================
+  AgentCoreMemory:
+    Type: AWS::BedrockAgentCore::Memory
+    Properties:
+      Name: !Sub "autoninja_rate_limiter_${Environment}"
+      EventExpiryDuration: 30
+      Description: "AgentCore Memory store for AutoNinja global rate limiting across all agents"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+        - Key: Purpose
+          Value: RateLimiting
+
+  # ============================================================================
   # Storage Stack - DynamoDB + S3
   # ============================================================================
   StorageStack:
@@ -156,6 +173,7 @@ Resources:
     DependsOn:
       - StorageStack
       - LambdaLayerStack
+      - AgentCoreMemory
     Properties:
       TemplateURL: !Sub
         - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/requirements-analyst.yaml"
@@ -171,10 +189,14 @@ Resources:
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
+        AgentCoreMemoryId: !GetAtt AgentCoreMemory.MemoryId
+        AgentCoreMemoryArn: !GetAtt AgentCoreMemory.MemoryArn
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -186,6 +208,7 @@ Resources:
     DependsOn:
       - StorageStack
       - LambdaLayerStack
+      - AgentCoreMemory
     Properties:
       TemplateURL: !Sub
         - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/code-generator.yaml"
@@ -201,10 +224,14 @@ Resources:
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
+        AgentCoreMemoryId: !GetAtt AgentCoreMemory.MemoryId
+        AgentCoreMemoryArn: !GetAtt AgentCoreMemory.MemoryArn
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -216,6 +243,7 @@ Resources:
     DependsOn:
       - StorageStack
       - LambdaLayerStack
+      - AgentCoreMemory
     Properties:
       TemplateURL: !Sub
         - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/solution-architect.yaml"
@@ -231,10 +259,14 @@ Resources:
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
+        AgentCoreMemoryId: !GetAtt AgentCoreMemory.MemoryId
+        AgentCoreMemoryArn: !GetAtt AgentCoreMemory.MemoryArn
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -246,6 +278,7 @@ Resources:
     DependsOn:
       - StorageStack
       - LambdaLayerStack
+      - AgentCoreMemory
     Properties:
       TemplateURL: !Sub
         - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/quality-validator.yaml"
@@ -261,10 +294,14 @@ Resources:
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
+        AgentCoreMemoryId: !GetAtt AgentCoreMemory.MemoryId
+        AgentCoreMemoryArn: !GetAtt AgentCoreMemory.MemoryArn
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -276,6 +313,7 @@ Resources:
     DependsOn:
       - StorageStack
       - LambdaLayerStack
+      - AgentCoreMemory
     Properties:
       TemplateURL: !Sub
         - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/deployment-manager.yaml"
@@ -291,10 +329,14 @@ Resources:
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
+        AgentCoreMemoryId: !GetAtt AgentCoreMemory.MemoryId
+        AgentCoreMemoryArn: !GetAtt AgentCoreMemory.MemoryArn
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -312,6 +354,7 @@ Resources:
       - SolutionArchitectStack
       - QualityValidatorStack
       - DeploymentManagerStack
+      - AgentCoreMemory
     Properties:
       TemplateURL: !Sub
         - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/supervisor.yaml"
@@ -337,7 +380,16 @@ Resources:
         DeploymentManagerAgentArn: !GetAtt DeploymentManagerStack.Outputs.AgentArn
         DeploymentManagerAgentId: !GetAtt DeploymentManagerStack.Outputs.AgentId
         DeploymentManagerAliasId: !GetAtt DeploymentManagerStack.Outputs.AgentAliasId
+        ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
+        ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
+        DeploymentBucket: !If
+          - UseDefaultDeploymentBucket
+          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
+          - !Ref DeploymentBucket
         LogRetentionDays: !Ref LogRetentionDays
+        AgentCoreMemoryId: !GetAtt AgentCoreMemory.MemoryId
+        AgentCoreMemoryArn: !GetAtt AgentCoreMemory.MemoryArn
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -393,16 +445,16 @@ Outputs:
     Description: Command to invoke the supervisor agent
     Value: !GetAtt SupervisorStack.Outputs.InvocationCommand
 
-  # AgentCore Memory
+  # AgentCore Memory (shared)
   AgentCoreMemoryId:
     Description: AgentCore Memory ID for rate limiting
-    Value: !GetAtt SupervisorStack.Outputs.AgentCoreMemoryId
+    Value: !GetAtt AgentCoreMemory.MemoryId
     Export:
       Name: !Sub "${AWS::StackName}-AgentCoreMemoryId"
 
   AgentCoreMemoryArn:
     Description: AgentCore Memory ARN for rate limiting
-    Value: !GetAtt SupervisorStack.Outputs.AgentCoreMemoryArn
+    Value: !GetAtt AgentCoreMemory.MemoryArn
     Export:
       Name: !Sub "${AWS::StackName}-AgentCoreMemoryArn"
 

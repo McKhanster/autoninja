@@ -98,30 +98,26 @@ AGENTS=("requirements-analyst" "code-generator" "solution-architect" "quality-va
 for agent in "${AGENTS[@]}"; do
     echo "  Processing $agent..."
     
-    BUILD_DIR="build/$agent"
-    ZIP_FILE="build/$agent.zip"
-    
     # Clean and create build directory
-    rm -rf "$BUILD_DIR" "$ZIP_FILE"
-    mkdir -p "$BUILD_DIR"
+    rm -rf "build/$agent.zip"
     
-    # Copy handler code
-    cp "lambda/$agent/handler.py" "$BUILD_DIR/"
-    
-    # Create ZIP
-    cd "$BUILD_DIR"
-    zip -r -q "../$(basename $ZIP_FILE)" .
+    # Install dependencies and package
+    cd "lambda/$agent"
+    if [ -f "requirements.txt" ]; then
+        pip install -r requirements.txt -t .
+    fi
+    zip -r "../../build/$agent.zip" .
     cd ../..
     
     # Upload to S3
-    aws s3 cp "$ZIP_FILE" \
+    aws s3 cp "build/$agent.zip" \
         "s3://${S3_BUCKET}/lambda/$agent.zip" \
         --sse aws:kms \
         --region "$REGION" \
         --profile "$PROFILE" \
         --quiet
     
-    SIZE=$(du -h "$ZIP_FILE" | cut -f1)
+    SIZE=$(du -h "build/$agent.zip" | cut -f1)
     echo -e "    ${GREEN}✓${NC} $agent ($SIZE)"
 done
 

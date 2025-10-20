@@ -12,17 +12,21 @@ Parameters:
   BedrockModel:
     Type: String
     Description: Foundation model ID for Bedrock Agents
-    Default: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+    Default: anthropic.claude-sonnet-4-5-20250929-v1:0
 
   DynamoDBBillingMode:
     Type: String
     Description: Billing mode for DynamoDB tables
     Default: PAY_PER_REQUEST
+    AllowedValues:
+      - PAY_PER_REQUEST
+      - PROVISIONED
 
   S3BucketName:
     Type: String
     Description: Optional custom name for S3 artifacts bucket
     Default: ""
+    AllowedPattern: "^$|^[a-z0-9][a-z0-9-]*[a-z0-9]$"
 
   DeploymentBucket:
     Type: String
@@ -33,11 +37,98 @@ Parameters:
     Type: Number
     Description: CloudWatch log retention period in days
     Default: 30
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653]
 
 Conditions:
   UseDefaultDeploymentBucket: !Equals [!Ref DeploymentBucket, ""]
 
 Resources:
+  # ============================================================================
+  # IAM Role for Stack Management (for future deployments/cleanups)
+  # ============================================================================
+  StackManagementRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "AutoNinjaCollaboratorsManagementRole-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: BedrockAgentManagement
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:CreateAgent
+                  - bedrock:UpdateAgent
+                  - bedrock:DeleteAgent
+                  - bedrock:GetAgent
+                  - bedrock:ListAgents
+                  - bedrock:CreateAgentAlias
+                  - bedrock:UpdateAgentAlias
+                  - bedrock:DeleteAgentAlias
+                  - bedrock:GetAgentAlias
+                  - bedrock:PrepareAgent
+                  - bedrock:InvokeAgent
+                  - bedrock:AssociateAgentCollaborator
+                  - bedrock:DisassociateAgentCollaborator
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResources
+                Resource: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/autoninja-*"
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                  - iam:GetRole
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                Resource: !Sub "arn:aws:iam::${AWS::AccountId}:role/AutoNinja*"
+              - Effect: Allow
+                Action:
+                  - lambda:DeleteFunction
+                  - lambda:GetFunction
+                Resource: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-*"
+              - Effect: Allow
+                Action:
+                  - bedrock-agentcore:DeleteMemory
+                  - bedrock-agentcore:GetMemory
+                  - bedrock-agentcore:ListMemories
+                Resource: !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:memory/*"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+        - Key: Purpose
+          Value: StackManagement
+
+  # ============================================================================
+  # AgentCore Memory for Rate Limiting (shared across all agents)
+  # ============================================================================
+  AgentCoreMemory:
+    Type: AWS::BedrockAgentCore::Memory
+    Properties:
+      Name: !Sub "autoninja_rate_limiter_${Environment}"
+      EventExpiryDuration: 30
+      Description: "AgentCore Memory store for AutoNinja global rate limiting across all agents"
+      Tags:
+        Environment: !Ref Environment
+        Application: AutoNinja
+        Purpose: RateLimiting
+
   # Storage Stack - DynamoDB + S3 + Rate Limiter
   StorageStack:
     Type: AWS::CloudFormation::Stack
@@ -94,9 +185,6 @@ Resources:
   # Collaborator Agent Stacks (5 agents)
   RequirementsAnalystStack:
     Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - StorageStack
-      - LambdaLayerStack
     Properties:
       TemplateURL: !Sub
         - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/requirements-analyst.yaml"
@@ -112,16 +200,17 @@ Resources:
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
+        AgentCoreMemoryId: !GetAtt AgentCoreMemory.MemoryId
+        AgentCoreMemoryArn: !GetAtt AgentCoreMemory.MemoryArn
 
   CodeGeneratorStack:
     Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - StorageStack
-      - LambdaLayerStack
     Properties:
       TemplateURL: !Sub
         - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/code-generator.yaml"
@@ -137,16 +226,17 @@ Resources:
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
+        AgentCoreMemoryId: !GetAtt AgentCoreMemory.MemoryId
+        AgentCoreMemoryArn: !GetAtt AgentCoreMemory.MemoryArn
 
   SolutionArchitectStack:
     Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - StorageStack
-      - LambdaLayerStack
     Properties:
       TemplateURL: !Sub
         - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/solution-architect.yaml"
@@ -162,16 +252,17 @@ Resources:
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
+        AgentCoreMemoryId: !GetAtt AgentCoreMemory.MemoryId
+        AgentCoreMemoryArn: !GetAtt AgentCoreMemory.MemoryArn
 
   QualityValidatorStack:
     Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - StorageStack
-      - LambdaLayerStack
     Properties:
       TemplateURL: !Sub
         - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/quality-validator.yaml"
@@ -187,16 +278,17 @@ Resources:
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
+        AgentCoreMemoryId: !GetAtt AgentCoreMemory.MemoryId
+        AgentCoreMemoryArn: !GetAtt AgentCoreMemory.MemoryArn
 
   DeploymentManagerStack:
     Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - StorageStack
-      - LambdaLayerStack
     Properties:
       TemplateURL: !Sub
         - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/deployment-manager.yaml"
@@ -212,10 +304,14 @@ Resources:
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
+        InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
+        AgentCoreMemoryId: !GetAtt AgentCoreMemory.MemoryId
+        AgentCoreMemoryArn: !GetAtt AgentCoreMemory.MemoryArn
 
 Outputs:
   # Collaborator Agent IDs and Alias IDs for supervisor setup
@@ -316,12 +412,30 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-InferenceRecordsTableName"
 
-
   ArtifactsBucketName:
     Description: S3 artifacts bucket name
     Value: !GetAtt StorageStack.Outputs.ArtifactsBucketName
     Export:
       Name: !Sub "${AWS::StackName}-ArtifactsBucketName"
+
+  # AgentCore Memory Outputs (for supervisor)
+  AgentCoreMemoryId:
+    Description: AgentCore Memory ID for rate limiting
+    Value: !GetAtt AgentCoreMemory.MemoryId
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentCoreMemoryId"
+
+  AgentCoreMemoryArn:
+    Description: AgentCore Memory ARN for rate limiting
+    Value: !GetAtt AgentCoreMemory.MemoryArn
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentCoreMemoryArn"
+
+  StackManagementRoleArn:
+    Description: ARN of the IAM role for managing collaborator deployments and cleanups
+    Value: !GetAtt StackManagementRole.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-StackManagementRoleArn"
 
   Environment:
     Description: Deployment environment

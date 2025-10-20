@@ -160,6 +160,24 @@ echo -e "    ${GREEN}✓${NC} Quality Validator: $QV_AGENT_ID (alias: $QV_ALIAS_
 echo -e "    ${GREEN}✓${NC} Deployment Manager: $DM_AGENT_ID (alias: $DM_ALIAS_ID)"
 echo ""
 
+# Get storage outputs
+INFERENCE_TABLE_NAME=$(aws cloudformation describe-stacks \
+    --stack-name "$COLLABORATORS_STACK_NAME" \
+    --region "$REGION" \
+    --profile "$PROFILE" \
+    --query 'Stacks[0].Outputs[?OutputKey==`InferenceRecordsTableName`].OutputValue' \
+    --output text)
+
+ARTIFACTS_BUCKET_NAME=$(aws cloudformation describe-stacks \
+    --stack-name "$COLLABORATORS_STACK_NAME" \
+    --region "$REGION" \
+    --profile "$PROFILE" \
+    --query 'Stacks[0].Outputs[?OutputKey==`ArtifactsBucketName`].OutputValue' \
+    --output text)
+
+INFERENCE_TABLE_ARN="arn:aws:dynamodb:${REGION}:${AWS_ACCOUNT_ID}:table/${INFERENCE_TABLE_NAME}"
+ARTIFACTS_BUCKET_ARN="arn:aws:s3:::${ARTIFACTS_BUCKET_NAME}"
+
 # Deploy supervisor CloudFormation stack
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════════════════════════${NC}"
 echo -e "${YELLOW}Step 3: Deploying supervisor CloudFormation stack...${NC}"
@@ -193,6 +211,10 @@ aws cloudformation deploy \
         DeploymentManagerAgentArn="$DM_AGENT_ARN" \
         DeploymentManagerAgentId="$DM_AGENT_ID" \
         DeploymentManagerAliasId="$DM_ALIAS_ID" \
+        ArtifactsBucketName="$ARTIFACTS_BUCKET_NAME" \
+        InferenceRecordsTableArn="$INFERENCE_TABLE_ARN" \
+        ArtifactsBucketArn="$ARTIFACTS_BUCKET_ARN" \
+        DeploymentBucket="$DEPLOYMENT_BUCKET" \
     --region "$REGION" \
     --profile "$PROFILE" \
     --no-fail-on-empty-changeset

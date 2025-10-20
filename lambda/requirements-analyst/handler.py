@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional
 # Import shared utilities from Lambda Layer
 from shared.persistence.dynamodb_client import DynamoDBClient
 from shared.persistence.s3_client import S3Client
+from shared.utils.agentcore_rate_limiter import enforce_rate_limit_before_call
 from shared.utils.logger import get_logger
 from shared.models.code_artifacts import CodeArtifacts
 
@@ -59,6 +60,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             agent_name='requirements-analyst',
             action_name=api_path
         )
+        
+        # Enforce global rate limit before processing
+        enforce_rate_limit_before_call('requirements-analyst')
         
         logger.info(f"Processing request for apiPath: {api_path}")
         

@@ -12,8 +12,23 @@ from typing import Dict, Any, Optional
 import logging
 
 # Configure logging
+import traceback
 logger = logging.getLogger()
 logger.setLevel(os.environ.get('LOG_LEVEL', 'INFO'))
+
+def log_structured(level, message, extra=None):
+    """Log structured message to CloudWatch"""
+    timestamp = datetime.now().isoformat()
+    log_entry = {
+        'timestamp': timestamp,
+        'level': level,
+        'message': message,
+        'function': traceback.extract_stack()[-2].function if traceback.extract_stack() else 'unknown'
+    }
+    if extra:
+        log_entry.update(extra)
+    logger.log(getattr(logging, level), json.dumps(log_entry))
+    print(json.dumps(log_entry))
 
 # AWS clients
 bedrock_agent_runtime = boto3.client('bedrock-agent-runtime')
@@ -40,23 +55,29 @@ def lambda_handler(event, context):
     Returns:
         Dict with final deployed agent ARN and results
     """
+    start_time = time.time()
+    log_structured('INFO', 'Lambda handler invoked', {'event_keys': list(event.keys())})
+    
     try:
         # Extract user request from Bedrock Agent event
         user_request = event.get("inputText", "")
         session_id = event.get("sessionId", f"session-{int(time.time())}")
         
-        logger.info(f"Starting orchestration for request: {user_request[:100]}...")
+        log_structured('INFO', f'Starting orchestration for request: {user_request[:100]}...', 
+                      {'session_id': session_id, 'request_length': len(user_request)})
         
         # Generate unique job_name
         job_name = generate_job_name(user_request)
         
         # Log start of orchestration
-        log_to_cloudwatch(f"Starting orchestration for job: {job_name}")
+        log_structured('INFO', f'Starting orchestration for job: {job_name}', {'job_name': job_name})
         
         # Sequential orchestration with rate limiting
         results = {}
         
         # 1. Requirements Analyst
+        log_structured('INFO', 'Invoking Requirements Analyst')
+        requirements_start = time.time()
         requirements = invoke_collaborator_with_rate_limiting(
             agent_id=get_agent_id("requirements-analyst"),
             alias_id=get_alias_id("requirements-analyst"),
@@ -64,9 +85,14 @@ def lambda_handler(event, context):
             input_text=f"job_name: {job_name}\nrequest: {user_request}",
             agent_name="requirements-analyst"
         )
+        requirements_time = time.time() - requirements_start
+        log_structured('INFO', 'Requirements Analyst completed', 
+                      {'duration': requirements_time, 'output_keys': list(requirements.keys())})
         results['requirements'] = requirements
         
         # 2. Code Generator
+        log_structured('INFO', 'Invoking Code Generator')
+        code_start = time.time()
         code = invoke_collaborator_with_rate_limiting(
             agent_id=get_agent_id("code-generator"),
             alias_id=get_alias_id("code-generator"),
@@ -74,9 +100,14 @@ def lambda_handler(event, context):
             input_text=f"job_name: {job_name}\nrequirements: {json.dumps(requirements)}",
             agent_name="code-generator"
         )
+        code_time = time.time() - code_start
+        log_structured('INFO', 'Code Generator completed', 
+                      {'duration': code_time, 'output_keys': list(code.keys())})
         results['code'] = code
         
         # 3. Solution Architect
+        log_structured('INFO', 'Invoking Solution Architect')
+        arch_start = time.time()
         architecture = invoke_collaborator_with_rate_limiting(
             agent_id=get_agent_id("solution-architect"),
             alias_id=get_alias_id("solution-architect"),
@@ -84,9 +115,14 @@ def lambda_handler(event, context):
             input_text=f"job_name: {job_name}\nrequirements: {json.dumps(requirements)}\ncode: {json.dumps(code)}",
             agent_name="solution-architect"
         )
+        arch_time = time.time() - arch_start
+        log_structured('INFO', 'Solution Architect completed', 
+                      {'duration': arch_time, 'output_keys': list(architecture.keys())})
         results['architecture'] = architecture
         
         # 4. Quality Validator
+        log_structured('INFO', 'Invoking Quality Validator')
+        val_start = time.time()
         validation = invoke_collaborator_with_rate_limiting(
             agent_id=get_agent_id("quality-validator"),
             alias_id=get_alias_id("quality-validator"),
@@ -94,10 +130,15 @@ def lambda_handler(event, context):
             input_text=f"job_name: {job_name}\ncode: {json.dumps(code)}\narchitecture: {json.dumps(architecture)}",
             agent_name="quality-validator"
         )
+        val_time = time.time() - val_start
+        log_structured('INFO', 'Quality Validator completed', 
+                      {'duration': val_time, 'is_valid': validation.get('is_valid'), 'issues_count': len(validation.get('issues', []))})
         results['validation'] = validation
         
         # 5. Deployment Manager (only if validation passes)
         if validation.get('is_valid', False):
+            log_structured('INFO', 'Validation passed, invoking Deployment Manager')
+            dep_start = time.time()
             deployment = invoke_collaborator_with_rate_limiting(
                 agent_id=get_agent_id("deployment-manager"),
                 alias_id=get_alias_id("deployment-manager"),
@@ -105,7 +146,13 @@ def lambda_handler(event, context):
                 input_text=f"job_name: {job_name}\nall_artifacts: {json.dumps(results)}",
                 agent_name="deployment-manager"
             )
+            dep_time = time.time() - dep_start
+            log_structured('INFO', 'Deployment Manager completed', 
+                          {'duration': dep_time, 'agent_arn': deployment.get('agent_arn')})
             results['deployment'] = deployment
+            
+            total_time = time.time() - start_time
+            log_structured('INFO', 'Orchestration completed successfully', {'total_duration': total_time, 'status': 'deployed'})
             
             return {
                 "job_name": job_name,
@@ -114,6 +161,9 @@ def lambda_handler(event, context):
                 "results": results
             }
         else:
+            total_time = time.time() - start_time
+            log_structured('WARNING', 'Orchestration failed validation', 
+                          {'total_duration': total_time, 'status': 'validation_failed', 'issues': validation.get('issues', [])})
             return {
                 "job_name": job_name,
                 "status": "validation_failed",
@@ -122,11 +172,17 @@ def lambda_handler(event, context):
             }
             
     except Exception as e:
-        log_to_cloudwatch(f"Error in supervisor orchestration: {str(e)}")
-        logger.error(f"Orchestration error: {str(e)}")
+        total_time = time.time() - start_time
+        error_details = {
+            'error': str(e),
+            'traceback': traceback.format_exc(),
+            'total_duration': total_time
+        }
+        log_structured('ERROR', f'Error in supervisor orchestration: {str(e)}', error_details)
         return {
             "status": "error",
-            "error": str(e)
+            "error": str(e),
+            "details": error_details
         }
 
 def invoke_collaborator_with_rate_limiting(
@@ -139,18 +195,21 @@ def invoke_collaborator_with_rate_limiting(
     """
     Invoke a collaborator agent with rate limiting and retry logic.
     """
+    log_structured('INFO', f'Starting invoke for {agent_name}', {'agent_id': agent_id[:8] + '...', 'input_length': len(input_text)})
+    
     for attempt in range(MAX_RETRIES):
         try:
             # Check and enforce GLOBAL rate limiting (applies to ALL agents including supervisor)
             wait_time = check_and_enforce_global_rate_limit()
             if wait_time > 0:
-                log_to_cloudwatch(f"Global rate limiting: waiting {wait_time}s before invoking {agent_name}")
+                log_structured('INFO', f"Global rate limiting: waiting {wait_time}s before invoking {agent_name}")
                 time.sleep(wait_time)
             
             # Update global rate limiter timestamp BEFORE making the call
             update_global_rate_limiter_timestamp(agent_name)
             
             # Invoke the collaborator
+            invoke_start = time.time()
             response = bedrock_agent_runtime.invoke_agent(
                 agentId=agent_id,
                 agentAliasId=alias_id,
@@ -158,6 +217,7 @@ def invoke_collaborator_with_rate_limiting(
                 inputText=input_text,
                 enableTrace=True
             )
+            invoke_time = time.time() - invoke_start
             
             # Parse streaming response
             result = ""
@@ -165,18 +225,21 @@ def invoke_collaborator_with_rate_limiting(
                 if 'chunk' in event:
                     result += event['chunk']['bytes'].decode('utf-8')
             
-            log_to_cloudwatch(f"Successfully invoked {agent_name} on attempt {attempt + 1}")
-            return json.loads(result) if result else {}
+            parsed_result = json.loads(result) if result else {}
+            log_structured('INFO', f"Successfully invoked {agent_name} on attempt {attempt + 1}", 
+                          {'duration': invoke_time, 'output_keys': list(parsed_result.keys())})
+            return parsed_result
             
         except Exception as e:
+            error_info = {'attempt': attempt + 1, 'error': str(e), 'traceback': traceback.format_exc()}
             if "throttlingException" in str(e) and attempt < MAX_RETRIES - 1:
                 # Exponential backoff with jitter
                 delay = BASE_DELAY * (2 ** attempt) + random.uniform(0, 1)
-                log_to_cloudwatch(f"Throttling detected for {agent_name}, retrying in {delay:.2f}s (attempt {attempt + 1})")
+                log_structured('WARNING', f"Throttling detected for {agent_name}, retrying in {delay:.2f}s", error_info)
                 time.sleep(delay)
                 continue
             else:
-                log_to_cloudwatch(f"Failed to invoke {agent_name} after {attempt + 1} attempts: {str(e)}")
+                log_structured('ERROR', f"Failed to invoke {agent_name} after {attempt + 1} attempts", error_info)
                 raise e
     
     raise Exception(f"Failed to invoke {agent_name} after {MAX_RETRIES} attempts")
@@ -189,7 +252,10 @@ def check_and_enforce_global_rate_limit() -> float:
     Returns:
         float: Seconds to wait (0 if no wait needed)
     """
+    start_time = time.time()
     try:
+        log_structured('DEBUG', 'Checking global rate limit')
+        
         # Retrieve global rate limiting data from AgentCore Memory using correct API
         response = bedrock_agentcore_data.retrieve_memory_records(
             memoryId=MEMORY_ID,
@@ -200,6 +266,7 @@ def check_and_enforce_global_rate_limit() -> float:
             }
         )
         
+        wait_time = 0.0
         if response.get('memoryRecords'):
             memory_record = response['memoryRecords'][0]
             # Extract content from conversational format
@@ -210,13 +277,18 @@ def check_and_enforce_global_rate_limit() -> float:
             
             if elapsed < MIN_INTERVAL_SECONDS:
                 wait_time = MIN_INTERVAL_SECONDS - elapsed
-                log_to_cloudwatch(f"Global rate limit: waiting {wait_time:.2f}s since last model invocation")
-                return wait_time
+                log_structured('INFO', f"Global rate limit: waiting {wait_time:.2f}s since last model invocation", 
+                              {'elapsed': elapsed, 'min_interval': MIN_INTERVAL_SECONDS})
+        else:
+            log_structured('INFO', 'No previous rate limit record found, no wait needed')
         
-        return 0.0
+        check_time = time.time() - start_time
+        log_structured('DEBUG', 'Rate limit check completed', {'duration': check_time, 'wait_time': wait_time})
+        return wait_time
         
     except Exception as e:
-        log_to_cloudwatch(f"Error checking global rate limit: {str(e)}")
+        error_info = {'error': str(e), 'traceback': traceback.format_exc()}
+        log_structured('ERROR', f"Error checking global rate limit", error_info)
         return 0.0
 
 def update_global_rate_limiter_timestamp(agent_name: str):
@@ -224,7 +296,10 @@ def update_global_rate_limiter_timestamp(agent_name: str):
     Update the global rate limiter timestamp for ANY model invocation using AgentCore Memory.
     This records that ANY agent (including supervisor) made a model call.
     """
+    start_time = time.time()
     try:
+        log_structured('DEBUG', f'Updating rate limiter for {agent_name}')
+        
         # Create event in AgentCore Memory to track rate limiting using correct format
         event_payload = [
             {
@@ -251,9 +326,11 @@ def update_global_rate_limiter_timestamp(agent_name: str):
             payload=event_payload
         )
         
-        log_to_cloudwatch(f"Updated global rate limiter: {agent_name} made model invocation")
+        update_time = time.time() - start_time
+        log_structured('INFO', f"Updated global rate limiter: {agent_name} made model invocation", {'duration': update_time})
     except Exception as e:
-        log_to_cloudwatch(f"Error updating global rate limiter for {agent_name}: {str(e)}")
+        error_info = {'error': str(e), 'traceback': traceback.format_exc()}
+        log_structured('ERROR', f"Error updating global rate limiter for {agent_name}", error_info)
 
 def generate_job_name(user_request: str) -> str:
     """Generate unique job_name from user request"""
@@ -298,8 +375,4 @@ def get_alias_id(agent_name: str) -> str:
     }
     return alias_ids.get(agent_name)
 
-def log_to_cloudwatch(message: str):
-    """Log message to CloudWatch"""
-    timestamp = datetime.now().isoformat()
-    logger.info(f"[{timestamp}] {message}")
-    print(f"[{timestamp}] {message}")
+# Remove old log_to_cloudwatch as it's replaced by log_structured
