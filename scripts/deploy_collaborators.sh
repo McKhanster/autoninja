@@ -304,8 +304,6 @@ Resources:
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
-        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
@@ -331,8 +329,6 @@ Resources:
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
-        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
@@ -358,8 +354,6 @@ Resources:
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
-        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
@@ -385,8 +379,6 @@ Resources:
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
-        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
@@ -412,8 +404,6 @@ Resources:
           - !Ref DeploymentBucket
         InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        RateLimiterTableName: !GetAtt StorageStack.Outputs.RateLimiterTableName
-        RateLimiterTableArn: !GetAtt StorageStack.Outputs.RateLimiterTableArn
         LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
         LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
         LogRetentionDays: !Ref LogRetentionDays
@@ -517,11 +507,6 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-InferenceRecordsTableName"
 
-  RateLimiterTableName:
-    Description: DynamoDB rate limiter table name
-    Value: !GetAtt StorageStack.Outputs.RateLimiterTableName
-    Export:
-      Name: !Sub "${AWS::StackName}-RateLimiterTableName"
 
   ArtifactsBucketName:
     Description: S3 artifacts bucket name

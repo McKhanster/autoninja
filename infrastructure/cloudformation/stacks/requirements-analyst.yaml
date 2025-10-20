@@ -26,10 +26,6 @@ Parameters:
     Type: String
     Description: Name of the S3 artifacts bucket
 
-  AgentCoreMemoryId:
-    Type: String
-    Description: ID of the AgentCore Memory for rate limiting
-
 
 
   LambdaLayerArn:
@@ -69,10 +65,6 @@ Resources:
               - Sid: AgentCoreMemoryOperations
                 Effect: Allow
                 Action:
-                  - bedrock-agentcore:CreateEvent
-                  - bedrock-agentcore:RetrieveMemoryRecords
-                  - bedrock-agentcore:ListMemoryRecords
-                Resource: !Sub "arn:aws:bedrock-agentcore:${AWS::Region}:${AWS::AccountId}:memory/${AgentCoreMemoryId}"
       Tags:
         - Key: Environment
           Value: !Ref Environment
@@ -99,7 +91,6 @@ Resources:
         Variables:
           DYNAMODB_TABLE_NAME: !Ref InferenceRecordsTableName
           S3_BUCKET_NAME: !Ref ArtifactsBucketName
-          MEMORY_ID: !Ref AgentCoreMemoryId
           LOG_LEVEL: INFO
           ENVIRONMENT: !Ref Environment
       Layers:
