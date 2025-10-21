@@ -64,10 +64,21 @@ SUPERVISOR_ALIAS_ID=$(aws cloudformation describe-stacks \
     --query 'Stacks[0].Outputs[?OutputKey==`AgentAliasId`].OutputValue' \
     --output text 2>/dev/null || echo "")
 
+# Check if supervisor created its own AgentCore Memory
+MEMORY_ID=$(aws cloudformation describe-stacks \
+    --stack-name "$SUPERVISOR_STACK_NAME" \
+    --region "$REGION" \
+    --profile "$PROFILE" \
+    --query 'Stacks[0].Outputs[?OutputKey==`AgentCoreMemoryId`].OutputValue' \
+    --output text 2>/dev/null || echo "")
+
 if [ -n "$SUPERVISOR_ID" ]; then
     echo -e "    ${GREEN}✓${NC} Supervisor Agent ID: $SUPERVISOR_ID"
     if [ -n "$SUPERVISOR_ALIAS_ID" ]; then
         echo -e "    ${GREEN}✓${NC} Supervisor Alias ID: $SUPERVISOR_ALIAS_ID"
+    fi
+    if [ -n "$MEMORY_ID" ]; then
+        echo -e "    ${GREEN}✓${NC} AgentCore Memory ID: $MEMORY_ID"
     fi
 else
     echo -e "    ${YELLOW}Warning: Could not retrieve supervisor agent details${NC}"

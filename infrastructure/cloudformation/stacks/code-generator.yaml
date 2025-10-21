@@ -262,16 +262,16 @@ Resources:
 
         Ensure code follows AWS best practices and Python standards.
       # ActionGroups temporarily removed for initial AgentCore Memory deployment
-      # ActionGroups:
-      #   - ActionGroupName: code-generator-actions
-      #     ActionGroupState: ENABLED
-      #     ActionGroupExecutor:
-      #       Lambda: !GetAtt LambdaFunction.Arn
-      #     Description: Actions for code generation
-      #     ApiSchema:
-      #       S3:
-      #         S3BucketName: !Ref DeploymentBucket
-      #         S3ObjectKey: schemas/code-generator-schema.yaml
+      ActionGroups:
+        - ActionGroupName: code-generator-actions
+          ActionGroupState: ENABLED
+          ActionGroupExecutor:
+            Lambda: !GetAtt LambdaFunction.Arn
+          Description: Actions for code generation
+          ApiSchema:
+            S3:
+              S3BucketName: !Ref DeploymentBucket
+              S3ObjectKey: schemas/code-generator-schema.yaml
       Tags:
         Application: AutoNinja
 
@@ -279,13 +279,13 @@ Resources:
   # Lambda Invoke Permission
   # ============================================================================
   # LambdaInvokePermission temporarily removed for initial AgentCore Memory deployment
-  # LambdaInvokePermission:
-  #   Type: AWS::Lambda::Permission
-  #   Properties:
-  #     FunctionName: !Ref LambdaFunction
-  #     Action: lambda:InvokeFunction
-  #     Principal: bedrock.amazonaws.com
-  #     SourceArn: !GetAtt Agent.AgentArn
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: bedrock.amazonaws.com
+      SourceArn: !GetAtt Agent.AgentArn
 
   # ============================================================================
   # Bedrock Agent Alias

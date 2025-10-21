@@ -89,6 +89,12 @@ Parameters:
     Type: String
     Description: S3 bucket containing deployment artifacts and schemas
 
+  AgentCoreMemoryId:
+    Type: String
+    Description: AgentCore Memory ID for rate limiting
+  AgentCoreMemoryArn:
+    Type: String
+    Description: AgentCore Memory Arn for rate limiting
   LogRetentionDays:
     Type: Number
     Description: CloudWatch log retention period
@@ -98,16 +104,16 @@ Resources:
   # ============================================================================
   # AgentCore Memory for Rate Limiting
   # ============================================================================
-  AgentCoreMemory:
-    Type: AWS::BedrockAgentCore::Memory
-    Properties:
-      Name: !Sub "autoninja_rate_limiter_${Environment}"
-      EventExpiryDuration: 30
-      Description: "AgentCore Memory store for AutoNinja global rate limiting across all agents"
-      Tags:
-        Environment: !Ref Environment
-        Application: AutoNinja
-        Purpose: RateLimiting
+  # AgentCoreMemory:
+  #   Type: AWS::BedrockAgentCore::Memory
+  #   Properties:
+  #     Name: !Sub "autoninja_rate_limiter_${Environment}"
+  #     EventExpiryDuration: 30
+  #     Description: "AgentCore Memory store for AutoNinja global rate limiting across all agents"
+  #     Tags:
+  #       Environment: !Ref Environment
+  #       Application: AutoNinja
+  #       Purpose: RateLimiting
 
   # ============================================================================
   # IAM Role - Supervisor Lambda Function
@@ -207,7 +213,7 @@ Resources:
         S3Key: lambda/supervisor-agentcore.zip
       Environment:
         Variables:
-          MEMORY_ID: !GetAtt AgentCoreMemory.MemoryId
+          MEMORY_ID: !Ref AgentCoreMemoryId
           REQUIREMENTS_ANALYST_AGENT_ID: !Ref RequirementsAnalystAgentId
           REQUIREMENTS_ANALYST_ALIAS_ID: !Ref RequirementsAnalystAliasId
           CODE_GENERATOR_AGENT_ID: !Ref CodeGeneratorAgentId
@@ -306,7 +312,7 @@ Resources:
                   - bedrock-agentcore:RetrieveMemoryRecords
                   - bedrock-agentcore:BatchCreateMemoryRecords
                 Resource:
-                  - !GetAtt AgentCoreMemory.MemoryArn
+                  - !Ref AgentCoreMemoryArn
               - Sid: ApiSchemaAccess
                 Effect: Allow
                 Action:
@@ -475,17 +481,17 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-AgentAliasId"
 
-  AgentCoreMemoryId:
-    Description: AgentCore Memory ID for rate limiting
-    Value: !GetAtt AgentCoreMemory.MemoryId
-    Export:
-      Name: !Sub "${AWS::StackName}-AgentCoreMemoryId"
+  # AgentCoreMemoryId:
+  #   Description: AgentCore Memory ID for rate limiting
+  #   Value: !GetAtt AgentCoreMemory.MemoryId
+  #   Export:
+  #     Name: !Sub "${AWS::StackName}-AgentCoreMemoryId"
 
-  AgentCoreMemoryArn:
-    Description: AgentCore Memory ARN for rate limiting
-    Value: !GetAtt AgentCoreMemory.MemoryArn
-    Export:
-      Name: !Sub "${AWS::StackName}-AgentCoreMemoryArn"
+  # AgentCoreMemoryArn:
+  #   Description: AgentCore Memory ARN for rate limiting
+  #   Value: !GetAtt AgentCoreMemory.MemoryArn
+  #   Export:
+  #     Name: !Sub "${AWS::StackName}-AgentCoreMemoryArn"
 
   InvocationCommand:
     Description: Command to invoke the supervisor agent

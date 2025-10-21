@@ -48,12 +48,6 @@ if ! aws s3 ls "s3://${DEPLOYMENT_BUCKET}" --region "$REGION" --profile "$PROFIL
         --profile "$PROFILE" \
         --create-bucket-configuration LocationConstraint="$REGION"
 
-    # Enable versioning
-    aws s3api put-bucket-versioning \
-        --bucket "$DEPLOYMENT_BUCKET" \
-        --region "$REGION" \
-        --profile "$PROFILE" \
-        --versioning-configuration Status=Enabled
 
     echo -e "${GREEN}✓ S3 bucket created and versioning enabled${NC}"
 else

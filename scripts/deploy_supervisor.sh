@@ -47,6 +47,34 @@ echo ""
 # Get collaborator agent details from stack outputs
 echo -e "${YELLOW}Step 2: Getting collaborator agent details...${NC}"
 
+
+# Build Lambda packages if not exist
+for agent in supervisor-agentcore; do
+    if [ ! -f "build/${agent}.zip" ]; then
+        echo "Building $agent..."
+        cd "lambda/$agent"
+        if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt -t .
+        fi
+        zip -r "../../build/${agent}.zip" .
+        cd ../..
+    fi
+done
+
+# Upload Lambda packages
+for agent in supervisor-agentcore; do
+    if [ -f "build/${agent}.zip" ]; then
+        aws s3 cp "build/${agent}.zip" \
+            "s3://${DEPLOYMENT_BUCKET}/lambda/${agent}.zip" \
+            --sse aws:kms \
+            --region "$REGION" \
+            --profile "$PROFILE" \
+            --quiet
+        SIZE=$(du -h "build/${agent}.zip" | cut -f1)
+        echo -e "    ${GREEN}✓${NC} ${agent}.zip ($SIZE)"
+    fi
+done
+
 # Get all agent IDs, ARNs, and Alias IDs
 REQ_AGENT_ID=$(aws cloudformation describe-stacks \
     --stack-name "$COLLABORATORS_STACK_NAME" \
@@ -153,6 +181,22 @@ DM_ALIAS_ID=$(aws cloudformation describe-stacks \
     --query 'Stacks[0].Outputs[?OutputKey==`DeploymentManagerAliasId`].OutputValue' \
     --output text)
 
+
+AGENTCORE_MEMORY_ID=$(aws cloudformation describe-stacks \
+    --stack-name "$COLLABORATORS_STACK_NAME" \
+    --region "$REGION" \
+    --profile "$PROFILE" \
+    --query 'Stacks[0].Outputs[?OutputKey==`AgentCoreMemoryId`].OutputValue' \
+    --output text)
+
+
+AGENTCORE_MEMORY_ARN=$(aws cloudformation describe-stacks \
+    --stack-name "$COLLABORATORS_STACK_NAME" \
+    --region "$REGION" \
+    --profile "$PROFILE" \
+    --query 'Stacks[0].Outputs[?OutputKey==`AgentCoreMemoryArn`].OutputValue' \
+    --output text)
+
 echo -e "    ${GREEN}✓${NC} Requirements Analyst: $REQ_AGENT_ID (alias: $REQ_ALIAS_ID)"
 echo -e "    ${GREEN}✓${NC} Code Generator: $CODE_AGENT_ID (alias: $CODE_ALIAS_ID)"
 echo -e "    ${GREEN}✓${NC} Solution Architect: $ARCH_AGENT_ID (alias: $ARCH_ALIAS_ID)"
@@ -215,6 +259,8 @@ aws cloudformation deploy \
         InferenceRecordsTableArn="$INFERENCE_TABLE_ARN" \
         ArtifactsBucketArn="$ARTIFACTS_BUCKET_ARN" \
         DeploymentBucket="$DEPLOYMENT_BUCKET" \
+        AgentCoreMemoryId="$AGENTCORE_MEMORY_ID" \
+        AgentCoreMemoryArn="$AGENTCORE_MEMORY_ARN" \
     --region "$REGION" \
     --profile "$PROFILE" \
     --no-fail-on-empty-changeset

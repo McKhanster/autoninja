@@ -261,16 +261,16 @@ Resources:
         6. Store diagrams in S3 artifacts bucket
 
         Ensure architecture is scalable, secure, and cost-effective.
-      # ActionGroups:
-      #   - ActionGroupName: solution-architect-actions
-      #     ActionGroupState: ENABLED
-      #     ActionGroupExecutor:
-      #       Lambda: !GetAtt LambdaFunction.Arn
-      #     Description: Actions for architecture design
-      #     ApiSchema:
-      #       S3:
-      #         S3BucketName: !Ref DeploymentBucket
-      #         S3ObjectKey: schemas/solution-architect-schema.yaml
+      ActionGroups:
+        - ActionGroupName: solution-architect-actions
+          ActionGroupState: ENABLED
+          ActionGroupExecutor:
+            Lambda: !GetAtt LambdaFunction.Arn
+          Description: Actions for architecture design
+          ApiSchema:
+            S3:
+              S3BucketName: !Ref DeploymentBucket
+              S3ObjectKey: schemas/solution-architect-schema.yaml
       Tags:
         Application: AutoNinja
 
@@ -278,13 +278,13 @@ Resources:
   # Lambda Invoke Permission
   # ============================================================================
   # LambdaInvokePermission temporarily removed for initial AgentCore Memory deployment
-  # LambdaInvokePermission:
-  #   Type: AWS::Lambda::Permission
-  #   Properties:
-  #     FunctionName: !Ref LambdaFunction
-  #     Action: lambda:InvokeFunction
-  #     Principal: bedrock.amazonaws.com
-  #     SourceArn: !GetAtt Agent.AgentArn
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: bedrock.amazonaws.com
+      SourceArn: !GetAtt Agent.AgentArn
 
   # ============================================================================
   # Bedrock Agent Alias

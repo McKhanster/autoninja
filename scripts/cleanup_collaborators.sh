@@ -120,16 +120,16 @@ for lambda in "${LAMBDAS[@]}"; do
     aws lambda delete-function --function-name "$lambda" --region "$REGION" --profile "$PROFILE" 2>/dev/null || echo -e "    ${YELLOW}Lambda may already be deleted.${NC}"
 done
 # Delete log groups
-LOG_GROUPS=("/aws/lambda/autoninja-*-${ENVIRONMENT}" "/aws/bedrock/agents/autoninja-*-${ENVIRONMENT}")
-for log_group in "${LOG_GROUPS[@]}"; do
-    echo "Deleting log groups matching: $log_group"
-    LOG_GROUP_IDS=$(aws logs describe-log-groups --log-group-name-prefix "$log_group" --region "$REGION" --profile "$PROFILE" --query 'logGroups[*].logGroupName' --output text 2>/dev/null)
-    for lg in $LOG_GROUP_IDS; do
-        aws logs delete-log-group --log-group-name "$lg" --region "$REGION" --profile "$PROFILE" 2>/dev/null || echo -e "    ${YELLOW}Log group deletion failed.${NC}"
-    done
-done
-echo -e "${GREEN}✓ Lambda and log groups cleanup attempted${NC}"
-echo ""
+# LOG_GROUPS=("/aws/lambda/autoninja-*-${ENVIRONMENT}" "/aws/bedrock/agents/autoninja-*-${ENVIRONMENT}")
+# for log_group in "${LOG_GROUPS[@]}"; do
+#     echo "Deleting log groups matching: $log_group"
+#     LOG_GROUP_IDS=$(aws logs describe-log-groups --log-group-name-prefix "$log_group" --region "$REGION" --profile "$PROFILE" --query 'logGroups[*].logGroupName' --output text 2>/dev/null)
+#     for lg in $LOG_GROUP_IDS; do
+#         aws logs delete-log-group --log-group-name "$lg" --region "$REGION" --profile "$PROFILE" 2>/dev/null || echo -e "    ${YELLOW}Log group deletion failed.${NC}"
+#     done
+# done
+# echo -e "${GREEN}✓ Lambda and log groups cleanup attempted${NC}"
+# echo ""
 
 # Step 7: Delete IAM roles (if not deleted by stack)
 echo -e "${YELLOW}Step 7: Deleting IAM roles...${NC}"

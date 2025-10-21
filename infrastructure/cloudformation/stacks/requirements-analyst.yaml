@@ -264,16 +264,16 @@ Resources:
 
         Always use the job_name provided by the supervisor for tracking.
       # ActionGroups temporarily removed for initial AgentCore Memory deployment
-      # ActionGroups:
-      #   - ActionGroupName: requirements-analyst-actions
-      #     ActionGroupState: ENABLED
-      #     ActionGroupExecutor:
-      #       Lambda: !GetAtt LambdaFunction.Arn
-      #     Description: Actions for requirements analysis
-      #     ApiSchema:
-      #       S3:
-      #         S3BucketName: !Ref DeploymentBucket
-      #         S3ObjectKey: schemas/requirements-analyst-schema.yaml
+      ActionGroups:
+        - ActionGroupName: requirements-analyst-actions
+          ActionGroupState: ENABLED
+          ActionGroupExecutor:
+            Lambda: !GetAtt LambdaFunction.Arn
+          Description: Actions for requirements analysis
+          ApiSchema:
+            S3:
+              S3BucketName: !Ref DeploymentBucket
+              S3ObjectKey: schemas/requirements-analyst-schema.yaml
       Tags:
         Application: AutoNinja
 
@@ -281,13 +281,13 @@ Resources:
   # Lambda Invoke Permission
   # ============================================================================
   # LambdaInvokePermission temporarily removed for initial AgentCore Memory deployment
-  # LambdaInvokePermission:
-  #   Type: AWS::Lambda::Permission
-  #   Properties:
-  #     FunctionName: !Ref LambdaFunction
-  #     Action: lambda:InvokeFunction
-  #     Principal: bedrock.amazonaws.com
-  #     SourceArn: !GetAtt Agent.AgentArn
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: bedrock.amazonaws.com
+      SourceArn: !GetAtt Agent.AgentArn
 
   # ============================================================================
   # Bedrock Agent Alias
