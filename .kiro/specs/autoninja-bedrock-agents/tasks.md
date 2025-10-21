@@ -550,7 +550,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Verify S3 artifacts saved correctly
     - _Requirements: 17.1, 17.2, 17.3_
 
-- [-] 10. Implement Deployment Manager Bedrock Agent
+- [x] 10. Implement Deployment Manager Bedrock Agent
 
   - Read .kiro/specs/autoninja-bedrock-agents/design.md and .kiro/specs/autoninja-bedrock-agents/requirements.md
 
@@ -726,7 +726,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
       - Verify all S3 artifacts saved correctly
       - _Requirements: 15.4, 17.1, 17.2, 17.3_
 
-- [-] 11. Implement Orchestrator/Supervisor Agent with AgentCore Runtime
+- [x] 11. Implement Orchestrator/Supervisor Agent with AgentCore Runtime
 
   **CRITICAL EXECUTION RULES**:
 
@@ -979,7 +979,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Check CloudWatch logs for supervisor orchestration steps
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 15.4_
 
-  - [ ] 11.10 Implement end-to-end integration test
+  - [x] 11.10 Implement end-to-end integration test
 
     - Create `tests/integration/test_supervisor_agentcore_e2e.py`
     - Test complete workflow from user request to deployed agent:
@@ -998,7 +998,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
     - Measure total execution time (should be < 8 hours)
     - _Requirements: 15.4, 17.1, 17.2, 17.3_
 
-  - [ ] 11.11 Document supervisor AgentCore architecture
+  - [x] 11.11 Document supervisor AgentCore architecture
 
     - Create `docs/supervisor-agentcore-architecture.md`
     - Document why AgentCore Runtime was chosen for supervisor
@@ -1021,7 +1021,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
       - Sequential workflow with validation gate
     - _Requirements: 16.1, 16.2_
 
-- [ ] 12. Create example scripts and documentation
+- [x] 12. Create example scripts and documentation
 
   - [ ] 12.1 Create query_inference.py script
 

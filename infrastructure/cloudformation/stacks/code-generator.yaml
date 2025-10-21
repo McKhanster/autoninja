@@ -141,6 +141,177 @@ Resources:
                   - s3:GetObject
                 Resource:
                   - !Sub "arn:aws:s3:::${DeploymentBucket}/schemas/*"
+      Tags:
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
+  # Lambda Function
+  # ============================================================================
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "autoninja-code-generator-${Environment}"
+      Description: Code Generator Lambda function for AutoNinja
+      Runtime: python3.12
+      Handler: handler.lambda_handler
+      Code:
+        S3Bucket: !Ref DeploymentBucket
+        S3Key: lambda/code-generator.zip
+      Role: !GetAtt LambdaRole.Arn
+      Timeout: 300
+      MemorySize: 512
+      Environment:
+        Variables:
+          LOG_LEVEL: INFO
+          DYNAMODB_TABLE_NAME: !Ref InferenceRecordsTableName
+          S3_BUCKET_NAME: !Ref ArtifactsBucketName
+      Layers:
+        - !Ref LambdaLayerArn
+      TracingConfig:
+        Mode: Active
+      Tags:
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
+  # IAM Role - Bedrock Agent
+  # ============================================================================
+  AgentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                "aws:SourceAccount": !Ref AWS::AccountId
+              ArnLike:
+                "aws:SourceArn": !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*"
+      Policies:
+        - PolicyName: BedrockAgentPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}"
+                  - !Sub "arn:aws:bedrock:*::foundation-model/*"
+                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*"
+              - Effect: Allow
+                Action:
+                  - bedrock:GetInferenceProfile
+                  - bedrock:GetFoundationModel
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource:
+                  - !Sub "arn:aws:s3:::${DeploymentBucket}/schemas/*"
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::${DeploymentBucket}"
+      Tags:
+        - Key: Application
+          Value: AutoNinja
+
+  # ============================================================================
+  # Bedrock Agent
+  # ============================================================================
+  Agent:
+    Type: AWS::Bedrock::Agent
+    Properties:
+      AgentName: !Sub "autoninja-code-generator-${Environment}"
+      Description: Code Generator agent - generates Lambda code, agent configs, and OpenAPI schemas
+      AgentResourceRoleArn: !GetAtt AgentRole.Arn
+      FoundationModel: !Ref BedrockModel
+      AgentCollaboration: DISABLED
+      IdleSessionTTLInSeconds: 1800
+      AutoPrepare: true
+      Instruction: |
+        You are a code generator for the AutoNinja system. Your role is to generate production-ready
+        code for AI agents based on requirements from the Requirements Analyst.
+
+        When you receive requirements:
+        1. Extract the job_name parameter from the request
+        2. Generate Lambda function code in Python with:
+           - Proper error handling
+           - Input validation
+           - Structured logging
+           - DynamoDB/S3 persistence
+        3. Generate Bedrock Agent configuration JSON
+        4. Generate OpenAPI schemas for action groups
+        5. Follow Python best practices and AWS Lambda patterns
+
+        Always use the job_name provided by the supervisor for tracking.
+      ActionGroups:
+        - ActionGroupName: code-generator-actions
+          ActionGroupState: ENABLED
+          ActionGroupExecutor:
+            Lambda: !GetAtt LambdaFunction.Arn
+          Description: Actions for code generation
+          ApiSchema:
+            S3:
+              S3BucketName: !Ref DeploymentBucket
+              S3ObjectKey: schemas/code-generator-schema.yaml
+      Tags:
+        Application: AutoNinja
+
+  # ============================================================================
+  # Lambda Invoke Permission
+  # ============================================================================
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: bedrock.amazonaws.com
+      SourceArn: !GetAtt Agent.AgentArn
+
+  # ============================================================================
+  # Bedrock Agent Alias
+  # ============================================================================
+  AgentAlias:
+    Type: AWS::Bedrock::AgentAlias
+    Properties:
+      AgentId: !GetAtt Agent.AgentId
+      AgentAliasName: production
+      Description: Production alias for Code Generator agent
+
+Outputs:
+  AgentId:
+    Description: Code Generator Agent ID
+    Value: !GetAtt Agent.AgentId
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentId"
+
+  AgentArn:
+    Description: Code Generator Agent ARN
+    Value: !GetAtt Agent.AgentArn
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentArn"
+
+  AgentAliasId:
+    Description: Code Generator Agent Alias ID
+    Value: !GetAtt AgentAlias.AgentAliasId
+    Export:
+      Name: !Sub "${AWS::StackName}-AgentAliasId"
+
+  LambdaFunctionArn:
+    Description: Code Generator Lambda Function ARN
+    Value: !GetAtt LambdaFunction.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-LambdaFunctionArn"
               - Sid: AgentCoreMemoryAccess
                 Effect: Allow
                 Action:
