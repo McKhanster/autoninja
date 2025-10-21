@@ -161,7 +161,7 @@ The following are explicitly out of scope for this fix:
 - **Region**: us-east-2 (confirmed available)
 
 ### DEP-2: Claude Sonnet 4.5 Model
-- **Model ID**: `us.anthropic.claude-sonnet-4-5-20250929-v1:0`
+- **Model ID**: `global.anthropic.claude-sonnet-4-5-20250929-v1:0`
 - **Rate Limit**: ~1 RPM for on-demand
 - **Status**: Available in us-east-2
 

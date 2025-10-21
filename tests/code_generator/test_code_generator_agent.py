@@ -18,6 +18,7 @@ from shared.utils.rate_limiter import BedrockRateLimiter
 AGENT_ID = "JYHLGG522G"  # Code Generator Agent ID
 AGENT_ALIAS_ID = "TSTALIASID"  # test alias pointing to DRAFT
 REGION = "us-east-2"
+foundational_model = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 def invoke_agent(prompt: str, session_id: str = None):
     """
@@ -162,7 +163,7 @@ def test_generate_agent_config():
         "system_prompts": "You are a friendly AI companion. Be supportive and engaging.",
         "architecture_requirements": {
             "bedrock": {
-                "foundation_model": "anthropic.claude-sonnet-4-5-20250929-v1:0",
+                "foundation_model": foundational_model,
                 "action_groups": 1
             }
         }

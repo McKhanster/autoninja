@@ -12,12 +12,12 @@ Parameters:
   BedrockModel:
     Type: String
     Description: Foundation model ID for Bedrock Agent
-    Default: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+    Default: global.anthropic.claude-sonnet-4-5-20250929-v1:0
 
   DeploymentBucket:
     Type: String
     Description: S3 bucket containing Lambda deployment packages and CloudFormation templates
-    Default: us.autoninja-deployment-artifacts-us-east-2
+    Default: autoninja-deployment-artifacts-us-east-2
 
   InferenceRecordsTableName:
     Type: String
@@ -212,7 +212,8 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
                   - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
+                  - !Sub "arn:aws:bedrock:*::foundation-model/*"
+                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*"
               - Effect: Allow
                 Action:
                   - bedrock:GetInferenceProfile

@@ -17,6 +17,7 @@ from shared.utils.logger import get_logger
 dynamodb_client = DynamoDBClient()
 s3_client = S3Client()
 logger = get_logger(__name__)
+foundational_model = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -197,7 +198,7 @@ def handle_design_architecture(
             "resources": {
                 "bedrock_agent": {
                     "name": f"{requirements.get('agent_purpose', 'agent').lower().replace(' ', '-')}",
-                    "foundation_model": arch_reqs.get('bedrock', {}).get('foundation_model', 'us.anthropic.claude-sonnet-4-5-20250929-v1:0'),
+                    "foundation_model": arch_reqs.get('bedrock', {}).get('foundation_model', foundational_model),
                     "action_groups": arch_reqs.get('bedrock', {}).get('action_groups', 1)
                 },
                 "lambda_functions": [

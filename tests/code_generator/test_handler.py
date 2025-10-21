@@ -17,6 +17,7 @@ sys.modules['shared.persistence.dynamodb_client'] = MagicMock()
 sys.modules['shared.persistence.s3_client'] = MagicMock()
 sys.modules['shared.utils.logger'] = MagicMock()
 sys.modules['shared.models.code_artifacts'] = MagicMock()
+foundational_model = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 # Now import the handler
 import importlib.util
@@ -134,7 +135,7 @@ def test_generate_agent_config():
         "system_prompts": "You are a test agent",
         "architecture_requirements": {
             "bedrock": {
-                "foundation_model": "anthropic.claude-sonnet-4-5-20250929-v1:0",
+                "foundation_model": foundational_model,
                 "action_groups": 1
             }
         }

@@ -41,9 +41,23 @@ Parameters:
   BedrockModel:
     Type: String
     Description: Foundation model ID for Bedrock Agents
-    Default: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+    Default: global.anthropic.claude-sonnet-4-5-20250929-v1:0
     AllowedValues:
-      - us.anthropic.claude-sonnet-4-5-20250929-v1:0
+      # Global cross-region profiles (highest throughput)
+      - global.anthropic.claude-sonnet-4-5-20250929-v1:0
+      - global.anthropic.claude-haiku-4-5-20251001-v1:0
+      # US cross-region profiles
+      - global.anthropic.claude-sonnet-4-5-20250929-v1:0
+      - us.anthropic.claude-3-5-sonnet-20241022-v2:0
+      - us.anthropic.claude-3-5-haiku-20241022-v1:0
+      # Qwen models (good quota)
+      - qwen2.5-72b-instruct-v1:0
+      - qwen2.5-14b-instruct-v1:0
+      - qwen2.5-7b-instruct-v1:0
+      # DeepSeek models (good quota)
+      - deepseek-ai.deepseek-v3-base
+      - deepseek-ai.deepseek-r1-distill-llama-70b-v1:0
+      - deepseek-ai.deepseek-r1-distill-qwen-32b-v1:0
 
   DynamoDBBillingMode:
     Type: String

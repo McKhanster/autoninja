@@ -18,6 +18,7 @@ from shared.utils.rate_limiter import BedrockRateLimiter
 AGENT_ID = "2NEZXJPHQU"  # Solution Architect Agent ID
 AGENT_ALIAS_ID = "TSTALIASID"  # test alias pointing to DRAFT
 REGION = "us-east-2"
+foundational_model = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 def invoke_agent(prompt: str, session_id: str = None):
     """
@@ -124,7 +125,7 @@ def test_design_architecture():
         "architecture_requirements": {
             "compute": {"lambda_functions": 1, "memory_mb": 512, "timeout_seconds": 60},
             "storage": {"dynamodb_tables": 0, "s3_buckets": 0},
-            "bedrock": {"agent_count": 1, "foundation_model": "us.anthropic.claude-sonnet-4-5-20250929-v1:0"}
+            "bedrock": {"agent_count": 1, "foundation_model": foundational_model}
         }
     }
     
@@ -171,7 +172,7 @@ def test_generate_iac():
     architecture = {
         "services": ["AWS Bedrock Agent", "AWS Lambda"],
         "resources": {
-            "bedrock_agent": {"name": "test-agent", "foundation_model": "us.anthropic.claude-sonnet-4-5-20250929-v1:0"},
+            "bedrock_agent": {"name": "test-agent", "foundation_model": foundational_model},
             "lambda_functions": [{"name": "test-lambda", "runtime": "python3.12", "memory": 512}]
         }
     }

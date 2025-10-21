@@ -9,11 +9,17 @@ import json
 import time
 import uuid
 import logging
+import os
 from botocore.exceptions import ClientError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Global configuration - can be overridden via environment variables
+AGENT_ID = os.environ.get('SUPERVISOR_AGENT_ID', 'RD5P02TYHO')
+ALIAS_ID = os.environ.get('SUPERVISOR_ALIAS_ID', 'TSTALIASID')
+AWS_REGION = os.environ.get('AWS_REGION', 'us-east-2')
 
 def invoke_supervisor_agent(agent_id, alias_id, prompt, session_id=None):
     """
@@ -21,8 +27,8 @@ def invoke_supervisor_agent(agent_id, alias_id, prompt, session_id=None):
     """
     if not session_id:
         session_id = f"test-session-{int(time.time())}"
-    
-    client = boto3.client('bedrock-agent-runtime', region_name='us-east-2')
+
+    client = boto3.client('bedrock-agent-runtime', region_name=AWS_REGION)
     
     try:
         logger.info(f"Invoking supervisor agent {agent_id} with alias {alias_id}")
@@ -88,27 +94,23 @@ def test_supervisor_basic():
     """
     Test basic supervisor agent functionality
     """
-    # Supervisor agent details from deployment
-    agent_id = "YCUCZDC5KM"
-    alias_id = "TSTALIASID"
-    
     # Test prompt
     prompt = "Build a simple friend agent for emotional support"
-    
+
     logger.info("=== TESTING SUPERVISOR AGENT ===")
-    logger.info(f"Agent ID: {agent_id}")
-    logger.info(f"Alias ID: {alias_id}")
+    logger.info(f"Agent ID: {AGENT_ID}")
+    logger.info(f"Alias ID: {ALIAS_ID}")
     
     try:
-        result = invoke_supervisor_agent(agent_id, alias_id, prompt)
-        
+        result = invoke_supervisor_agent(AGENT_ID, ALIAS_ID, prompt)
+
         # Verify response
         assert result['completion'], "No completion received from supervisor"
         assert result['session_id'], "No session ID returned"
-        
+
         logger.info("✅ Supervisor agent test PASSED")
         return True
-        
+
     except Exception as e:
         logger.error(f"❌ Supervisor agent test FAILED: {e}")
         return False
@@ -117,15 +119,12 @@ def test_supervisor_job_generation():
     """
     Test that supervisor generates proper job_name
     """
-    agent_id = "YCUCZDC5KM"
-    alias_id = "TSTALIASID"
-    
     prompt = "Create a customer service agent for insurance claims"
-    
+
     logger.info("=== TESTING JOB NAME GENERATION ===")
     
     try:
-        result = invoke_supervisor_agent(agent_id, alias_id, prompt)
+        result = invoke_supervisor_agent(AGENT_ID, ALIAS_ID, prompt)
         
         # Check if response mentions job_name
         completion = result['completion'].lower()

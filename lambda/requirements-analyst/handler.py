@@ -19,6 +19,7 @@ from shared.models.code_artifacts import CodeArtifacts
 dynamodb_client = DynamoDBClient()
 s3_client = S3Client()
 logger = get_logger(__name__)
+foundational_model = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -185,7 +186,7 @@ def handle_extract_requirements(
             "architecture_requirements": {
                 "compute": {"lambda_functions": 1, "memory_mb": 512, "timeout_seconds": 60},
                 "storage": {"dynamodb_tables": 0, "s3_buckets": 0},
-                "bedrock": {"agent_count": 1, "foundation_model": "us.anthropic.claude-sonnet-4-5-20250929-v1:0", "action_groups": 1}
+                "bedrock": {"agent_count": 1, "foundation_model": foundational_model, "action_groups": 1}
             },
             "deployment_requirements": {
                 "deployment_method": "cloudformation",

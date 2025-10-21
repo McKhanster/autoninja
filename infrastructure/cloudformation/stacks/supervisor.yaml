@@ -12,7 +12,7 @@ Parameters:
   BedrockModel:
     Type: String
     Description: Foundation model ID for Bedrock Supervisor Agent
-    Default: us.anthropic.claude-sonnet-4-5-20250929-v1:0
+    Default: global.anthropic.claude-sonnet-4-5-20250929-v1:0
 
   RequirementsAnalystAgentArn:
     Type: String
@@ -147,7 +147,8 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
                   - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
+                  - !Sub "arn:aws:bedrock:*::foundation-model/*"
+                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*"
               - Sid: BedrockGeneralAccess
                 Effect: Allow
                 Action:
@@ -283,7 +284,8 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
                   - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
+                  - !Sub "arn:aws:bedrock:*::foundation-model/*"
+                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*"
               - Sid: GetModelInfo
                 Effect: Allow
                 Action:

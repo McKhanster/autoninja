@@ -18,7 +18,7 @@ from shared.models.code_artifacts import CodeArtifacts
 dynamodb_client = DynamoDBClient()
 s3_client = S3Client()
 logger = get_logger(__name__)
-
+foundational_model = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
@@ -538,7 +538,7 @@ def generate_bedrock_agent_config(requirements: Dict[str, Any]) -> Dict[str, Any
     arch_reqs = requirements.get('architecture_requirements', {})
     bedrock_config = arch_reqs.get('bedrock', {})
     
-    foundation_model = bedrock_config.get('foundation_model', 'us.anthropic.claude-sonnet-4-5-20250929-v1:0')
+    foundation_model = bedrock_config.get('foundation_model', foundational_model)
     
     # Generate agent name from purpose
     agent_name = agent_purpose.lower().replace(' ', '-')[:50]

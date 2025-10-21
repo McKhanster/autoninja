@@ -155,7 +155,7 @@ This implementation plan enhances the existing AutoNinja system with AgentCore c
 
     - Add Bedrock model invocation permissions from infrastructure/cloudformation/permission/permission.json
     - Include bedrock:InvokeModel and bedrock:InvokeModelWithResponseStream actions
-    - Add permissions for Claude Sonnet 4.5 model (us.anthropic.claude-sonnet-4-5-20250929-v1:0)
+    - Add permissions for Claude Sonnet 4.5 model (global.anthropic.claude-sonnet-4-5-20250929-v1:0)
     - Include bedrock:GetInferenceProfile and bedrock:GetFoundationModel permissions
     - Update supervisor CloudFormation template with enhanced IAM policy
     - _Requirements: 1.9, 2.1, 7.1_
