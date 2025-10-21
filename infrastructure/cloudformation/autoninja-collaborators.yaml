@@ -12,7 +12,7 @@ Parameters:
   BedrockModel:
     Type: String
     Description: Foundation model ID for Bedrock Agents
-    Default: anthropic.claude-sonnet-4-5-20250929-v1:0
+    Default: us.anthropic.claude-sonnet-4-5-20250929-v1:0
 
   DynamoDBBillingMode:
     Type: String

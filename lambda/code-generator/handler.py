@@ -538,7 +538,7 @@ def generate_bedrock_agent_config(requirements: Dict[str, Any]) -> Dict[str, Any
     arch_reqs = requirements.get('architecture_requirements', {})
     bedrock_config = arch_reqs.get('bedrock', {})
     
-    foundation_model = bedrock_config.get('foundation_model', 'anthropic.claude-sonnet-4-5-20250929-v1:0')
+    foundation_model = bedrock_config.get('foundation_model', 'us.anthropic.claude-sonnet-4-5-20250929-v1:0')
     
     # Generate agent name from purpose
     agent_name = agent_purpose.lower().replace(' ', '-')[:50]

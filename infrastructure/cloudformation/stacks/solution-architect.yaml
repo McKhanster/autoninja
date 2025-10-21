@@ -17,7 +17,7 @@ Parameters:
   DeploymentBucket:
     Type: String
     Description: S3 bucket containing Lambda deployment packages and CloudFormation templates
-    Default: autoninja-deployment-artifacts-us-east-2
+    Default: us.autoninja-deployment-artifacts-us-east-2
 
   InferenceRecordsTableName:
     Type: String
@@ -172,6 +172,8 @@ Resources:
       Environment:
         Variables:
           LOG_LEVEL: INFO
+          DYNAMODB_TABLE_NAME: !Ref InferenceRecordsTableName
+          S3_BUCKET_NAME: !Ref ArtifactsBucketName
       Layers:
         - !Ref LambdaLayerArn
       TracingConfig:

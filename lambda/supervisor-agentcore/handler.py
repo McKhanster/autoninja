@@ -23,7 +23,7 @@ def log_structured(level, message, extra=None):
         'timestamp': timestamp,
         'level': level,
         'message': message,
-        'function': traceback.extract_stack()[-2].function if traceback.extract_stack() else 'unknown'
+        'function': traceback.extract_stack()[-2].name if traceback.extract_stack() else 'unknown'
     }
     if extra:
         log_entry.update(extra)
@@ -41,7 +41,7 @@ s3 = boto3.client('s3')
 MEMORY_ID = os.environ.get('MEMORY_ID') or os.environ.get('BEDROCK_AGENTCORE_MEMORY_ID') or "autoninja_supervisor_mem-Fj5viaEP75"
 MIN_INTERVAL_SECONDS = 30  # 30 seconds minimum between ANY model invocations
 MAX_RETRIES = 5
-BASE_DELAY = 1.0
+BASE_DELAY = 30.0  # Fixed 30-second delay for retries
 RATE_LIMIT_ACTOR_ID = "rate-limiter"
 RATE_LIMIT_SESSION_ID = "global-model-invocations"
 
@@ -233,8 +233,8 @@ def invoke_collaborator_with_rate_limiting(
         except Exception as e:
             error_info = {'attempt': attempt + 1, 'error': str(e), 'traceback': traceback.format_exc()}
             if "throttlingException" in str(e) and attempt < MAX_RETRIES - 1:
-                # Exponential backoff with jitter
-                delay = BASE_DELAY * (2 ** attempt) + random.uniform(0, 1)
+                # Fixed 30-second delay for all retries
+                delay = BASE_DELAY + random.uniform(0, 1)  # Small jitter to prevent synchronization
                 log_structured('WARNING', f"Throttling detected for {agent_name}, retrying in {delay:.2f}s", error_info)
                 time.sleep(delay)
                 continue

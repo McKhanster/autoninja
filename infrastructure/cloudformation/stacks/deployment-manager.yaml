@@ -17,7 +17,7 @@ Parameters:
   DeploymentBucket:
     Type: String
     Description: S3 bucket containing Lambda deployment packages and CloudFormation templates
-    Default: autoninja-deployment-artifacts-us-east-2
+    Default: us.autoninja-deployment-artifacts-us-east-2
 
   InferenceRecordsTableName:
     Type: String
@@ -180,6 +180,8 @@ Resources:
       Environment:
         Variables:
           LOG_LEVEL: INFO
+          DYNAMODB_TABLE_NAME: !Ref InferenceRecordsTableName
+          S3_BUCKET_NAME: !Ref ArtifactsBucketName
       Layers:
         - !Ref LambdaLayerArn
       TracingConfig:
@@ -217,6 +219,8 @@ Resources:
                   - bedrock:InvokeModelWithResponseStream
                 Resource:
                   - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}"
+                  - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
               - Effect: Allow
                 Action:
                   - bedrock:GetInferenceProfile

@@ -158,12 +158,26 @@ Resources:
                 Effect: Allow
                 Action:
                   - bedrock-agent-runtime:InvokeAgent
+                  - bedrock:InvokeAgent
                 Resource:
                   - !Ref RequirementsAnalystAgentArn
                   - !Ref CodeGeneratorAgentArn
                   - !Ref SolutionArchitectAgentArn
                   - !Ref QualityValidatorAgentArn
                   - !Ref DeploymentManagerAgentArn
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${RequirementsAnalystAgentId}/${RequirementsAnalystAliasId}"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${CodeGeneratorAgentId}/${CodeGeneratorAliasId}"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${SolutionArchitectAgentId}/${SolutionArchitectAliasId}"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${QualityValidatorAgentId}/${QualityValidatorAliasId}"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${DeploymentManagerAgentId}/${DeploymentManagerAliasId}"
+              - Sid: AgentCoreMemoryAccess
+                Effect: Allow
+                Action:
+                  - bedrock-agentcore:CreateEvent
+                  - bedrock-agentcore:RetrieveMemoryRecords
+                  - bedrock-agentcore:BatchCreateMemoryRecords
+                Resource:
+                  - !Ref AgentCoreMemoryArn
               - Sid: CloudWatchLogs
                 Effect: Allow
                 Action:
@@ -264,8 +278,12 @@ Resources:
                 Action:
                   - bedrock:InvokeModel
                   - bedrock:InvokeModelWithResponseStream
+                  - bedrock:GetInferenceProfile
+                  - bedrock:GetFoundationModel
                 Resource:
                   - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
+                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}"
+                  - !Sub "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
               - Sid: GetModelInfo
                 Effect: Allow
                 Action:

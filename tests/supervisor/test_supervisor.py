@@ -89,8 +89,8 @@ def test_supervisor_basic():
     Test basic supervisor agent functionality
     """
     # Supervisor agent details from deployment
-    agent_id = "9KW7MIXTF9"
-    alias_id = "OOML66ARUI"
+    agent_id = "YCUCZDC5KM"
+    alias_id = "TSTALIASID"
     
     # Test prompt
     prompt = "Build a simple friend agent for emotional support"
@@ -117,8 +117,8 @@ def test_supervisor_job_generation():
     """
     Test that supervisor generates proper job_name
     """
-    agent_id = "9KW7MIXTF9"
-    alias_id = "OOML66ARUI"
+    agent_id = "YCUCZDC5KM"
+    alias_id = "TSTALIASID"
     
     prompt = "Create a customer service agent for insurance claims"
     
