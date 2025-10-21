@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 import logging
 
+from shared.utils.agentcore_rate_limiter import check_and_enforce_global_rate_limit, update_global_rate_limiter_timestamp
+
 # Configure logging
 import traceback
 logger = logging.getLogger()
@@ -39,9 +41,8 @@ s3 = boto3.client('s3')
 # Configuration
 # For AgentCore Runtime, memory ID is available through environment or can be retrieved from AgentCore
 MEMORY_ID = os.environ.get('MEMORY_ID') or os.environ.get('BEDROCK_AGENTCORE_MEMORY_ID') or "autoninja_supervisor_mem-Fj5viaEP75"
-MIN_INTERVAL_SECONDS = 30  # 30 seconds minimum between ANY model invocations
 MAX_RETRIES = 5
-BASE_DELAY = 30.0  # Fixed 30-second delay for retries
+BASE_DELAY = 30.0  # Base delay for exponential backoff in retries
 RATE_LIMIT_ACTOR_ID = "rate-limiter"
 RATE_LIMIT_SESSION_ID = "global-model-invocations"
 
@@ -229,13 +230,13 @@ def invoke_collaborator_with_rate_limiting(
             log_structured('INFO', f"Successfully invoked {agent_name} on attempt {attempt + 1}", 
                           {'duration': invoke_time, 'output_keys': list(parsed_result.keys())})
             return parsed_result
-            
+        
         except Exception as e:
             error_info = {'attempt': attempt + 1, 'error': str(e), 'traceback': traceback.format_exc()}
             if "throttlingException" in str(e) and attempt < MAX_RETRIES - 1:
-                # Fixed 30-second delay for all retries
-                delay = BASE_DELAY + random.uniform(0, 1)  # Small jitter to prevent synchronization
-                log_structured('WARNING', f"Throttling detected for {agent_name}, retrying in {delay:.2f}s", error_info)
+                # Exponential backoff for throttling retries
+                delay = BASE_DELAY * (2 ** attempt) + random.uniform(0, BASE_DELAY)  # Exponential with jitter
+                log_structured('WARNING', f"Throttling detected for {agent_name}, retrying in {delay:.2f}s (attempt {attempt + 1})", error_info)
                 time.sleep(delay)
                 continue
             else:
@@ -244,93 +245,9 @@ def invoke_collaborator_with_rate_limiting(
     
     raise Exception(f"Failed to invoke {agent_name} after {MAX_RETRIES} attempts")
 
-def check_and_enforce_global_rate_limit() -> float:
-    """
-    Check global rate limiter using AgentCore Memory for ANY model invocation.
-    This applies to ALL agents including the supervisor.
-    
-    Returns:
-        float: Seconds to wait (0 if no wait needed)
-    """
-    start_time = time.time()
-    try:
-        log_structured('DEBUG', 'Checking global rate limit')
-        
-        # Retrieve global rate limiting data from AgentCore Memory using correct API
-        response = bedrock_agentcore_data.retrieve_memory_records(
-            memoryId=MEMORY_ID,
-            namespace="/rate-limiting/global",
-            searchCriteria={
-                'searchQuery': 'last model invocation timestamp',
-                'topK': 1
-            }
-        )
-        
-        wait_time = 0.0
-        if response.get('memoryRecords'):
-            memory_record = response['memoryRecords'][0]
-            # Extract content from conversational format
-            content_text = memory_record['content']['conversational']['content']['text']
-            content = json.loads(content_text)
-            last_invocation = datetime.fromisoformat(content['last_invocation'])
-            elapsed = (datetime.now() - last_invocation).total_seconds()
-            
-            if elapsed < MIN_INTERVAL_SECONDS:
-                wait_time = MIN_INTERVAL_SECONDS - elapsed
-                log_structured('INFO', f"Global rate limit: waiting {wait_time:.2f}s since last model invocation", 
-                              {'elapsed': elapsed, 'min_interval': MIN_INTERVAL_SECONDS})
-        else:
-            log_structured('INFO', 'No previous rate limit record found, no wait needed')
-        
-        check_time = time.time() - start_time
-        log_structured('DEBUG', 'Rate limit check completed', {'duration': check_time, 'wait_time': wait_time})
-        return wait_time
-        
-    except Exception as e:
-        error_info = {'error': str(e), 'traceback': traceback.format_exc()}
-        log_structured('ERROR', f"Error checking global rate limit", error_info)
-        return 0.0
+# The check_and_enforce_global_rate_limit function is now imported from shared/utils/agentcore_rate_limiter.py
 
-def update_global_rate_limiter_timestamp(agent_name: str):
-    """
-    Update the global rate limiter timestamp for ANY model invocation using AgentCore Memory.
-    This records that ANY agent (including supervisor) made a model call.
-    """
-    start_time = time.time()
-    try:
-        log_structured('DEBUG', f'Updating rate limiter for {agent_name}')
-        
-        # Create event in AgentCore Memory to track rate limiting using correct format
-        event_payload = [
-            {
-                'conversational': {
-                    'content': {
-                        'text': json.dumps({
-                            "last_invocation": datetime.now().isoformat(),
-                            "last_agent": agent_name,
-                            "invocation_count": 1,
-                            "created_at": datetime.now().isoformat()
-                        })
-                    },
-                    'role': 'ASSISTANT'
-                }
-            }
-        ]
-        
-        # Store rate limiting event in AgentCore Memory
-        bedrock_agentcore_data.create_event(
-            memoryId=MEMORY_ID,
-            actorId=RATE_LIMIT_ACTOR_ID,
-            sessionId=RATE_LIMIT_SESSION_ID,
-            eventTimestamp=datetime.now(),
-            payload=event_payload
-        )
-        
-        update_time = time.time() - start_time
-        log_structured('INFO', f"Updated global rate limiter: {agent_name} made model invocation", {'duration': update_time})
-    except Exception as e:
-        error_info = {'error': str(e), 'traceback': traceback.format_exc()}
-        log_structured('ERROR', f"Error updating global rate limiter for {agent_name}", error_info)
+# The update_global_rate_limiter_timestamp function is now imported from shared/utils/agentcore_rate_limiter.py
 
 def generate_job_name(user_request: str) -> str:
     """Generate unique job_name from user request"""

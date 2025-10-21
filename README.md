@@ -190,7 +190,7 @@ aws cloudformation create-stack \
   --stack-name autoninja-system \
   --template-body file://infrastructure/cloudformation/autoninja-complete.yaml \
   --parameters ParameterKey=Environment,ParameterValue=production \
-               ParameterKey=BedrockModel,ParameterValue=anthropic.claude-sonnet-4-5-20250929-v1:0 \
+               ParameterKey=BedrockModel,ParameterValue=anthropic.claude-3-7-sonnet-20250219-v1:0 \
   --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
   --region us-east-2
 
@@ -357,7 +357,7 @@ export S3_BUCKET_NAME=autoninja-artifacts
 export S3_REGION=us-east-2
 
 # Bedrock Configuration
-export BEDROCK_MODEL_ID=anthropic.claude-sonnet-4-5-20250929-v1:0
+export BEDROCK_MODEL_ID=anthropic.claude-3-7-sonnet-20250219-v1:0
 export BEDROCK_REGION=us-east-2
 
 # Logging Configuration
@@ -379,7 +379,7 @@ Each agent is configured with:
 Example supervisor configuration:
 ```yaml
 AgentName: orchestrator-supervisor
-FoundationModel: anthropic.claude-sonnet-4-5-20250929-v1:0
+FoundationModel: anthropic.claude-3-7-sonnet-20250219-v1:0
 Instruction: |
   You are the AutoNinja orchestrator supervisor. Your role is to coordinate 5 specialist agents
   to generate production-ready AI agents from user descriptions.

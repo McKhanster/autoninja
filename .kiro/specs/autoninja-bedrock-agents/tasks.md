@@ -76,7 +76,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
 
     - Read about Bedrock Agent and AgentCore from AWS Documentation MCP
     - Create 5 collaborator agents with basic instructions
-    - Set foundation model (anthropic.claude-sonnet-4-5-20250929-v1:0), IAM role
+    - Set foundation model (anthropic.claude-3-7-sonnet-20250219-v1:0), IAM role
     - Configure action groups with Lambda ARNs (OpenAPI schemas will be added later)
     - Set agentCollaboration to DISABLED (collaborators don't coordinate)
     - Enable CloudWatch Logs for each agent
@@ -96,7 +96,7 @@ This implementation plan breaks down the AutoNinja AWS Bedrock Agents system int
 
     - Read about Bedrock Agent and AgentCore from AWS Documentation MCP
     - Create supervisor agent with comprehensive instructions for orchestration
-    - Set foundation model (anthropic.claude-sonnet-4-5-20250929-v1:0), IAM role
+    - Set foundation model (anthropic.claude-3-7-sonnet-20250219-v1:0), IAM role
     - Set agentCollaboration to SUPERVISOR (coordinates responses from collaborators)
     - No action groups (coordination only)
     - Enable CloudWatch Logs

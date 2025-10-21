@@ -18,7 +18,7 @@ from shared.utils.rate_limiter import BedrockRateLimiter
 AGENT_ID = "2NEZXJPHQU"  # Solution Architect Agent ID
 AGENT_ALIAS_ID = "TSTALIASID"  # test alias pointing to DRAFT
 REGION = "us-east-2"
-foundational_model = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+foundational_model = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 
 def invoke_agent(prompt: str, session_id: str = None):
     """

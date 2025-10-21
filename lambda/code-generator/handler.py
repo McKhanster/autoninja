@@ -18,7 +18,7 @@ from shared.models.code_artifacts import CodeArtifacts
 dynamodb_client = DynamoDBClient()
 s3_client = S3Client()
 logger = get_logger(__name__)
-foundational_model = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+foundational_model = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """

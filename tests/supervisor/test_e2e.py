@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # GLOBAL CONFIGURATION
 # ============================================================================
-SUPERVISOR_AGENT_ID = os.environ.get('SUPERVISOR_AGENT_ID', 'RD5P02TYHO')
-SUPERVISOR_ALIAS_ID = os.environ.get('SUPERVISOR_ALIAS_ID', 'VXDMLS0YZJ')
+SUPERVISOR_AGENT_ID = os.environ.get('SUPERVISOR_AGENT_ID', 'SWIBSRA8HO')
+SUPERVISOR_ALIAS_ID = os.environ.get('SUPERVISOR_ALIAS_ID', 'TSTALIASID')
 AWS_REGION = os.environ.get('AWS_REGION', 'us-east-2')
 AWS_PROFILE = os.environ.get('AWS_PROFILE', 'AdministratorAccess-784327326356')
 

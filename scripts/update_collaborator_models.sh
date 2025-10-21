@@ -5,8 +5,8 @@ set -e
 # Update Bedrock Agent Foundation Models
 #
 # This script updates all collaborator agents to use the correct inference
-# profile ID (global.anthropic.claude-sonnet-4-5-20250929-v1:0) instead of the
-# foundation model ID (anthropic.claude-sonnet-4-5-20250929-v1:0).
+# profile ID (us.anthropic.claude-3-7-sonnet-20250219-v1:0) instead of the
+# foundation model ID (anthropic.claude-3-7-sonnet-20250219-v1:0).
 #
 # Process:
 # 1. Get current agent configuration (to preserve instructions, action groups)
@@ -17,7 +17,7 @@ set -e
 
 REGION=${AWS_REGION:-us-east-2}
 PROFILE=${AWS_PROFILE:-AdministratorAccess-784327326356}
-NEW_MODEL="global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+NEW_MODEL="us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 
 echo "=========================================="
 echo "Updating Collaborator Agent Models"

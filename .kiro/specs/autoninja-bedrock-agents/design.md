@@ -250,7 +250,7 @@ Every Lambda function IMMEDIATELY logs to both layers:
 - **Deployment**: Containerized via AgentCore starter toolkit
 - **Runtime**: Isolated microVM sessions in AgentCore Runtime
 - **Execution Time**: Up to 8 hours per session
-- **Foundation Model**: `anthropic.claude-sonnet-4-5-20250929-v1:0` (via boto3)
+- **Foundation Model**: `anthropic.claude-3-7-sonnet-20250219-v1:0` (via boto3)
 - **Orchestration Type**: Sequential logical workflow (not intelligent routing)
 
 **Code Structure**:
@@ -399,7 +399,7 @@ agentcore invoke '{"prompt": "I would like a friend agent"}'
 **Purpose**: Extract and validate requirements from natural language user requests
 
 **Configuration**:
-- **Foundation Model**: `anthropic.claude-sonnet-4-5-20250929-v1:0`
+- **Foundation Model**: `anthropic.claude-3-7-sonnet-20250219-v1:0`
 - **Action Group**: `requirements-analyst-actions`
 - **Lambda Function**: `requirements-analyst-lambda`
 - **OpenAPI Schema**: `schemas/requirements-analyst-schema.yaml`
@@ -457,7 +457,7 @@ Always use the job_name provided by the supervisor for tracking.
 **Purpose**: Design AWS architecture for the requested agent
 
 **Configuration**:
-- **Foundation Model**: `anthropic.claude-sonnet-4-5-20250929-v1:0`
+- **Foundation Model**: `anthropic.claude-3-7-sonnet-20250219-v1:0`
 - **Action Group**: `solution-architect-actions`
 - **Lambda Function**: `solution-architect-lambda`
 - **OpenAPI Schema**: `schemas/solution-architect-schema.yaml`
@@ -514,7 +514,7 @@ Always use the job_name provided by the supervisor for tracking.
 **Purpose**: Generate production-ready Lambda functions and Bedrock Agent configurations
 
 **Configuration**:
-- **Foundation Model**: `anthropic.claude-sonnet-4-5-20250929-v1:0`
+- **Foundation Model**: `anthropic.claude-3-7-sonnet-20250219-v1:0`
 - **Action Group**: `code-generator-actions`
 - **Lambda Function**: `code-generator-lambda`
 - **OpenAPI Schema**: `schemas/code-generator-schema.yaml`
@@ -561,7 +561,7 @@ Always use the job_name provided by the supervisor for tracking.
 **Purpose**: Validate generated code for quality, security, and compliance
 
 **Configuration**:
-- **Foundation Model**: `anthropic.claude-sonnet-4-5-20250929-v1:0`
+- **Foundation Model**: `anthropic.claude-3-7-sonnet-20250219-v1:0`
 - **Action Group**: `quality-validator-actions`
 - **Lambda Function**: `quality-validator-lambda`
 - **OpenAPI Schema**: `schemas/quality-validator-schema.yaml`
@@ -614,7 +614,7 @@ Always use the job_name provided by the supervisor for tracking.
 **Purpose**: Deploy generated agents to AWS and verify successful deployment
 
 **Configuration**:
-- **Foundation Model**: `anthropic.claude-sonnet-4-5-20250929-v1:0`
+- **Foundation Model**: `anthropic.claude-3-7-sonnet-20250219-v1:0`
 - **Action Group**: `deployment-manager-actions`
 - **Lambda Function**: `deployment-manager-lambda`
 - **OpenAPI Schema**: `schemas/deployment-manager-schema.yaml`
@@ -690,7 +690,7 @@ Always use the job_name provided by the supervisor for tracking.
     "inference_id": "unique-inference-id",
     "prompt": "Full raw prompt sent to Bedrock or Lambda",
     "response": "Full raw response from Bedrock or Lambda",
-    "model_id": "anthropic.claude-sonnet-4-5-20250929-v1:0",
+    "model_id": "anthropic.claude-3-7-sonnet-20250219-v1:0",
     "tokens_used": 4532,
     "cost_estimate": 0.0226,
     "duration_seconds": 3.24,
@@ -1421,7 +1421,7 @@ Agent:
     AgentName: !Ref AgentName
     Description: "Description of agent purpose"
     AgentResourceRoleArn: !GetAtt BedrockAgentRole.Arn
-    FoundationModel: anthropic.claude-sonnet-4-5-20250929-v1:0
+    FoundationModel: anthropic.claude-3-7-sonnet-20250219-v1:0
     Instruction: |
       [SYSTEM PROMPTS FROM #1]
     IdleSessionTTLInSeconds: 1800

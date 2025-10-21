@@ -60,7 +60,7 @@
 ```json
 {
   "agentName": "friend-agent-for-companionship",
-  "foundationModel": "anthropic.claude-sonnet-4-5-20250929-v1:0",
+  "foundationModel": "anthropic.claude-3-7-sonnet-20250219-v1:0",
   "instruction": "You are a friendly AI companion. Be supportive and engaging.",
   "description": "Friend agent for companionship",
   "idleSessionTTLInSeconds": 1800,

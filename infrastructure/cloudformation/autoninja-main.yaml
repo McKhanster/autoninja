@@ -41,13 +41,13 @@ Parameters:
   BedrockModel:
     Type: String
     Description: Foundation model ID for Bedrock Agents
-    Default: global.anthropic.claude-sonnet-4-5-20250929-v1:0
+    Default: us.anthropic.claude-3-7-sonnet-20250219-v1:0
     AllowedValues:
       # Global cross-region profiles (highest throughput)
-      - global.anthropic.claude-sonnet-4-5-20250929-v1:0
+      - us.anthropic.claude-3-7-sonnet-20250219-v1:0
       - global.anthropic.claude-haiku-4-5-20251001-v1:0
       # US cross-region profiles
-      - global.anthropic.claude-sonnet-4-5-20250929-v1:0
+      - us.anthropic.claude-3-7-sonnet-20250219-v1:0
       - us.anthropic.claude-3-5-sonnet-20241022-v2:0
       - us.anthropic.claude-3-5-haiku-20241022-v1:0
       # Qwen models (good quota)

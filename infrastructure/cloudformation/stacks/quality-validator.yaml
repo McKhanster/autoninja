@@ -12,7 +12,7 @@ Parameters:
   BedrockModel:
     Type: String
     Description: Foundation model ID for Bedrock Agent
-    Default: global.anthropic.claude-sonnet-4-5-20250929-v1:0
+    Default: us.anthropic.claude-3-7-sonnet-20250219-v1:0
 
   DeploymentBucket:
     Type: String
@@ -59,7 +59,7 @@ Parameters:
   InferenceProfileModelId:
     Type: String
     Description: Inference profile model ID for cross-region access
-    Default: "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+    Default: "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 
 Resources:
   # ============================================================================

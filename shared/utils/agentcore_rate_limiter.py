@@ -1,6 +1,6 @@
 """
 AgentCore-based global rate limiter for AutoNinja agents.
-Enforces 30-second minimum intervals between any model invocations across all agents using shared AgentCore Memory.
+Enforces 60-second minimum intervals between any model invocations across all agents using shared AgentCore Memory.
 """
 import json
 import time
@@ -10,7 +10,7 @@ import boto3
 import os
 
 # Constants
-MIN_INTERVAL_SECONDS = 30  # 30 seconds minimum between ANY model invocations
+MIN_INTERVAL_SECONDS = 60  # 60 seconds minimum between ANY model invocations
 MAX_RETRIES = 5
 BASE_DELAY = 1.0
 RATE_LIMIT_ACTOR_ID = "rate-limiter"
@@ -44,14 +44,12 @@ def check_and_enforce_global_rate_limit() -> float:
         memory_id = get_memory_id()
         client = _get_agentcore_client()
         
-        # Retrieve global rate limiting data from AgentCore Memory
+        # Retrieve latest global rate limiting event from AgentCore Memory (sorted DESC)
         response = client.retrieve_memory_records(
             memoryId=memory_id,
             namespace="/rate-limiting/global",
-            searchCriteria={
-                'searchQuery': 'last model invocation timestamp',
-                'topK': 1
-            }
+            sortOrder='DESC',
+            maxResults=1
         )
         
         wait_time = 0.0

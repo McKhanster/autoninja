@@ -17,7 +17,7 @@ sys.modules['shared.persistence.dynamodb_client'] = MagicMock()
 sys.modules['shared.persistence.s3_client'] = MagicMock()
 sys.modules['shared.utils.logger'] = MagicMock()
 sys.modules['shared.models.code_artifacts'] = MagicMock()
-foundational_model = "global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+foundational_model = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 
 # Now import the handler
 import importlib.util

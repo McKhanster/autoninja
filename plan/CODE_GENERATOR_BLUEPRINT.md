@@ -18,7 +18,7 @@ The Code Generator is the ONLY validated agent with proven end-to-end functional
   "agentName": "autoninja-code-generator-production",
   "agentArn": "arn:aws:bedrock:us-east-2:784327326356:agent/JYHLGG522G",
   "agentStatus": "PREPARED",
-  "foundationModel": "global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+  "foundationModel": "us.anthropic.claude-3-7-sonnet-20250219-v1:0",
   "idleSessionTTLInSeconds": 600,
   "agentResourceRoleArn": "arn:aws:iam::784327326356:role/service-role/AmazonBedrockExecutionRoleForAgents_9T2URGTFNQC"
 }
@@ -286,8 +286,8 @@ arn:aws:lambda:us-east-2:784327326356:layer:autoninja-shared-layer-production:3
         "bedrock:GetFoundationModel"
       ],
       "Resource": [
-        "arn:aws:bedrock:us-east-2:784327326356:inference-profile/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
-        "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0"
+        "arn:aws:bedrock:us-east-2:784327326356:inference-profile/us.anthropic.claude-3-7-sonnet-20250219-v1:0",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-3-7-sonnet-20250219-v1:0"
       ]
     }
   ]

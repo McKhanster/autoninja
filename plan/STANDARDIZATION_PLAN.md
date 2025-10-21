@@ -126,7 +126,7 @@ Parameters:
     Default: production
   FoundationModel:
     Type: String
-    Default: global.anthropic.claude-sonnet-4-5-20250929-v1:0
+    Default: us.anthropic.claude-3-7-sonnet-20250219-v1:0
   LogLevel:
     Type: String
     Default: INFO
@@ -546,7 +546,7 @@ aws cloudformation create-stack \
   --template-body file://infrastructure/cloudformation/autoninja-complete.yaml \
   --parameters \
     ParameterKey=Environment,ParameterValue=production \
-    ParameterKey=FoundationModel,ParameterValue=global.anthropic.claude-sonnet-4-5-20250929-v1:0 \
+    ParameterKey=FoundationModel,ParameterValue=us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
     ParameterKey=LogLevel,ParameterValue=INFO \
   --capabilities CAPABILITY_NAMED_IAM \
   --region us-east-2

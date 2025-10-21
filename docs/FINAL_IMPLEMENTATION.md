@@ -55,7 +55,7 @@ Parameters:
     Default: production
   BedrockModel:
     Type: String
-    Default: global.anthropic.claude-sonnet-4-5-20250929-v1:0
+    Default: us.anthropic.claude-3-7-sonnet-20250219-v1:0
   DeploymentBucket:
     Type: String
     Default: autoninja-deployment-artifacts-us-east-2

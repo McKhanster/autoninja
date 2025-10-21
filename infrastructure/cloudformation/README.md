@@ -52,7 +52,7 @@ aws cloudformation create-stack \
   --template-body file://infrastructure/cloudformation/autoninja-complete.yaml \
   --parameters \
     ParameterKey=Environment,ParameterValue=production \
-    ParameterKey=BedrockModel,ParameterValue=anthropic.claude-sonnet-4-5-20250929-v1:0 \
+    ParameterKey=BedrockModel,ParameterValue=anthropic.claude-3-7-sonnet-20250219-v1:0 \
     ParameterKey=LogRetentionDays,ParameterValue=30 \
   --capabilities CAPABILITY_NAMED_IAM \
   --region us-east-2
@@ -93,7 +93,7 @@ aws cloudformation describe-stacks \
 | Parameter | Description | Default | Allowed Values |
 |-----------|-------------|---------|----------------|
 | Environment | Deployment environment | production | production, staging, development |
-| BedrockModel | Foundation model ID | anthropic.claude-sonnet-4-5-20250929-v1:0 | Valid Bedrock model IDs |
+| BedrockModel | Foundation model ID | anthropic.claude-3-7-sonnet-20250219-v1:0 | Valid Bedrock model IDs |
 | DynamoDBBillingMode | DynamoDB billing mode | PAY_PER_REQUEST | PAY_PER_REQUEST, PROVISIONED |
 | S3BucketName | Custom S3 bucket name (optional) | (auto-generated) | Valid S3 bucket name |
 | LogRetentionDays | CloudWatch log retention | 30 | 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, etc. |
