@@ -79,12 +79,35 @@ echo -e "${YELLOW}Step 3: Uploading Lambda deployment packages...${NC}"
 for agent in requirements-analyst code-generator solution-architect quality-validator deployment-manager custom-orchestration; do
     if [ ! -f "build/${agent}.zip" ]; then
         echo "Building $agent..."
-        cd "lambda/$agent"
-        if [ -f "requirements.txt" ]; then
-            pip install -r requirements.txt -t .
+        
+        # Create clean build directory for this agent
+        mkdir -p "build/${agent}"
+        rm -rf "build/${agent}/"*
+        
+        # Copy source files to build directory
+        cp -r "lambda/${agent}/"* "build/${agent}/"
+        
+        # Install Python dependencies in build directory
+        if [ -f "build/${agent}/requirements.txt" ]; then
+            echo "Installing Python dependencies for $agent..."
+            pip install -r "build/${agent}/requirements.txt" -t "build/${agent}/"
         fi
-        zip -r "../../build/${agent}.zip" .
+        
+        # Copy shared utilities for agents that need them
+        if [[ "$agent" =~ ^(requirements-analyst|code-generator|solution-architect|quality-validator|deployment-manager)$ ]]; then
+            echo "Copying shared utilities for $agent..."
+            cp -r shared "build/${agent}/"
+        fi
+        
+        # Create zip from build directory
+        cd "build/${agent}"
+        zip -r "../${agent}.zip" .
         cd ../..
+        
+        # Clean up build directory
+        rm -rf "build/${agent}"
+        
+        echo "✓ Built build/${agent}.zip"
     fi
 done
 

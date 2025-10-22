@@ -52,12 +52,35 @@ echo -e "${YELLOW}Step 2: Getting collaborator agent details...${NC}"
 for agent in supervisor-agentcore; do
     if [ ! -f "build/${agent}.zip" ]; then
         echo "Building $agent..."
-        cd "lambda/$agent"
-        if [ -f "requirements.txt" ]; then
-            pip install -r requirements.txt -t .
+        
+        # Create clean build directory for this agent
+        mkdir -p "build/${agent}"
+        rm -rf "build/${agent}/*"
+        
+        # Copy source files to build directory
+        cp -r "lambda/${agent}/"* "build/${agent}/"
+        
+        # Install Python dependencies in build directory
+        if [ -f "build/${agent}/requirements.txt" ]; then
+            echo "Installing Python dependencies..."
+            pip install -r "build/${agent}/requirements.txt" -t "build/${agent}/"
         fi
-        zip -r "../../build/${agent}.zip" .
+        
+        # Copy shared utilities (required for supervisor)
+        if [ "$agent" = "supervisor-agentcore" ]; then
+            echo "Copying shared utilities for supervisor..."
+            cp -r shared "build/${agent}/"
+        fi
+        
+        # Create zip from build directory
+        cd "build/${agent}"
+        zip -r "../${agent}.zip" .
         cd ../..
+        
+        # Clean up build directory
+        rm -rf "build/${agent}"
+        
+        echo "✓ Built build/${agent}.zip"
     fi
 done
 
@@ -228,9 +251,9 @@ echo -e "${YELLOW}Step 3: Deploying supervisor CloudFormation stack...${NC}"
 echo -e "${YELLOW}═══════════════════════════════════════════════════════════════════════════════${NC}"
 echo ""
 echo "This will create:"
-echo "  • 1 Supervisor Agent (with AgentCollaboration: SUPERVISOR)"
-echo "  • AgentCollaborators configuration for all 5 collaborators"
-echo "  • IAM roles and policies for supervisor"
+echo "  • 1 Supervisor Agent (with direct Lambda orchestration)"
+echo "  • Supervisor Lambda function for orchestrating 5 agent Lambdas"
+echo "  • IAM roles and policies for supervisor and Lambda"
 echo "  • CloudWatch log groups"
 echo ""
 
@@ -240,22 +263,8 @@ aws cloudformation deploy \
     --capabilities CAPABILITY_NAMED_IAM \
     --parameter-overrides \
         Environment="$ENVIRONMENT" \
-        RequirementsAnalystAgentArn="$REQ_AGENT_ARN" \
-        RequirementsAnalystAgentId="$REQ_AGENT_ID" \
-        RequirementsAnalystAliasId="$REQ_ALIAS_ID" \
-        CodeGeneratorAgentArn="$CODE_AGENT_ARN" \
-        CodeGeneratorAgentId="$CODE_AGENT_ID" \
-        CodeGeneratorAliasId="$CODE_ALIAS_ID" \
-        SolutionArchitectAgentArn="$ARCH_AGENT_ARN" \
-        SolutionArchitectAgentId="$ARCH_AGENT_ID" \
-        SolutionArchitectAliasId="$ARCH_ALIAS_ID" \
-        QualityValidatorAgentArn="$QV_AGENT_ARN" \
-        QualityValidatorAgentId="$QV_AGENT_ID" \
-        QualityValidatorAliasId="$QV_ALIAS_ID" \
-        DeploymentManagerAgentArn="$DM_AGENT_ARN" \
-        DeploymentManagerAgentId="$DM_AGENT_ID" \
-        DeploymentManagerAliasId="$DM_ALIAS_ID" \
         ArtifactsBucketName="$ARTIFACTS_BUCKET_NAME" \
+        InferenceRecordsTableName="$INFERENCE_TABLE_NAME" \
         InferenceRecordsTableArn="$INFERENCE_TABLE_ARN" \
         ArtifactsBucketArn="$ARTIFACTS_BUCKET_ARN" \
         DeploymentBucket="$DEPLOYMENT_BUCKET" \

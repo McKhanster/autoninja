@@ -10,8 +10,8 @@ from typing import Dict, Any, List, Optional
 # Import shared utilities from Lambda Layer
 from shared.persistence.dynamodb_client import DynamoDBClient
 from shared.persistence.s3_client import S3Client
-from shared.utils.agentcore_rate_limiter import enforce_rate_limit_before_call
 from shared.utils.logger import get_logger
+from shared.utils.agentcore_rate_limiter import apply_rate_limiting
 from shared.models.code_artifacts import CodeArtifacts
 
 
@@ -19,7 +19,7 @@ from shared.models.code_artifacts import CodeArtifacts
 dynamodb_client = DynamoDBClient()
 s3_client = S3Client()
 logger = get_logger(__name__)
-foundational_model = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+foundational_model = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -62,8 +62,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             action_name=api_path
         )
         
-        # Enforce global rate limit before processing
-        enforce_rate_limit_before_call('requirements-analyst')
+        # Apply rate limiting before processing
+        apply_rate_limiting('requirements-analyst')
         
         logger.info(f"Processing request for apiPath: {api_path}")
         
@@ -157,12 +157,15 @@ def handle_extract_requirements(
         raise ValueError("Missing required parameters: job_name and user_request")
     
     # Log raw input to DynamoDB immediately
+    raw_request = json.dumps(event, default=str)
+    logger.info(f"RAW REQUEST for {job_name}: {raw_request}")
+    
     timestamp = dynamodb_client.log_inference_input(
         job_name=job_name,
         session_id=session_id,
         agent_name='requirements-analyst',
         action_name='extract_requirements',
-        prompt=json.dumps(event, default=str),
+        prompt=raw_request,
         model_id='lambda-function'
     )['timestamp']
     
@@ -204,6 +207,9 @@ def handle_extract_requirements(
         
         # Log raw output to DynamoDB immediately
         duration = time.time() - start_time
+        raw_response = json.dumps(result, default=str)
+        logger.info(f"RAW RESPONSE for {job_name}: {raw_response}")
+        
         s3_uri = s3_client.get_s3_uri(
             job_name=job_name,
             phase='requirements',
@@ -214,30 +220,38 @@ def handle_extract_requirements(
         dynamodb_client.log_inference_output(
             job_name=job_name,
             timestamp=timestamp,
-            response=json.dumps(result, default=str),
+            response=raw_response,
             duration_seconds=duration,
             artifacts_s3_uri=s3_uri,
             status='success'
         )
         
         # Save requirements to S3
-        s3_client.save_converted_artifact(
-            job_name=job_name,
-            phase='requirements',
-            agent_name='requirements-analyst',
-            artifact=requirements,
-            filename='requirements.json',
-            content_type='application/json'
-        )
+        try:
+            s3_client.save_converted_artifact(
+                job_name=job_name,
+                phase='requirements',
+                agent_name='requirements-analyst',
+                artifact=requirements,
+                filename='requirements.json',
+                content_type='application/json'
+            )
+            logger.info(f"Requirements saved to S3 for job {job_name}")
+        except Exception as s3_error:
+            logger.error(f"Failed to save requirements to S3 for job {job_name}: {str(s3_error)}")
         
         # Also save raw response to S3
-        s3_client.save_raw_response(
-            job_name=job_name,
-            phase='requirements',
-            agent_name='requirements-analyst',
-            response=result,
-            filename='extract_requirements_raw_response.json'
-        )
+        try:
+            s3_client.save_raw_response(
+                job_name=job_name,
+                phase='requirements',
+                agent_name='requirements-analyst',
+                response=result,
+                filename='extract_requirements_raw_response.json'
+            )
+            logger.info(f"Raw response saved to S3 for job {job_name}")
+        except Exception as s3_error:
+            logger.error(f"Failed to save raw response to S3 for job {job_name}: {str(s3_error)}")
         
         logger.info(f"Requirements extracted successfully for job {job_name}")
         return result
@@ -334,23 +348,31 @@ def handle_analyze_complexity(
         )
         
         # Save analysis to S3
-        s3_client.save_converted_artifact(
-            job_name=job_name,
-            phase='requirements',
-            agent_name='requirements-analyst',
-            artifact=result,
-            filename='complexity_analysis.json',
-            content_type='application/json'
-        )
+        try:
+            s3_client.save_converted_artifact(
+                job_name=job_name,
+                phase='requirements',
+                agent_name='requirements-analyst',
+                artifact=result,
+                filename='complexity_analysis.json',
+                content_type='application/json'
+            )
+            logger.info(f"Complexity analysis saved to S3 for job {job_name}")
+        except Exception as s3_error:
+            logger.error(f"Failed to save complexity analysis to S3 for job {job_name}: {str(s3_error)}")
         
         # Also save raw response to S3
-        s3_client.save_raw_response(
-            job_name=job_name,
-            phase='requirements',
-            agent_name='requirements-analyst',
-            response=result,
-            filename='analyze_complexity_raw_response.json'
-        )
+        try:
+            s3_client.save_raw_response(
+                job_name=job_name,
+                phase='requirements',
+                agent_name='requirements-analyst',
+                response=result,
+                filename='analyze_complexity_raw_response.json'
+            )
+            logger.info(f"Complexity analysis raw response saved to S3 for job {job_name}")
+        except Exception as s3_error:
+            logger.error(f"Failed to save complexity analysis raw response to S3 for job {job_name}: {str(s3_error)}")
         
         logger.info(f"Complexity analyzed successfully for job {job_name}")
         return result
@@ -453,23 +475,31 @@ def handle_validate_requirements(
         )
         
         # Save validation results to S3
-        s3_client.save_converted_artifact(
-            job_name=job_name,
-            phase='requirements',
-            agent_name='requirements-analyst',
-            artifact=result,
-            filename='validation_results.json',
-            content_type='application/json'
-        )
+        try:
+            s3_client.save_converted_artifact(
+                job_name=job_name,
+                phase='requirements',
+                agent_name='requirements-analyst',
+                artifact=result,
+                filename='validation_results.json',
+                content_type='application/json'
+            )
+            logger.info(f"Validation results saved to S3 for job {job_name}")
+        except Exception as s3_error:
+            logger.error(f"Failed to save validation results to S3 for job {job_name}: {str(s3_error)}")
         
         # Also save raw response to S3
-        s3_client.save_raw_response(
-            job_name=job_name,
-            phase='requirements',
-            agent_name='requirements-analyst',
-            response=result,
-            filename='validate_requirements_raw_response.json'
-        )
+        try:
+            s3_client.save_raw_response(
+                job_name=job_name,
+                phase='requirements',
+                agent_name='requirements-analyst',
+                response=result,
+                filename='validate_requirements_raw_response.json'
+            )
+            logger.info(f"Validation results raw response saved to S3 for job {job_name}")
+        except Exception as s3_error:
+            logger.error(f"Failed to save validation results raw response to S3 for job {job_name}: {str(s3_error)}")
         
         logger.info(f"Requirements validated successfully for job {job_name}")
         return result
@@ -483,3 +513,4 @@ def handle_validate_requirements(
             duration_seconds=time.time() - start_time
         )
         raise
+

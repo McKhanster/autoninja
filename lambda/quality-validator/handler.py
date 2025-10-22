@@ -11,6 +11,7 @@ from typing import Dict, Any, List, Optional
 from shared.persistence.dynamodb_client import DynamoDBClient
 from shared.persistence.s3_client import S3Client
 from shared.utils.logger import get_logger
+from shared.utils.agentcore_rate_limiter import apply_rate_limiting
 
 
 # Initialize clients
@@ -58,6 +59,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             agent_name='quality-validator',
             action_name=api_path
         )
+        
+        # Apply rate limiting before processing
+        apply_rate_limiting('quality-validator')
         
         logger.info(f"Processing request for apiPath: {api_path}")
         
@@ -161,12 +165,15 @@ def handle_validate_code(
         code = code_str or {}
     
     # Log raw input to DynamoDB immediately
+    raw_request = json.dumps(event, default=str)
+    logger.info(f"RAW REQUEST for {job_name}: {raw_request}")
+    
     timestamp = dynamodb_client.log_inference_input(
         job_name=job_name,
         session_id=session_id,
         agent_name='quality-validator',
         action_name='validate_code',
-        prompt=json.dumps(event, default=str),
+        prompt=raw_request,
         model_id='lambda-function'
     )['timestamp']
     
@@ -211,6 +218,9 @@ def handle_validate_code(
         
         # Log raw output to DynamoDB immediately
         duration = time.time() - start_time
+        raw_response = json.dumps(result, default=str)
+        logger.info(f"RAW RESPONSE for {job_name}: {raw_response}")
+        
         s3_uri = s3_client.get_s3_uri(
             job_name=job_name,
             phase='validation',
@@ -221,7 +231,7 @@ def handle_validate_code(
         dynamodb_client.log_inference_output(
             job_name=job_name,
             timestamp=timestamp,
-            response=json.dumps(result, default=str),
+            response=raw_response,
             duration_seconds=duration,
             artifacts_s3_uri=s3_uri,
             status='success'
@@ -323,6 +333,10 @@ def handle_security_scan(
         # Check for common security issues
         if isinstance(code, dict):
             for filename, content in code.items():
+                # Ensure content is a string
+                if not isinstance(content, str):
+                    content = str(content)
+                
                 # Check for hardcoded credentials
                 if 'password' in content.lower() or 'api_key' in content.lower():
                     if '=' in content:

@@ -17,8 +17,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Global configuration - can be overridden via environment variables
-AGENT_ID = os.environ.get('SUPERVISOR_AGENT_ID', 'SWIBSRA8HO')
-ALIAS_ID = os.environ.get('SUPERVISOR_ALIAS_ID', 'FPR4HP4KRI')
+AGENT_ID = os.environ.get('SUPERVISOR_AGENT_ID', 'DAQAIWIYYE')
+ALIAS_ID = os.environ.get('SUPERVISOR_ALIAS_ID', 'PB8TEAYL1T')
 AWS_REGION = os.environ.get('AWS_REGION', 'us-east-2')
 
 def invoke_supervisor_agent(agent_id, alias_id, prompt, session_id=None):

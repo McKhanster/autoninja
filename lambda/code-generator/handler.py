@@ -11,6 +11,7 @@ from typing import Dict, Any, List, Optional
 from shared.persistence.dynamodb_client import DynamoDBClient
 from shared.persistence.s3_client import S3Client
 from shared.utils.logger import get_logger
+from shared.utils.agentcore_rate_limiter import apply_rate_limiting
 from shared.models.code_artifacts import CodeArtifacts
 
 
@@ -18,7 +19,7 @@ from shared.models.code_artifacts import CodeArtifacts
 dynamodb_client = DynamoDBClient()
 s3_client = S3Client()
 logger = get_logger(__name__)
-foundational_model = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+foundational_model = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
@@ -59,6 +60,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             agent_name='code-generator',
             action_name=api_path
         )
+        
+        # Apply rate limiting before processing
+        apply_rate_limiting('code-generator')
         
         logger.info(f"Processing request for apiPath: {api_path}")
         
@@ -171,12 +175,15 @@ def handle_generate_lambda_code(
         function_spec = function_spec_str or {}
     
     # Log raw input to DynamoDB immediately
+    raw_request = json.dumps(event, default=str)
+    logger.info(f"RAW REQUEST for {job_name}: {raw_request}")
+    
     timestamp = dynamodb_client.log_inference_input(
         job_name=job_name,
         session_id=session_id,
         agent_name='code-generator',
         action_name='generate_lambda_code',
-        prompt=json.dumps(event, default=str),
+        prompt=raw_request,
         model_id='lambda-function'
     )['timestamp']
     
@@ -197,6 +204,9 @@ def handle_generate_lambda_code(
         
         # Log raw output to DynamoDB immediately
         duration = time.time() - start_time
+        raw_response = json.dumps(result, default=str)
+        logger.info(f"RAW RESPONSE for {job_name}: {raw_response}")
+        
         s3_uri = s3_client.get_s3_uri(
             job_name=job_name,
             phase='code',
@@ -207,7 +217,7 @@ def handle_generate_lambda_code(
         dynamodb_client.log_inference_output(
             job_name=job_name,
             timestamp=timestamp,
-            response=json.dumps(result, default=str),
+            response=raw_response,
             duration_seconds=duration,
             artifacts_s3_uri=s3_uri,
             status='success'
@@ -533,10 +543,19 @@ def generate_bedrock_agent_config(requirements: Dict[str, Any]) -> Dict[str, Any
     Returns:
         Dict with agent configuration
     """
-    agent_purpose = requirements.get('agent_purpose', 'AI agent')
-    system_prompts = requirements.get('system_prompts', '')
+    agent_purpose_raw = requirements.get('agent_purpose', 'AI agent')
+    agent_purpose = str(agent_purpose_raw) if agent_purpose_raw else 'AI agent'
+    
+    system_prompts_raw = requirements.get('system_prompts', '')
+    system_prompts = str(system_prompts_raw) if system_prompts_raw else ''
+    
     arch_reqs = requirements.get('architecture_requirements', {})
+    if not isinstance(arch_reqs, dict):
+        arch_reqs = {}
+        
     bedrock_config = arch_reqs.get('bedrock', {})
+    if not isinstance(bedrock_config, dict):
+        bedrock_config = {}
     
     foundation_model = bedrock_config.get('foundation_model', foundational_model)
     
@@ -684,8 +703,12 @@ def generate_openapi_yaml(action_group_spec: Dict[str, Any]) -> str:
     Returns:
         String containing YAML schema
     """
-    agent_name = action_group_spec.get('agent_name', 'generated-agent')
-    actions = action_group_spec.get('actions', [])
+    # Defensive programming - ensure we have strings
+    agent_name_raw = action_group_spec.get('agent_name', 'generated-agent')
+    agent_name = str(agent_name_raw) if agent_name_raw else 'generated-agent'
+    
+    actions_raw = action_group_spec.get('actions', [])
+    actions = actions_raw if isinstance(actions_raw, list) else []
     
     # If no actions specified, create a default action
     if not actions:
@@ -709,9 +732,14 @@ paths:
     
     # Add paths for each action
     for action in actions:
-        action_name = action.get('name', 'action')
+        if not isinstance(action, dict):
+            continue
+            
+        action_name_raw = action.get('name', 'action')
+        action_name = str(action_name_raw) if action_name_raw else 'action'
         action_desc = action.get('description', f'{action_name} action')
-        parameters = action.get('parameters', [])
+        parameters_raw = action.get('parameters', [])
+        parameters = parameters_raw if isinstance(parameters_raw, list) else []
         
         path = f"/{action_name.replace('_', '-')}"
         
@@ -731,16 +759,19 @@ paths:
         
         # Add required parameters
         for param in parameters:
-            schema += f"                - {param}\n"
+            param_str = str(param) if param else 'param'
+            schema += f"                - {param_str}\n"
         
         schema += f"""              properties:
 """
         
         # Add parameter definitions
         for param in parameters:
-            schema += f"""                {param}:
+            param_str = str(param) if param else 'param'
+            param_desc = param_str.replace('_', ' ').title()
+            schema += f"""                {param_str}:
                   type: string
-                  description: {param.replace('_', ' ').title()}
+                  description: {param_desc}
 """
         
         schema += f"""      responses:

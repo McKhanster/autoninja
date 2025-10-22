@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: >
-  AutoNinja Supervisor Stack - Bedrock Supervisor Agent for multi-agent collaboration
-  orchestration across 5 collaborator agents.
+  AutoNinja Supervisor Stack - Bedrock Supervisor Agent with direct Lambda orchestration
+  across 5 agent Lambda functions using AgentCore Memory rate limiting.
 
 Parameters:
   Environment:
@@ -14,68 +14,14 @@ Parameters:
     Description: Foundation model ID for Bedrock Supervisor Agent
     Default: us.anthropic.claude-3-7-sonnet-20250219-v1:0
 
-  RequirementsAnalystAgentArn:
-    Type: String
-    Description: ARN of Requirements Analyst Agent
 
-  RequirementsAnalystAgentId:
-    Type: String
-    Description: Agent ID of Requirements Analyst Agent
-
-  RequirementsAnalystAliasId:
-    Type: String
-    Description: Alias ID of Requirements Analyst Agent
-
-  CodeGeneratorAgentArn:
-    Type: String
-    Description: ARN of Code Generator Agent
-
-  CodeGeneratorAgentId:
-    Type: String
-    Description: Agent ID of Code Generator Agent
-
-  CodeGeneratorAliasId:
-    Type: String
-    Description: Alias ID of Code Generator Agent
-
-  SolutionArchitectAgentArn:
-    Type: String
-    Description: ARN of Solution Architect Agent
-
-  SolutionArchitectAgentId:
-    Type: String
-    Description: Agent ID of Solution Architect Agent
-
-  SolutionArchitectAliasId:
-    Type: String
-    Description: Alias ID of Solution Architect Agent
-
-  QualityValidatorAgentArn:
-    Type: String
-    Description: ARN of Quality Validator Agent
-
-  QualityValidatorAgentId:
-    Type: String
-    Description: Agent ID of Quality Validator Agent
-
-  QualityValidatorAliasId:
-    Type: String
-    Description: Alias ID of Quality Validator Agent
-
-  DeploymentManagerAgentArn:
-    Type: String
-    Description: ARN of Deployment Manager Agent
-
-  DeploymentManagerAgentId:
-    Type: String
-    Description: Agent ID of Deployment Manager Agent
-
-  DeploymentManagerAliasId:
-    Type: String
-    Description: Alias ID of Deployment Manager Agent
   ArtifactsBucketName:
     Type: String
     Description: Name of the S3 artifacts bucket
+
+  InferenceRecordsTableName:
+    Type: String
+    Description: Name of the DynamoDB inference records table
 
   InferenceRecordsTableArn:
     Type: String
@@ -155,22 +101,16 @@ Resources:
                   - bedrock:GetInferenceProfile
                   - bedrock:GetFoundationModel
                 Resource: "*"
-              - Sid: InvokeCollaborators
+              - Sid: InvokeLambdaFunctions
                 Effect: Allow
                 Action:
-                  - bedrock-agent-runtime:InvokeAgent
-                  - bedrock:InvokeAgent
+                  - lambda:InvokeFunction
                 Resource:
-                  - !Ref RequirementsAnalystAgentArn
-                  - !Ref CodeGeneratorAgentArn
-                  - !Ref SolutionArchitectAgentArn
-                  - !Ref QualityValidatorAgentArn
-                  - !Ref DeploymentManagerAgentArn
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${RequirementsAnalystAgentId}/${RequirementsAnalystAliasId}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${CodeGeneratorAgentId}/${CodeGeneratorAliasId}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${SolutionArchitectAgentId}/${SolutionArchitectAliasId}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${QualityValidatorAgentId}/${QualityValidatorAliasId}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${DeploymentManagerAgentId}/${DeploymentManagerAliasId}"
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-requirements-analyst-${Environment}"
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-code-generator-${Environment}"
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-solution-architect-${Environment}"
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-quality-validator-${Environment}"
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-deployment-manager-${Environment}"
               - Sid: AgentCoreMemoryAccess
                 Effect: Allow
                 Action:
@@ -229,16 +169,13 @@ Resources:
       Environment:
         Variables:
           MEMORY_ID: !Ref AgentCoreMemoryId
-          REQUIREMENTS_ANALYST_AGENT_ID: !Ref RequirementsAnalystAgentId
-          REQUIREMENTS_ANALYST_ALIAS_ID: !Ref RequirementsAnalystAliasId
-          CODE_GENERATOR_AGENT_ID: !Ref CodeGeneratorAgentId
-          CODE_GENERATOR_ALIAS_ID: !Ref CodeGeneratorAliasId
-          SOLUTION_ARCHITECT_AGENT_ID: !Ref SolutionArchitectAgentId
-          SOLUTION_ARCHITECT_ALIAS_ID: !Ref SolutionArchitectAliasId
-          QUALITY_VALIDATOR_AGENT_ID: !Ref QualityValidatorAgentId
-          QUALITY_VALIDATOR_ALIAS_ID: !Ref QualityValidatorAliasId
-          DEPLOYMENT_MANAGER_AGENT_ID: !Ref DeploymentManagerAgentId
-          DEPLOYMENT_MANAGER_ALIAS_ID: !Ref DeploymentManagerAliasId
+          REQUIREMENTS_ANALYST_LAMBDA_NAME: !Sub "autoninja-requirements-analyst-${Environment}"
+          CODE_GENERATOR_LAMBDA_NAME: !Sub "autoninja-code-generator-${Environment}"
+          SOLUTION_ARCHITECT_LAMBDA_NAME: !Sub "autoninja-solution-architect-${Environment}"
+          QUALITY_VALIDATOR_LAMBDA_NAME: !Sub "autoninja-quality-validator-${Environment}"
+          DEPLOYMENT_MANAGER_LAMBDA_NAME: !Sub "autoninja-deployment-manager-${Environment}"
+          DYNAMODB_TABLE_NAME: !Ref InferenceRecordsTableName
+          S3_BUCKET_NAME: !Ref ArtifactsBucketName
           ARTIFACTS_BUCKET_NAME: !Ref ArtifactsBucketName
           INFERENCE_RECORDS_TABLE_ARN: !Ref InferenceRecordsTableArn
       Timeout: 900
@@ -292,39 +229,6 @@ Resources:
                   - bedrock:GetInferenceProfile
                   - bedrock:GetFoundationModel
                 Resource: "*"
-              - Sid: InvokeCollaborators
-                Effect: Allow
-                Action:
-                  - bedrock:InvokeAgent
-                Resource:
-                  - !Ref RequirementsAnalystAgentArn
-                  - !Ref CodeGeneratorAgentArn
-                  - !Ref SolutionArchitectAgentArn
-                  - !Ref QualityValidatorAgentArn
-                  - !Ref DeploymentManagerAgentArn
-              - Sid: CollaboratorManagement
-                Effect: Allow
-                Action:
-                  - bedrock:AssociateAgentCollaborator
-                  - bedrock:DisassociateAgentCollaborator
-                  - bedrock:GetAgentCollaborator
-                  - bedrock:ListAgentCollaborators
-                  - bedrock:GetAgent
-                  - bedrock:GetAgentAlias
-                  - bedrock:ListAgents
-                  - bedrock:ListAgentAliases
-                Resource: "*"
-              - Sid: AgentAliasAccess
-                Effect: Allow
-                Action:
-                  - bedrock:GetAgentAlias
-                  - bedrock:InvokeAgent
-                Resource:
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${RequirementsAnalystAgentId}/${RequirementsAnalystAliasId}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${CodeGeneratorAgentId}/${CodeGeneratorAliasId}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${SolutionArchitectAgentId}/${SolutionArchitectAliasId}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${QualityValidatorAgentId}/${QualityValidatorAliasId}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${DeploymentManagerAgentId}/${DeploymentManagerAliasId}"
               - Sid: AgentCoreMemoryAccess
                 Effect: Allow
                 Action:
@@ -369,35 +273,192 @@ Resources:
       Description: Supervisor agent orchestrating 5 collaborator agents for generating Bedrock Agents from natural language
       AgentResourceRoleArn: !GetAtt AgentRole.Arn
       FoundationModel: !Ref BedrockModel
-      AgentCollaboration: SUPERVISOR
+      AgentCollaboration: DISABLED
       IdleSessionTTLInSeconds: 3600
       AutoPrepare: true
       Instruction: |
-        You are the AutoNinja supervisor agent. Your role is to orchestrate 5 collaborator agents
-        to generate fully deployed Bedrock Agents from natural language requests.
+        You are the AutoNinja Orchestration Supervisor - a Senior AI Systems Architect with 15+ years of experience in enterprise AI system design, project management, and quality assurance. You orchestrate a team of 5 specialized AI agents to transform natural language requests into production-ready, deployed Bedrock Agents.
+
+        ## ORCHESTRATION PHILOSOPHY
+
+        ### QUALITY-FIRST APPROACH
+        - Ensure every artifact meets production standards before proceeding
+        - Implement comprehensive validation gates between phases
+        - Maintain end-to-end traceability and audit trails
+        - Optimize for reliability, security, and maintainability
+        - Deliver enterprise-grade solutions that scale
+
+        ### SYSTEMATIC WORKFLOW MANAGEMENT
+        - Coordinate complex multi-agent workflows with precision
+        - Implement proper error handling and recovery procedures
+        - Maintain consistent quality standards across all phases
+        - Ensure seamless data flow between specialized agents
+        - Monitor progress and provide stakeholder visibility
+
+        ## ORCHESTRATION FRAMEWORK
+
+        ### PHASE 1: REQUIREMENTS ENGINEERING (Requirements Analyst)
+        **Objective:** Transform user requests into comprehensive, structured requirements
+        
+        **Quality Gates:**
+        - Business requirements clearly defined and measurable
+        - Technical specifications complete and feasible
+        - Compliance requirements identified and documented
+        - Success criteria established and testable
+        
+        **Validation Criteria:**
+        - All functional requirements are specific and actionable
+        - Technical requirements include performance, security, and scalability
+        - Business value and ROI clearly articulated
+        - Risk assessment and mitigation strategies defined
+
+        ### PHASE 2: SOLUTION ARCHITECTURE (Solution Architect)
+        **Objective:** Design comprehensive AWS architecture following Well-Architected principles
+        
+        **Quality Gates:**
+        - Architecture aligns with AWS Well-Architected Framework
+        - Security controls and compliance measures implemented
+        - Cost optimization and resource efficiency planned
+        - Scalability and performance requirements addressed
+        
+        **Validation Criteria:**
+        - Service selection justified with clear rationale
+        - Integration patterns follow AWS best practices
+        - Disaster recovery and business continuity planned
+        - Monitoring and observability strategy defined
+
+        ### PHASE 3: CODE DEVELOPMENT (Code Generator)
+        **Objective:** Generate production-ready code, configurations, and documentation
+        
+        **Quality Gates:**
+        - Code follows industry standards and best practices
+        - Comprehensive error handling and logging implemented
+        - Security controls and input validation included
+        - Testing framework and documentation complete
+        
+        **Validation Criteria:**
+        - Lambda code is production-ready with proper structure
+        - Bedrock Agent configuration is complete and optimized
+        - OpenAPI schemas are comprehensive with examples
+        - Documentation enables easy deployment and maintenance
+
+        ### PHASE 4: QUALITY ASSURANCE (Quality Validator)
+        **Objective:** Comprehensive security, compliance, and quality validation
+        
+        **Quality Gates:**
+        - No critical or high-risk security vulnerabilities
+        - Full compliance with applicable regulatory frameworks
+        - Code quality score meets minimum thresholds (≥85/100)
+        - Performance and scalability requirements validated
+        
+        **Validation Criteria:**
+        - Security assessment passes OWASP and AWS security standards
+        - Compliance validation confirms regulatory adherence
+        - Code quality analysis meets enterprise standards
+        - Performance benchmarks and monitoring implemented
+
+        ### PHASE 5: DEPLOYMENT ORCHESTRATION (Deployment Manager)
+        **Objective:** Deploy production-ready infrastructure and configure agents
+        
+        **Quality Gates:**
+        - CloudFormation templates are complete and validated
+        - Infrastructure deployment succeeds with all resources
+        - Agent configuration and testing complete successfully
+        - Monitoring and alerting operational and validated
+        
+        **Validation Criteria:**
+        - Infrastructure follows AWS best practices and security standards
+        - Agent deployment includes comprehensive monitoring
+        - End-to-end testing validates full functionality
+        - Operational procedures and runbooks documented
+
+        ## ORCHESTRATION WORKFLOW
+
+        ```
+        User Request → Requirements Analysis → Architecture Design → 
+        Code Generation → Quality Validation → Deployment → 
+        Testing → Production Ready Agent
+        ```
+
+        ### DECISION FRAMEWORK
+        **Proceed to Next Phase When:**
+        - All quality gates for current phase are satisfied
+        - Validation criteria meet or exceed minimum thresholds
+        - No critical issues or blockers identified
+        - Stakeholder approval obtained (if required)
+
+        **Hold or Iterate When:**
+        - Quality gates not met or validation failures detected
+        - Critical security vulnerabilities or compliance issues found
+        - Performance requirements not satisfied
+        - Business requirements unclear or incomplete
+
+        **Escalate When:**
+        - Technical feasibility concerns identified
+        - Resource constraints or timeline conflicts arise
+        - Regulatory compliance issues require legal review
+        - Architectural decisions need stakeholder input
+
+        ## QUALITY ASSURANCE STANDARDS
+
+        ### ENTERPRISE READINESS CRITERIA
+        - **Security:** Comprehensive security controls implemented and validated
+        - **Compliance:** Full adherence to applicable regulatory frameworks
+        - **Performance:** Meets or exceeds specified performance benchmarks
+        - **Reliability:** High availability and fault tolerance designed and tested
+        - **Maintainability:** Clear documentation and operational procedures
+        - **Scalability:** Architecture supports expected growth and load
+        - **Cost Efficiency:** Optimized resource utilization and cost management
+
+        ### SUCCESS METRICS
+        - **Quality Score:** Overall system quality ≥ 90/100
+        - **Security Rating:** No critical or high-risk vulnerabilities
+        - **Compliance Status:** 100% compliance with applicable regulations
+        - **Performance Benchmarks:** All SLA requirements met or exceeded
+        - **Deployment Success:** Zero-downtime deployment with full rollback capability
+        - **Operational Readiness:** Complete monitoring, alerting, and documentation
+
+        ## STAKEHOLDER COMMUNICATION
+
+        ### PROGRESS REPORTING
+        - Real-time status updates for each orchestration phase
+        - Quality gate results and validation outcomes
+        - Risk identification and mitigation strategies
+        - Timeline adherence and milestone achievement
+        - Resource utilization and cost tracking
+
+        ### DELIVERABLE DOCUMENTATION
+        - Comprehensive requirements specification
+        - Detailed architecture design and rationale
+        - Complete code repository with documentation
+        - Security and compliance assessment reports
+        - Deployment guides and operational runbooks
+        - Testing results and performance benchmarks
+
+        Your role is to ensure that every generated agent meets enterprise standards for security, compliance, performance, and maintainability while delivering exceptional business value to stakeholders.
 
         WORKFLOW:
-        When a user provides a request, use the orchestrate_agents function to handle the complete workflow.
-        The orchestration function will:
+        When a user provides a request, use the /orchestrate action to handle the complete workflow.
+        The orchestration Lambda function will:
         1. Generate job_name from user request (format: job-{keyword}-{YYYYMMDD}-{HHMMSS})
-        2. Route to Requirements Analyst with AgentCore Memory rate limiting
-        3. Route to Code Generator with rate limiting
-        4. Route to Solution Architect with rate limiting
-        5. Route to Quality Validator with rate limiting
+        2. Invoke Requirements Analyst Lambda with AgentCore Memory rate limiting
+        3. Invoke Solution Architect Lambda with rate limiting
+        4. Invoke Code Generator Lambda with rate limiting
+        5. Invoke Quality Validator Lambda with rate limiting
         6. VALIDATION GATE: If is_valid == false, STOP and return failures
-        7. If valid, route to Deployment Manager with rate limiting
+        7. If valid, invoke Deployment Manager Lambda with rate limiting
         8. Return deployed agent ARN, alias ID, and invocation commands
 
         CRITICAL RULES:
-        - ALWAYS use the orchestrate_agents function for user requests
-        - The function handles all rate limiting automatically using AgentCore Memory
-        - The function ensures 30-second minimum intervals between ALL model invocations
-        - The function implements exponential backoff for throttling exceptions
-        - Return the complete results from the orchestration function to the user
+        - ALWAYS use the /orchestrate action for user requests
+        - The orchestration uses direct Lambda invocation with AgentCore Memory rate limiting
+        - The function ensures proper delays between Lambda invocations to prevent throttling
+        - Return the complete results from the orchestration to the user
+        - NO Bedrock Agent Collaboration is used - only direct Lambda orchestration
 
         EXAMPLE USAGE:
         User: "Build a simple friend agent for emotional support"
-        Response: Use orchestrate_agents with user_request parameter, then return the results
+        Response: Call the /orchestrate action with user_request parameter, then return the results
       ActionGroups:
         - ActionGroupName: supervisor-orchestration
           Description: Orchestrates collaborator agents with AgentCore Memory rate limiting
@@ -407,47 +468,7 @@ Resources:
             S3:
               S3BucketName: !Ref DeploymentBucket
               S3ObjectKey: schemas/supervisor-schema.yaml
-      AgentCollaborators:
-        - CollaboratorName: requirements-analyst
-          AgentDescriptor:
-            AliasArn: !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${RequirementsAnalystAgentId}/${RequirementsAnalystAliasId}"
-          CollaborationInstruction: |
-            Invoke this agent to extract and analyze requirements from user requests.
-            Pass the job_name and user_request to this agent.
-            Wait for structured requirements document before proceeding.
-          RelayConversationHistory: TO_COLLABORATOR
-        - CollaboratorName: code-generator
-          AgentDescriptor:
-            AliasArn: !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${CodeGeneratorAgentId}/${CodeGeneratorAliasId}"
-          CollaborationInstruction: |
-            Invoke this agent to generate Lambda code, agent configurations, and OpenAPI schemas.
-            Pass the job_name and requirements from Requirements Analyst.
-            Wait for code generation to complete before proceeding.
-          RelayConversationHistory: TO_COLLABORATOR
-        - CollaboratorName: solution-architect
-          AgentDescriptor:
-            AliasArn: !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${SolutionArchitectAgentId}/${SolutionArchitectAliasId}"
-          CollaborationInstruction: |
-            Invoke this agent to design AWS architecture and generate CloudFormation templates.
-            Pass the job_name, requirements, and code references.
-            Wait for architecture design to complete before proceeding.
-          RelayConversationHistory: TO_COLLABORATOR
-        - CollaboratorName: quality-validator
-          AgentDescriptor:
-            AliasArn: !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${QualityValidatorAgentId}/${QualityValidatorAliasId}"
-          CollaborationInstruction: |
-            Invoke this agent to validate code quality, security, and compliance.
-            Pass the job_name and all artifacts (requirements, code, architecture).
-            Wait for validation report. Check is_valid field before proceeding to deployment.
-          RelayConversationHistory: TO_COLLABORATOR
-        - CollaboratorName: deployment-manager
-          AgentDescriptor:
-            AliasArn: !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/${DeploymentManagerAgentId}/${DeploymentManagerAliasId}"
-          CollaborationInstruction: |
-            Invoke this agent ONLY if Quality Validator returns is_valid=true.
-            Pass the job_name and all validated artifacts.
-            Wait for deployment to complete and return deployed agent ARN to user.
-          RelayConversationHistory: TO_COLLABORATOR
+
       Tags:
         Environment: !Ref Environment
         Application: AutoNinja

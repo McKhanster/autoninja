@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 # GLOBAL CONFIGURATION
 # ============================================================================
-SUPERVISOR_AGENT_ID = os.environ.get('SUPERVISOR_AGENT_ID', 'SWIBSRA8HO')
-SUPERVISOR_ALIAS_ID = os.environ.get('SUPERVISOR_ALIAS_ID', 'TSTALIASID')
+SUPERVISOR_AGENT_ID = os.environ.get('SUPERVISOR_AGENT_ID', 'P9EDOCVJXG')
+SUPERVISOR_ALIAS_ID = os.environ.get('SUPERVISOR_ALIAS_ID', 'GVTYHN8EQ0')
 AWS_REGION = os.environ.get('AWS_REGION', 'us-east-2')
 AWS_PROFILE = os.environ.get('AWS_PROFILE', 'AdministratorAccess-784327326356')
 
@@ -65,7 +65,8 @@ logs = session.client('logs')
 
 def invoke_supervisor(prompt: str) -> dict:
     """Invoke supervisor agent and return results"""
-    session_id = f"e2e-test-{int(time.time())}"
+    import random
+    session_id = f"e2e-test-{int(time.time())}-{random.randint(1000, 9999)}"
 
     logger.info("=" * 80)
     logger.info("INVOKING SUPERVISOR AGENT")
@@ -74,6 +75,10 @@ def invoke_supervisor(prompt: str) -> dict:
     logger.info(f"Session ID: {session_id}")
     logger.info(f"Prompt: {prompt}")
     logger.info("=" * 80)
+
+    # Add delay to avoid rate limiting - Claude 3.7 has very low quotas
+    logger.info("Waiting 10 seconds to avoid rate limiting...")
+    time.sleep(10)
 
     start_time = datetime.now()
 

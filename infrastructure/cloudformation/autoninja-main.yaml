@@ -40,8 +40,33 @@ Parameters:
 
   BedrockModel:
     Type: String
-    Description: Foundation model ID for Bedrock Agents
+    Description: Foundation model ID for Bedrock Agents (Supervisor)
     Default: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+
+  RequirementsAnalystModel:
+    Type: String
+    Description: Foundation model ID for Requirements Analyst
+    Default: us.anthropic.claude-3-5-haiku-20241022-v1:0
+
+  CodeGeneratorModel:
+    Type: String
+    Description: Foundation model ID for Code Generator
+    Default: qwen2.5-72b-instruct-v1:0
+
+  SolutionArchitectModel:
+    Type: String
+    Description: Foundation model ID for Solution Architect
+    Default: qwen2.5-14b-instruct-v1:0
+
+  QualityValidatorModel:
+    Type: String
+    Description: Foundation model ID for Quality Validator
+    Default: us.anthropic.claude-3-5-haiku-20241022-v1:0
+
+  DeploymentManagerModel:
+    Type: String
+    Description: Foundation model ID for Deployment Manager
+    Default: deepseek-ai.deepseek-r1-distill-llama-70b-v1:0
     AllowedValues:
       # Global cross-region profiles (highest throughput)
       - us.anthropic.claude-3-7-sonnet-20250219-v1:0
@@ -82,7 +107,26 @@ Parameters:
     Type: Number
     Description: CloudWatch log retention period in days
     Default: 30
-    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, 3653]
+    AllowedValues:
+      [
+        1,
+        3,
+        5,
+        7,
+        14,
+        30,
+        60,
+        90,
+        120,
+        150,
+        180,
+        365,
+        400,
+        545,
+        731,
+        1827,
+        3653,
+      ]
 
 Conditions:
   UseDefaultDeploymentBucket: !Equals [!Ref DeploymentBucket, ""]
@@ -197,7 +241,6 @@ Resources:
             - !Ref DeploymentBucket
       Parameters:
         Environment: !Ref Environment
-        BedrockModel: !Ref BedrockModel
         DeploymentBucket: !If
           - UseDefaultDeploymentBucket
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
@@ -232,7 +275,6 @@ Resources:
             - !Ref DeploymentBucket
       Parameters:
         Environment: !Ref Environment
-        BedrockModel: !Ref BedrockModel
         DeploymentBucket: !If
           - UseDefaultDeploymentBucket
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
@@ -267,7 +309,6 @@ Resources:
             - !Ref DeploymentBucket
       Parameters:
         Environment: !Ref Environment
-        BedrockModel: !Ref BedrockModel
         DeploymentBucket: !If
           - UseDefaultDeploymentBucket
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
@@ -302,7 +343,6 @@ Resources:
             - !Ref DeploymentBucket
       Parameters:
         Environment: !Ref Environment
-        BedrockModel: !Ref BedrockModel
         DeploymentBucket: !If
           - UseDefaultDeploymentBucket
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
@@ -337,7 +377,6 @@ Resources:
             - !Ref DeploymentBucket
       Parameters:
         Environment: !Ref Environment
-        BedrockModel: !Ref BedrockModel
         DeploymentBucket: !If
           - UseDefaultDeploymentBucket
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
@@ -378,23 +417,9 @@ Resources:
             - !Ref DeploymentBucket
       Parameters:
         Environment: !Ref Environment
-        BedrockModel: !Ref BedrockModel
-        RequirementsAnalystAgentArn: !GetAtt RequirementsAnalystStack.Outputs.AgentArn
-        RequirementsAnalystAgentId: !GetAtt RequirementsAnalystStack.Outputs.AgentId
-        RequirementsAnalystAliasId: !GetAtt RequirementsAnalystStack.Outputs.AgentAliasId
-        CodeGeneratorAgentArn: !GetAtt CodeGeneratorStack.Outputs.AgentArn
-        CodeGeneratorAgentId: !GetAtt CodeGeneratorStack.Outputs.AgentId
-        CodeGeneratorAliasId: !GetAtt CodeGeneratorStack.Outputs.AgentAliasId
-        SolutionArchitectAgentArn: !GetAtt SolutionArchitectStack.Outputs.AgentArn
-        SolutionArchitectAgentId: !GetAtt SolutionArchitectStack.Outputs.AgentId
-        SolutionArchitectAliasId: !GetAtt SolutionArchitectStack.Outputs.AgentAliasId
-        QualityValidatorAgentArn: !GetAtt QualityValidatorStack.Outputs.AgentArn
-        QualityValidatorAgentId: !GetAtt QualityValidatorStack.Outputs.AgentId
-        QualityValidatorAliasId: !GetAtt QualityValidatorStack.Outputs.AgentAliasId
-        DeploymentManagerAgentArn: !GetAtt DeploymentManagerStack.Outputs.AgentArn
-        DeploymentManagerAgentId: !GetAtt DeploymentManagerStack.Outputs.AgentId
-        DeploymentManagerAliasId: !GetAtt DeploymentManagerStack.Outputs.AgentAliasId
+
         ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
+        InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
         InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
         ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
         DeploymentBucket: !If

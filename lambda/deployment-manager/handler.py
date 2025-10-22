@@ -11,6 +11,7 @@ from typing import Dict, Any, List, Optional
 from shared.persistence.dynamodb_client import DynamoDBClient
 from shared.persistence.s3_client import S3Client
 from shared.utils.logger import get_logger
+from shared.utils.agentcore_rate_limiter import apply_rate_limiting
 
 
 # Initialize clients
@@ -58,6 +59,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             agent_name='deployment-manager',
             action_name=api_path
         )
+        
+        # Apply rate limiting before processing
+        apply_rate_limiting('deployment-manager')
         
         logger.info(f"Processing request for apiPath: {api_path}")
         
@@ -161,12 +165,15 @@ def handle_generate_cloudformation(
     architecture = json.loads(architecture_str) if isinstance(architecture_str, str) else (architecture_str or {})
     
     # Log raw input to DynamoDB immediately
+    raw_request = json.dumps(event, default=str)
+    logger.info(f"RAW REQUEST for {job_name}: {raw_request}")
+    
     timestamp = dynamodb_client.log_inference_input(
         job_name=job_name,
         session_id=session_id,
         agent_name='deployment-manager',
         action_name='generate_cloudformation',
-        prompt=json.dumps(event, default=str),
+        prompt=raw_request,
         model_id='lambda-function'
     )['timestamp']
     
@@ -227,6 +234,9 @@ Outputs:
         
         # Log raw output to DynamoDB immediately
         duration = time.time() - start_time
+        raw_response = json.dumps(result, default=str)
+        logger.info(f"RAW RESPONSE for {job_name}: {raw_response}")
+        
         s3_uri = s3_client.get_s3_uri(
             job_name=job_name,
             phase='deployment',
@@ -237,7 +247,7 @@ Outputs:
         dynamodb_client.log_inference_output(
             job_name=job_name,
             timestamp=timestamp,
-            response=json.dumps(result, default=str),
+            response=raw_response,
             duration_seconds=duration,
             artifacts_s3_uri=s3_uri,
             status='success'
@@ -317,19 +327,120 @@ def handle_deploy_stack(
     )['timestamp']
     
     try:
-        # Deploy stack (simulated - actual deployment would use boto3 CloudFormation client)
-        logger.info(f"Deploying stack for job: {job_name}")
+        # Deploy stack using boto3 CloudFormation client
+        import boto3
+        cf_client = boto3.client('cloudformation')
         
-        stack_id = f"arn:aws:cloudformation:us-east-2:123456789012:stack/{stack_name}/generated-id"
+        logger.info(f"Deploying CloudFormation stack: {stack_name}")
         
-        # Prepare response
-        result = {
-            "job_name": job_name,
-            "stack_id": stack_id,
-            "status": "CREATE_COMPLETE",
-            "outputs": json.dumps({"LambdaFunctionArn": "arn:aws:lambda:us-east-2:123456789012:function:example"}),
-            "error_message": None
-        }
+        # Parse CloudFormation template
+        if isinstance(cloudformation_template, str):
+            try:
+                cf_template = json.loads(cloudformation_template)
+                template_body = json.dumps(cf_template)
+            except json.JSONDecodeError:
+                # Assume it's YAML
+                template_body = cloudformation_template
+        else:
+            template_body = json.dumps(cloudformation_template)
+        
+        # Deploy the stack
+        try:
+            response = cf_client.create_stack(
+                StackName=stack_name,
+                TemplateBody=template_body,
+                Parameters=[
+                    {
+                        'ParameterKey': 'Environment',
+                        'ParameterValue': parameters.get('Environment', 'production')
+                    }
+                ],
+                Capabilities=['CAPABILITY_IAM'],
+                Tags=[
+                    {
+                        'Key': 'Project',
+                        'Value': 'AutoNinja'
+                    },
+                    {
+                        'Key': 'JobName',
+                        'Value': job_name
+                    }
+                ]
+            )
+            
+            stack_id = response['StackId']
+            
+            # Wait for stack creation to complete (with timeout)
+            logger.info(f"Waiting for stack creation to complete: {stack_name}")
+            waiter = cf_client.get_waiter('stack_create_complete')
+            waiter.wait(
+                StackName=stack_name,
+                WaiterConfig={
+                    'Delay': 15,
+                    'MaxAttempts': 40  # 10 minutes max
+                }
+            )
+            
+            # Get stack outputs
+            stack_info = cf_client.describe_stacks(StackName=stack_name)
+            outputs = {}
+            if stack_info['Stacks'][0].get('Outputs'):
+                for output in stack_info['Stacks'][0]['Outputs']:
+                    outputs[output['OutputKey']] = output['OutputValue']
+            
+            # Prepare response
+            result = {
+                "job_name": job_name,
+                "stack_id": stack_id,
+                "stack_name": stack_name,
+                "status": "CREATE_COMPLETE",
+                "outputs": outputs,
+                "error_message": None
+            }
+            
+        except cf_client.exceptions.AlreadyExistsException:
+            logger.warning(f"Stack {stack_name} already exists, updating instead")
+            
+            # Update existing stack
+            response = cf_client.update_stack(
+                StackName=stack_name,
+                TemplateBody=template_body,
+                Parameters=[
+                    {
+                        'ParameterKey': 'Environment',
+                        'ParameterValue': parameters.get('Environment', 'production')
+                    }
+                ],
+                Capabilities=['CAPABILITY_IAM']
+            )
+            
+            stack_id = response['StackId']
+            
+            # Wait for update to complete
+            waiter = cf_client.get_waiter('stack_update_complete')
+            waiter.wait(
+                StackName=stack_name,
+                WaiterConfig={
+                    'Delay': 15,
+                    'MaxAttempts': 40
+                }
+            )
+            
+            # Get updated outputs
+            stack_info = cf_client.describe_stacks(StackName=stack_name)
+            outputs = {}
+            if stack_info['Stacks'][0].get('Outputs'):
+                for output in stack_info['Stacks'][0]['Outputs']:
+                    outputs[output['OutputKey']] = output['OutputValue']
+            
+            result = {
+                "job_name": job_name,
+                "stack_id": stack_id,
+                "stack_name": stack_name,
+                "status": "UPDATE_COMPLETE",
+                "outputs": outputs,
+                "error_message": None
+            }
         
         # Log raw output to DynamoDB immediately
         duration = time.time() - start_time

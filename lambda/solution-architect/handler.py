@@ -11,13 +11,14 @@ from typing import Dict, Any, List, Optional
 from shared.persistence.dynamodb_client import DynamoDBClient
 from shared.persistence.s3_client import S3Client
 from shared.utils.logger import get_logger
+from shared.utils.agentcore_rate_limiter import apply_rate_limiting
 
 
 # Initialize clients
 dynamodb_client = DynamoDBClient()
 s3_client = S3Client()
 logger = get_logger(__name__)
-foundational_model = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+foundational_model = "us.anthropic.claude-opus-4-1-20250805-v1:0"
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -59,6 +60,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             agent_name='solution-architect',
             action_name=api_path
         )
+        
+        # Apply rate limiting before processing
+        apply_rate_limiting('solution-architect')
         
         logger.info(f"Processing request for apiPath: {api_path}")
         
@@ -171,12 +175,15 @@ def handle_design_architecture(
         code_file_references = code_file_references_str or {}
     
     # Log raw input to DynamoDB immediately
+    raw_request = json.dumps(event, default=str)
+    logger.info(f"RAW REQUEST for {job_name}: {raw_request}")
+    
     timestamp = dynamodb_client.log_inference_input(
         job_name=job_name,
         session_id=session_id,
         agent_name='solution-architect',
         action_name='design_architecture',
-        prompt=json.dumps(event, default=str),
+        prompt=raw_request,
         model_id='lambda-function'
     )['timestamp']
     
@@ -253,6 +260,9 @@ def handle_design_architecture(
         
         # Log raw output to DynamoDB immediately
         duration = time.time() - start_time
+        raw_response = json.dumps(result, default=str)
+        logger.info(f"RAW RESPONSE for {job_name}: {raw_response}")
+        
         s3_uri = s3_client.get_s3_uri(
             job_name=job_name,
             phase='architecture',
@@ -263,7 +273,7 @@ def handle_design_architecture(
         dynamodb_client.log_inference_output(
             job_name=job_name,
             timestamp=timestamp,
-            response=json.dumps(result, default=str),
+            response=raw_response,
             duration_seconds=duration,
             artifacts_s3_uri=s3_uri,
             status='success'

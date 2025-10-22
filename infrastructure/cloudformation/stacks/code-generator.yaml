@@ -12,7 +12,7 @@ Parameters:
   BedrockModel:
     Type: String
     Description: Foundation model ID for Bedrock Agent
-    Default: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+    Default: us.anthropic.claude-sonnet-4-5-20250929-v1:0
 
   DeploymentBucket:
     Type: String
@@ -141,6 +141,14 @@ Resources:
                   - s3:GetObject
                 Resource:
                   - !Sub "arn:aws:s3:::${DeploymentBucket}/schemas/*"
+              - Sid: AgentCoreMemoryAccess
+                Effect: Allow
+                Action:
+                  - bedrock-agentcore:CreateEvent
+                  - bedrock-agentcore:RetrieveMemoryRecords
+                  - bedrock-agentcore:BatchCreateMemoryRecords
+                Resource:
+                  - !Ref AgentCoreMemoryArn
       Tags:
         - Key: Application
           Value: AutoNinja
@@ -164,177 +172,7 @@ Resources:
       Environment:
         Variables:
           LOG_LEVEL: INFO
-          DYNAMODB_TABLE_NAME: !Ref InferenceRecordsTableName
-          S3_BUCKET_NAME: !Ref ArtifactsBucketName
-      Layers:
-        - !Ref LambdaLayerArn
-      TracingConfig:
-        Mode: Active
-      Tags:
-        - Key: Application
-          Value: AutoNinja
-
-  # ============================================================================
-  # IAM Role - Bedrock Agent
-  # ============================================================================
-  AgentRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: bedrock.amazonaws.com
-            Action: sts:AssumeRole
-            Condition:
-              StringEquals:
-                "aws:SourceAccount": !Ref AWS::AccountId
-              ArnLike:
-                "aws:SourceArn": !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*"
-      Policies:
-        - PolicyName: BedrockAgentPermissions
-          PolicyDocument:
-            Version: "2012-10-17"
-            Statement:
-              - Effect: Allow
-                Action:
-                  - bedrock:InvokeModel
-                  - bedrock:InvokeModelWithResponseStream
-                Resource:
-                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:*::foundation-model/*"
-                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*"
-              - Effect: Allow
-                Action:
-                  - bedrock:GetInferenceProfile
-                  - bedrock:GetFoundationModel
-                Resource: "*"
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                Resource:
-                  - !Sub "arn:aws:s3:::${DeploymentBucket}/schemas/*"
-              - Effect: Allow
-                Action:
-                  - s3:ListBucket
-                Resource:
-                  - !Sub "arn:aws:s3:::${DeploymentBucket}"
-      Tags:
-        - Key: Application
-          Value: AutoNinja
-
-  # ============================================================================
-  # Bedrock Agent
-  # ============================================================================
-  Agent:
-    Type: AWS::Bedrock::Agent
-    Properties:
-      AgentName: !Sub "autoninja-code-generator-${Environment}"
-      Description: Code Generator agent - generates Lambda code, agent configs, and OpenAPI schemas
-      AgentResourceRoleArn: !GetAtt AgentRole.Arn
-      FoundationModel: !Ref BedrockModel
-      AgentCollaboration: DISABLED
-      IdleSessionTTLInSeconds: 1800
-      AutoPrepare: true
-      Instruction: |
-        You are a code generator for the AutoNinja system. Your role is to generate production-ready
-        code for AI agents based on requirements from the Requirements Analyst.
-
-        When you receive requirements:
-        1. Extract the job_name parameter from the request
-        2. Generate Lambda function code in Python with:
-           - Proper error handling
-           - Input validation
-           - Structured logging
-           - DynamoDB/S3 persistence
-        3. Generate Bedrock Agent configuration JSON
-        4. Generate OpenAPI schemas for action groups
-        5. Follow Python best practices and AWS Lambda patterns
-
-        Always use the job_name provided by the supervisor for tracking.
-      ActionGroups:
-        - ActionGroupName: code-generator-actions
-          ActionGroupState: ENABLED
-          ActionGroupExecutor:
-            Lambda: !GetAtt LambdaFunction.Arn
-          Description: Actions for code generation
-          ApiSchema:
-            S3:
-              S3BucketName: !Ref DeploymentBucket
-              S3ObjectKey: schemas/code-generator-schema.yaml
-      Tags:
-        Application: AutoNinja
-
-  # ============================================================================
-  # Lambda Invoke Permission
-  # ============================================================================
-  LambdaInvokePermission:
-    Type: AWS::Lambda::Permission
-    Properties:
-      FunctionName: !Ref LambdaFunction
-      Action: lambda:InvokeFunction
-      Principal: bedrock.amazonaws.com
-      SourceArn: !GetAtt Agent.AgentArn
-
-  # ============================================================================
-  # Bedrock Agent Alias
-  # ============================================================================
-  AgentAlias:
-    Type: AWS::Bedrock::AgentAlias
-    Properties:
-      AgentId: !GetAtt Agent.AgentId
-      AgentAliasName: production
-      Description: Production alias for Code Generator agent
-
-Outputs:
-  AgentId:
-    Description: Code Generator Agent ID
-    Value: !GetAtt Agent.AgentId
-    Export:
-      Name: !Sub "${AWS::StackName}-AgentId"
-
-  AgentArn:
-    Description: Code Generator Agent ARN
-    Value: !GetAtt Agent.AgentArn
-    Export:
-      Name: !Sub "${AWS::StackName}-AgentArn"
-
-  AgentAliasId:
-    Description: Code Generator Agent Alias ID
-    Value: !GetAtt AgentAlias.AgentAliasId
-    Export:
-      Name: !Sub "${AWS::StackName}-AgentAliasId"
-
-  LambdaFunctionArn:
-    Description: Code Generator Lambda Function ARN
-    Value: !GetAtt LambdaFunction.Arn
-    Export:
-      Name: !Sub "${AWS::StackName}-LambdaFunctionArn"
-      Tags:
-        - Key: Application
-          Value: AutoNinja
-
-  # ============================================================================
-  # Lambda Function
-  # ============================================================================
-  LambdaFunction:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: !Sub "autoninja-code-generator-${Environment}"
-      Description: Code Generator Lambda function for AutoNinja
-      Runtime: python3.12
-      Handler: handler.lambda_handler
-      Code:
-        S3Bucket: !Ref DeploymentBucket
-        S3Key: lambda/code-generator.zip
-      Role: !GetAtt LambdaRole.Arn
-      Timeout: 300
-      MemorySize: 512
-      Environment:
-        Variables:
-          LOG_LEVEL: INFO
+          MEMORY_ID: !Ref AgentCoreMemoryId
           DYNAMODB_TABLE_NAME: !Ref InferenceRecordsTableName
           S3_BUCKET_NAME: !Ref ArtifactsBucketName
       Layers:
@@ -411,25 +249,199 @@ Outputs:
     Type: AWS::Bedrock::Agent
     Properties:
       AgentName: !Sub "autoninja-code-generator-${Environment}"
-      Description: Code Generator agent - generates Lambda code, configs, and schemas
+      Description: Code Generator agent - generates Lambda code, agent configs, and OpenAPI schemas
       AgentResourceRoleArn: !GetAtt AgentRole.Arn
       FoundationModel: !Ref BedrockModel
       AgentCollaboration: DISABLED
       IdleSessionTTLInSeconds: 1800
       AutoPrepare: true
       Instruction: |
-        You are a code generator for the AutoNinja system. Your role is to generate production-ready Python Lambda code, agent configurations, and OpenAPI schemas based on requirements from the Requirements Analyst.
+        You are a Senior Software Engineer and AI Systems Developer with 12+ years of experience building production-grade applications. You specialize in AWS Lambda, Bedrock Agents, and enterprise software development with expertise in Python, security, performance optimization, and maintainable code architecture.
+
+        ## CODE DEVELOPMENT PHILOSOPHY
+
+        ### PRODUCTION-FIRST MINDSET
+        - Write code that can handle production traffic from day one
+        - Implement comprehensive error handling and graceful degradation
+        - Include structured logging and observability hooks
+        - Follow security best practices and input validation
+        - Design for testability and maintainability
+
+        ### CODE QUALITY STANDARDS
+        - Follow PEP 8 and industry coding standards
+        - Write self-documenting code with clear variable names
+        - Include comprehensive docstrings and comments
+        - Implement proper separation of concerns
+        - Use design patterns appropriate for the use case
+
+        ## DEVELOPMENT FRAMEWORK
+
+        ### 1. REQUIREMENTS ANALYSIS
+        - Understand the business logic and user requirements
+        - Identify security and compliance considerations
+        - Plan for error scenarios and edge cases
+        - Consider performance and scalability needs
+
+        ### 2. ARCHITECTURE DESIGN
+        - Design modular, reusable code components
+        - Plan for proper separation of concerns
+        - Implement appropriate design patterns
+        - Consider future extensibility and maintenance
+
+        ### 3. IMPLEMENTATION STRATEGY
+        - Start with robust input validation and sanitization
+        - Implement comprehensive error handling
+        - Add structured logging and monitoring hooks
+        - Include security controls and access validation
+        - Write testable, modular functions
+
+        ### 4. QUALITY ASSURANCE
+        - Include unit test examples and test data
+        - Add performance monitoring and metrics
+        - Implement health checks and status endpoints
+        - Document API contracts and usage examples
+
+        ## OUTPUT SPECIFICATION
+
+        Generate complete, production-ready code packages:
+
+        ```json
+        {
+          "lambda_code": {
+            "handler.py": "Main Lambda handler with full Bedrock Agent integration",
+            "business_logic.py": "Core business logic separated from handler",
+            "utils.py": "Utility functions and helpers",
+            "validators.py": "Input validation and sanitization",
+            "exceptions.py": "Custom exception classes",
+            "config.py": "Configuration management",
+            "requirements.txt": "Python dependencies with pinned versions"
+          },
+          "agent_configuration": {
+            "name": "Descriptive agent name",
+            "description": "Clear agent purpose and capabilities",
+            "instruction": "Detailed agent personality and behavior guide",
+            "foundation_model": "Appropriate model selection with rationale",
+            "idle_session_ttl": "Session timeout configuration",
+            "action_groups": [
+              {
+                "name": "Action group name",
+                "description": "What this action group does",
+                "lambda_function": "Associated Lambda function",
+                "api_schema": "OpenAPI schema reference"
+              }
+            ],
+            "knowledge_bases": ["Associated knowledge bases if applicable"],
+            "guardrails": "Safety and content filtering configuration"
+          },
+          "openapi_schema": {
+            "openapi": "3.0.0",
+            "info": "API metadata and description",
+            "paths": "Complete API endpoint definitions",
+            "components": "Reusable schema components",
+            "examples": "Request/response examples for testing"
+          },
+          "testing_framework": {
+            "unit_tests": "Comprehensive test cases",
+            "integration_tests": "End-to-end testing scenarios",
+            "test_data": "Sample inputs and expected outputs",
+            "performance_tests": "Load and stress testing guidelines"
+          },
+          "documentation": {
+            "readme.md": "Setup and usage instructions",
+            "api_docs.md": "API documentation and examples",
+            "deployment_guide.md": "Deployment and configuration guide",
+            "troubleshooting.md": "Common issues and solutions"
+          }
+        }
+        ```
+
+        ## LAMBDA HANDLER TEMPLATE STRUCTURE
+
+        Every Lambda handler must include:
+
+        ```python
+        import json
+        import logging
+        import time
+        from typing import Dict, Any, Optional
+        from datetime import datetime
+
+        # Configure structured logging
+        logger = logging.getLogger()
+        logger.setLevel(logging.INFO)
+
+        def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
+            """
+            Production-ready Lambda handler for Bedrock Agent.
+            
+            Args:
+                event: Bedrock Agent input event
+                context: Lambda execution context
+                
+            Returns:
+                Bedrock Agent response with proper error handling
+            """
+            request_id = context.aws_request_id
+            start_time = time.time()
+            
+            try:
+                # Log incoming request
+                logger.info(f"Processing request {request_id}", extra={
+                    "request_id": request_id,
+                    "api_path": event.get("apiPath"),
+                    "session_id": event.get("sessionId")
+                })
+                
+                # Validate input
+                validated_input = validate_input(event)
+                
+                # Process business logic
+                result = process_request(validated_input)
+                
+                # Format response
+                response = format_success_response(event, result)
+                
+                # Log success
+                duration = time.time() - start_time
+                logger.info(f"Request completed successfully", extra={
+                    "request_id": request_id,
+                    "duration_ms": duration * 1000,
+                    "status": "success"
+                })
+                
+                return response
+                
+            except ValidationError as e:
+                return handle_validation_error(event, e, request_id)
+            except BusinessLogicError as e:
+                return handle_business_error(event, e, request_id)
+            except Exception as e:
+                return handle_unexpected_error(event, e, request_id)
+        ```
+
+        ## CODE QUALITY REQUIREMENTS
+        - Include comprehensive error handling for all failure modes
+        - Implement structured logging with correlation IDs
+        - Add input validation and sanitization for security
+        - Include performance monitoring and metrics collection
+        - Write modular, testable code with clear separation of concerns
+        - Add comprehensive docstrings and inline documentation
+        - Include unit test examples and test data
+        - Follow security best practices for data handling
+        - Implement proper configuration management
+        - Add health checks and status monitoring endpoints
 
         When you receive requirements:
-        1. Use the job_name for tracking
-        2. Generate Lambda function code with error handling, logging, and persistence
-        3. Create agent configuration JSON with name, instructions, model, action groups
-        4. Generate OpenAPI 3.0 schema for action groups with endpoints, parameters, responses
-        5. Return all artifacts in structured JSON format
-        6. Store generated code in S3 artifacts bucket
+        1. Extract the job_name and requirements from the input
+        2. Call the generate-code action with the job_name and requirements
+        3. Take the JSON response from generate-code and return it directly to the caller
+        4. If asked to generate specific components, call the appropriate actions
+        5. Always return the complete JSON response from the action functions
 
-        Ensure code follows AWS best practices and Python standards.
-      # ActionGroups temporarily removed for initial AgentCore Memory deployment
+        IMPORTANT: You must return the exact JSON response from the action functions to the caller.
+        Do not summarize or modify the JSON - return it exactly as received from the functions.
+        
+        Always use the job_name provided by the supervisor for tracking.
       ActionGroups:
         - ActionGroupName: code-generator-actions
           ActionGroupState: ENABLED
@@ -446,7 +458,6 @@ Outputs:
   # ============================================================================
   # Lambda Invoke Permission
   # ============================================================================
-  # LambdaInvokePermission temporarily removed for initial AgentCore Memory deployment
   LambdaInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -470,22 +481,22 @@ Outputs:
     Description: Code Generator Agent ID
     Value: !GetAtt Agent.AgentId
     Export:
-      Name: !Sub "${AWS::StackName}-CodeGeneratorAgentId"
+      Name: !Sub "${AWS::StackName}-AgentId"
 
   AgentArn:
     Description: Code Generator Agent ARN
     Value: !GetAtt Agent.AgentArn
     Export:
-      Name: !Sub "${AWS::StackName}-CodeGeneratorAgentArn"
+      Name: !Sub "${AWS::StackName}-AgentArn"
 
   AgentAliasId:
     Description: Code Generator Agent Alias ID
     Value: !GetAtt AgentAlias.AgentAliasId
     Export:
-      Name: !Sub "${AWS::StackName}-CodeGeneratorAgentAliasId"
+      Name: !Sub "${AWS::StackName}-AgentAliasId"
 
   LambdaFunctionArn:
     Description: Code Generator Lambda Function ARN
     Value: !GetAtt LambdaFunction.Arn
     Export:
-      Name: !Sub "${AWS::StackName}-CodeGeneratorLambdaFunctionArn"
+      Name: !Sub "${AWS::StackName}-LambdaFunctionArn"
