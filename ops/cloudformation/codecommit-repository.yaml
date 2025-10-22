@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AutoNinja CodeCommit Repository - Git repository for AutoNinja Bedrock Agents codebase'
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: 'Repository Configuration'
+        Parameters:
+          - RepositoryName
+          - RepositoryDescription
+          - Environment
+    ParameterLabels:
+      RepositoryName:
+        default: 'Repository Name'
+      RepositoryDescription:
+        default: 'Repository Description'
+      Environment:
+        default: 'Environment'
+
+Parameters:
+  RepositoryName:
+    Type: String
+    Default: 'autoninja-bedrock-agents'
+    Description: 'Name of the CodeCommit repository'
+    AllowedPattern: '^[a-zA-Z0-9._\-]+$'
+    ConstraintDescription: 'Repository name must contain only alphanumeric characters, periods, underscores, and hyphens'
+
+  RepositoryDescription:
+    Type: String
+    Default: 'AutoNinja multi-agent Bedrock system for generating production-ready AWS Bedrock Agents'
+    Description: 'Description of the CodeCommit repository'
+    MaxLength: 1000
+
+  Environment:
+    Type: String
+    Default: 'production'
+    Description: 'Environment name for tagging'
+    AllowedValues:
+      - production
+      - staging
+      - development
+
+Resources:
+  # CodeCommit Repository
+  CodeCommitRepository:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: !Ref RepositoryName
+      RepositoryDescription: !Ref RepositoryDescription
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Purpose
+          Value: SourceControl
+
+  # IAM Policy for CodeCommit Read Access
+  CodeCommitReadPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${RepositoryName}-read-access'
+      Description: 'Provides read-only access to the CodeCommit repository'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: CodeCommitReadAccess
+            Effect: Allow
+            Action:
+              - codecommit:BatchGetRepositories
+              - codecommit:Get*
+              - codecommit:GitPull
+              - codecommit:List*
+              - codecommit:Describe*
+            Resource: !GetAtt CodeCommitRepository.Arn
+          - Sid: CodeCommitListRepositories
+            Effect: Allow
+            Action:
+              - codecommit:ListRepositories
+            Resource: '*'
+
+  # IAM Policy for CodeCommit Write Access
+  CodeCommitWritePolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${RepositoryName}-write-access'
+      Description: 'Provides read and write access to the CodeCommit repository'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: CodeCommitWriteAccess
+            Effect: Allow
+            Action:
+              - codecommit:BatchGetRepositories
+              - codecommit:Get*
+              - codecommit:GitPull
+              - codecommit:GitPush
+              - codecommit:List*
+              - codecommit:Describe*
+              - codecommit:CreateBranch
+              - codecommit:DeleteBranch
+              - codecommit:UpdateDefaultBranch
+              - codecommit:Merge*
+              - codecommit:Put*
+              - codecommit:Post*
+              - codecommit:Test*
+              - codecommit:Update*
+            Resource: !GetAtt CodeCommitRepository.Arn
+          - Sid: CodeCommitListRepositories
+            Effect: Allow
+            Action:
+              - codecommit:ListRepositories
+            Resource: '*'
+
+  # IAM Policy for CodePipeline Integration
+  CodePipelineIntegrationPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub '${RepositoryName}-codepipeline-access'
+      Description: 'Provides CodePipeline access to the CodeCommit repository'
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: CodeCommitSourceAccess
+            Effect: Allow
+            Action:
+              - codecommit:GetBranch
+              - codecommit:GetCommit
+              - codecommit:UploadArchive
+              - codecommit:GetUploadArchiveStatus
+              - codecommit:CancelUploadArchive
+            Resource: !GetAtt CodeCommitRepository.Arn
+
+Outputs:
+  RepositoryArn:
+    Description: 'ARN of the CodeCommit repository'
+    Value: !GetAtt CodeCommitRepository.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-RepositoryArn'
+
+  RepositoryCloneUrlHttp:
+    Description: 'HTTPS clone URL for the CodeCommit repository'
+    Value: !GetAtt CodeCommitRepository.CloneUrlHttp
+    Export:
+      Name: !Sub '${AWS::StackName}-CloneUrlHttp'
+
+  RepositoryCloneUrlSsh:
+    Description: 'SSH clone URL for the CodeCommit repository'
+    Value: !GetAtt CodeCommitRepository.CloneUrlSsh
+    Export:
+      Name: !Sub '${AWS::StackName}-CloneUrlSsh'
+
+  RepositoryName:
+    Description: 'Name of the CodeCommit repository'
+    Value: !GetAtt CodeCommitRepository.Name
+    Export:
+      Name: !Sub '${AWS::StackName}-RepositoryName'
+
+  ReadPolicyArn:
+    Description: 'ARN of the IAM policy for read access'
+    Value: !Ref CodeCommitReadPolicy
+    Export:
+      Name: !Sub '${AWS::StackName}-ReadPolicyArn'
+
+  WritePolicyArn:
+    Description: 'ARN of the IAM policy for write access'
+    Value: !Ref CodeCommitWritePolicy
+    Export:
+      Name: !Sub '${AWS::StackName}-WritePolicyArn'
+
+  CodePipelinePolicyArn:
+    Description: 'ARN of the IAM policy for CodePipeline integration'
+    Value: !Ref CodePipelineIntegrationPolicy
+    Export:
+      Name: !Sub '${AWS::StackName}-CodePipelinePolicyArn'

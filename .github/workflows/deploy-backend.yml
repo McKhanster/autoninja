@@ -1,0 +1,67 @@
+name: Deploy Backend Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+      - deployment-infrastructure
+    paths:
+      - 'lambda/**'
+      - 'shared/**'
+      - 'infrastructure/**'
+      - 'schemas/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-2
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  deploy:
+    name: Deploy Backend to AWS
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r shared/requirements.txt
+
+      - name: Package Lambda Layer
+        run: |
+          chmod +x scripts/package_lambda_layer.sh
+          ./scripts/package_lambda_layer.sh
+
+      - name: Upload schemas to S3
+        run: |
+          chmod +x scripts/upload_schemas.sh
+          ./scripts/upload_schemas.sh
+
+      - name: Deploy nested stacks
+        run: |
+          chmod +x scripts/deploy_nested_stacks.sh
+          export AUTO_DEPLOY=true
+          ./scripts/deploy_nested_stacks.sh
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "✅ Backend deployment completed successfully"
+          echo "Region: ${{ env.AWS_REGION }}"
+          echo "Commit: ${{ github.sha }}"

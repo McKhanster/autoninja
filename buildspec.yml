@@ -1,0 +1,51 @@
+version: 0.2
+
+# Frontend Build Specification for AWS CodeBuild
+# Builds the React application and prepares artifacts for deployment to AWS Amplify
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+    commands:
+      - echo "Installing frontend dependencies..."
+      - cd frontend
+      - npm ci
+      - cd ..
+  
+  pre_build:
+    commands:
+      - echo "Pre-build phase - verifying environment..."
+      - node --version
+      - npm --version
+      - echo "Build started on `date`"
+  
+  build:
+    commands:
+      - echo "Building React application..."
+      - cd frontend
+      - npm run build
+      - cd ..
+      - echo "Build completed on `date`"
+  
+  post_build:
+    commands:
+      - echo "Post-build phase - preparing artifacts..."
+      - ls -la frontend/build/
+      - echo "Frontend build artifacts ready for deployment"
+
+artifacts:
+  files:
+    - '**/*'
+  base-directory: frontend/build
+  name: frontend-build-artifacts
+
+cache:
+  paths:
+    - 'frontend/node_modules/**/*'
+
+env:
+  variables:
+    NODE_ENV: production
+    CI: true
+    GENERATE_SOURCEMAP: false

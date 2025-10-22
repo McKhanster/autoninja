@@ -1,0 +1,118 @@
+version: 0.2
+
+# Backend Build Specification for AWS CodeBuild
+# Packages Lambda functions and uploads artifacts to S3 for CloudFormation deployment
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.12
+    commands:
+      - echo "Installing backend dependencies..."
+      - pip install --upgrade pip
+      - pip install boto3 botocore
+  
+  pre_build:
+    commands:
+      - echo "Pre-build phase - verifying environment..."
+      - python --version
+      - pip --version
+      - echo "AWS Region: $AWS_REGION"
+      - echo "Deployment Bucket: $DEPLOYMENT_BUCKET"
+      - echo "Build started on `date`"
+  
+  build:
+    commands:
+      - echo "Packaging Lambda functions..."
+      - mkdir -p build/lambda
+      
+      # Package shared layer
+      - echo "Packaging shared Lambda layer..."
+      - cd shared
+      - zip -r ../build/lambda/autoninja-shared-layer.zip . -x "*.pyc" -x "__pycache__/*" -x "*.git*"
+      - cd ..
+      
+      # Package each Lambda function
+      - echo "Packaging requirements-analyst Lambda..."
+      - cd lambda/requirements-analyst
+      - zip -r ../../build/lambda/requirements-analyst.zip . -x "*.pyc" -x "__pycache__/*"
+      - cd ../..
+      
+      - echo "Packaging code-generator Lambda..."
+      - cd lambda/code-generator
+      - zip -r ../../build/lambda/code-generator.zip . -x "*.pyc" -x "__pycache__/*"
+      - cd ../..
+      
+      - echo "Packaging solution-architect Lambda..."
+      - cd lambda/solution-architect
+      - zip -r ../../build/lambda/solution-architect.zip . -x "*.pyc" -x "__pycache__/*"
+      - cd ../..
+      
+      - echo "Packaging quality-validator Lambda..."
+      - cd lambda/quality-validator
+      - zip -r ../../build/lambda/quality-validator.zip . -x "*.pyc" -x "__pycache__/*"
+      - cd ../..
+      
+      - echo "Packaging deployment-manager Lambda..."
+      - cd lambda/deployment-manager
+      - zip -r ../../build/lambda/deployment-manager.zip . -x "*.pyc" -x "__pycache__/*"
+      - cd ../..
+      
+      - echo "Packaging supervisor-agentcore Lambda..."
+      - cd lambda/supervisor-agentcore
+      - pip install -r requirements.txt -t .
+      - zip -r ../../build/lambda/supervisor-agentcore.zip . -x "*.pyc" -x "__pycache__/*"
+      - cd ../..
+      
+      - echo "Lambda packaging completed"
+      - ls -lh build/lambda/
+  
+  post_build:
+    commands:
+      - echo "Post-build phase - uploading artifacts to S3..."
+      
+      # Upload Lambda packages to S3
+      - |
+        if [ -n "$DEPLOYMENT_BUCKET" ]; then
+          echo "Uploading Lambda packages to s3://$DEPLOYMENT_BUCKET/lambda/"
+          aws s3 cp build/lambda/ s3://$DEPLOYMENT_BUCKET/lambda/ --recursive --region $AWS_REGION
+          echo "Upload completed successfully"
+        else
+          echo "DEPLOYMENT_BUCKET not set, skipping S3 upload"
+        fi
+      
+      # Upload CloudFormation templates
+      - |
+        if [ -n "$DEPLOYMENT_BUCKET" ]; then
+          echo "Uploading CloudFormation templates to s3://$DEPLOYMENT_BUCKET/cloudformation/"
+          aws s3 cp infrastructure/cloudformation/ s3://$DEPLOYMENT_BUCKET/cloudformation/ --recursive --region $AWS_REGION --exclude "*" --include "*.yaml"
+          echo "CloudFormation templates uploaded"
+        fi
+      
+      # Upload OpenAPI schemas
+      - |
+        if [ -n "$DEPLOYMENT_BUCKET" ]; then
+          echo "Uploading OpenAPI schemas to s3://$DEPLOYMENT_BUCKET/schemas/"
+          aws s3 cp schemas/ s3://$DEPLOYMENT_BUCKET/schemas/ --recursive --region $AWS_REGION --exclude "*" --include "*.yaml"
+          echo "Schemas uploaded"
+        fi
+      
+      - echo "Backend build and deployment completed on `date`"
+
+artifacts:
+  files:
+    - 'build/lambda/**/*'
+    - 'infrastructure/cloudformation/**/*.yaml'
+    - 'schemas/**/*.yaml'
+  name: backend-build-artifacts
+
+cache:
+  paths:
+    - '/root/.cache/pip/**/*'
+
+env:
+  variables:
+    AWS_REGION: us-east-2
+    PYTHONUNBUFFERED: 1
+  parameter-store:
+    DEPLOYMENT_BUCKET: /autoninja/deployment-bucket

@@ -1,0 +1,567 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AutoNinja CI/CD Pipeline - Automated build and deployment pipeline using CodePipeline and CodeBuild'
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: 'Environment Configuration'
+        Parameters:
+          - Environment
+      - Label:
+          default: 'Source Configuration'
+        Parameters:
+          - CodeCommitRepositoryName
+          - CodeCommitRepositoryArn
+          - BranchName
+      - Label:
+          default: 'Deployment Configuration'
+        Parameters:
+          - AmplifyAppId
+          - DeploymentBucketName
+    ParameterLabels:
+      Environment:
+        default: 'Deployment Environment'
+      CodeCommitRepositoryName:
+        default: 'CodeCommit Repository Name'
+      CodeCommitRepositoryArn:
+        default: 'CodeCommit Repository ARN'
+      BranchName:
+        default: 'Git Branch Name'
+      AmplifyAppId:
+        default: 'Amplify App ID'
+      DeploymentBucketName:
+        default: 'Deployment Bucket Name'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues:
+      - production
+      - staging
+      - development
+    Description: 'Deployment environment for the pipeline'
+
+  CodeCommitRepositoryName:
+    Type: String
+    Default: 'autoninja-bedrock-agents'
+    Description: 'Name of the CodeCommit repository'
+
+  CodeCommitRepositoryArn:
+    Type: String
+    Description: 'ARN of the CodeCommit repository'
+
+  BranchName:
+    Type: String
+    Default: main
+    Description: 'Git branch name to monitor for changes'
+
+  AmplifyAppId:
+    Type: String
+    Description: 'Amplify App ID for frontend deployment'
+
+  DeploymentBucketName:
+    Type: String
+    Description: 'S3 bucket name for storing deployment artifacts (Lambda packages, CloudFormation templates)'
+
+Resources:
+  # S3 Bucket for Pipeline Artifacts
+  PipelineArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'autoninja-pipeline-artifacts-${AWS::AccountId}-${Environment}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldArtifacts
+            Status: Enabled
+            ExpirationInDays: 30
+            NoncurrentVersionExpirationInDays: 7
+          - Id: TransitionToIA
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 7
+                StorageClass: STANDARD_IA
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: Purpose
+          Value: PipelineArtifacts
+
+  # IAM Role for Frontend CodeBuild Project
+  FrontendCodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'autoninja-frontend-codebuild-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+      Policies:
+        - PolicyName: FrontendBuildPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: S3ArtifactAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:GetObjectVersion
+                Resource:
+                  - !Sub '${PipelineArtifactsBucket.Arn}/*'
+              - Sid: S3BucketAccess
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt PipelineArtifactsBucket.Arn
+              - Sid: CloudWatchLogsAccess
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*'
+              - Sid: AmplifyDeployAccess
+                Effect: Allow
+                Action:
+                  - amplify:GetApp
+                  - amplify:GetBranch
+                  - amplify:StartDeployment
+                  - amplify:GetJob
+                Resource:
+                  - !Sub 'arn:aws:amplify:${AWS::Region}:${AWS::AccountId}:apps/${AmplifyAppId}/*'
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # IAM Role for Backend CodeBuild Project
+  BackendCodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'autoninja-backend-codebuild-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+      Policies:
+        - PolicyName: BackendBuildPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: S3ArtifactAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:GetObjectVersion
+                Resource:
+                  - !Sub '${PipelineArtifactsBucket.Arn}/*'
+              - Sid: S3BucketAccess
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt PipelineArtifactsBucket.Arn
+              - Sid: S3DeploymentBucketAccess
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::${DeploymentBucketName}/*'
+                  - !Sub 'arn:aws:s3:::${DeploymentBucketName}'
+              - Sid: CloudWatchLogsAccess
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !Sub 'arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/*'
+              - Sid: CloudFormationAccess
+                Effect: Allow
+                Action:
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                Resource: '*'
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # CodeBuild Project for Frontend
+  FrontendBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub 'autoninja-frontend-build-${Environment}'
+      Description: 'Build project for AutoNinja React frontend application'
+      ServiceRole: !GetAtt FrontendCodeBuildRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: NODE_ENV
+            Value: production
+          - Name: CI
+            Value: true
+          - Name: GENERATE_SOURCEMAP
+            Value: false
+          - Name: AMPLIFY_APP_ID
+            Value: !Ref AmplifyAppId
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec.yml
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Sub '/aws/codebuild/autoninja-frontend-${Environment}'
+          StreamName: build
+      Cache:
+        Type: S3
+        Location: !Sub '${PipelineArtifactsBucket}/build-cache/frontend'
+      TimeoutInMinutes: 15
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: BuildType
+          Value: Frontend
+
+  # CodeBuild Project for Backend
+  BackendBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub 'autoninja-backend-build-${Environment}'
+      Description: 'Build project for AutoNinja backend Lambda functions and CloudFormation templates'
+      ServiceRole: !GetAtt BackendCodeBuildRole.Arn
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:7.0
+        EnvironmentVariables:
+          - Name: AWS_REGION
+            Value: !Ref AWS::Region
+          - Name: DEPLOYMENT_BUCKET
+            Value: !Ref DeploymentBucketName
+          - Name: PYTHONUNBUFFERED
+            Value: 1
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: buildspec-backend.yml
+      LogsConfig:
+        CloudWatchLogs:
+          Status: ENABLED
+          GroupName: !Sub '/aws/codebuild/autoninja-backend-${Environment}'
+          StreamName: build
+      Cache:
+        Type: S3
+        Location: !Sub '${PipelineArtifactsBucket}/build-cache/backend'
+      TimeoutInMinutes: 20
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+        - Key: ManagedBy
+          Value: CloudFormation
+        - Key: BuildType
+          Value: Backend
+
+  # IAM Role for CodePipeline
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'autoninja-codepipeline-role-${Environment}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: CodePipelinePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: S3ArtifactAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:PutObject
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt PipelineArtifactsBucket.Arn
+                  - !Sub '${PipelineArtifactsBucket.Arn}/*'
+              - Sid: CodeCommitAccess
+                Effect: Allow
+                Action:
+                  - codecommit:GetBranch
+                  - codecommit:GetCommit
+                  - codecommit:UploadArchive
+                  - codecommit:GetUploadArchiveStatus
+                  - codecommit:CancelUploadArchive
+                Resource:
+                  - !Ref CodeCommitRepositoryArn
+              - Sid: CodeBuildAccess
+                Effect: Allow
+                Action:
+                  - codebuild:BatchGetBuilds
+                  - codebuild:StartBuild
+                  - codebuild:StopBuild
+                Resource:
+                  - !GetAtt FrontendBuildProject.Arn
+                  - !GetAtt BackendBuildProject.Arn
+              - Sid: AmplifyAccess
+                Effect: Allow
+                Action:
+                  - amplify:GetApp
+                  - amplify:GetBranch
+                  - amplify:StartDeployment
+                  - amplify:GetJob
+                  - amplify:ListJobs
+                Resource:
+                  - !Sub 'arn:aws:amplify:${AWS::Region}:${AWS::AccountId}:apps/${AmplifyAppId}/*'
+              - Sid: CloudFormationAccess
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:ValidateTemplate
+                Resource:
+                  - !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/autoninja-*/*'
+              - Sid: IAMPassRole
+                Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    iam:PassedToService:
+                      - cloudformation.amazonaws.com
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  # CodePipeline Resource
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: !Sub 'autoninja-pipeline-${Environment}'
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineArtifactsBucket
+      Stages:
+        # Source Stage - CodeCommit
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: CodeCommit
+                Version: '1'
+              Configuration:
+                RepositoryName: !Ref CodeCommitRepositoryName
+                BranchName: !Ref BranchName
+                PollForSourceChanges: true
+              OutputArtifacts:
+                - Name: SourceOutput
+              RunOrder: 1
+        
+        # Build Stage - Parallel Frontend and Backend Builds
+        - Name: Build
+          Actions:
+            - Name: FrontendBuild
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref FrontendBuildProject
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: FrontendBuildOutput
+              RunOrder: 1
+            
+            - Name: BackendBuild
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref BackendBuildProject
+              InputArtifacts:
+                - Name: SourceOutput
+              OutputArtifacts:
+                - Name: BackendBuildOutput
+              RunOrder: 1
+        
+        # Deploy Stage - Sequential Frontend and Backend Deployments
+        - Name: Deploy
+          Actions:
+            - Name: DeployFrontend
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: S3
+                Version: '1'
+              Configuration:
+                BucketName: !Ref PipelineArtifactsBucket
+                Extract: true
+                ObjectKey: !Sub 'frontend-deployments/${Environment}'
+              InputArtifacts:
+                - Name: FrontendBuildOutput
+              RunOrder: 1
+            
+            - Name: DeployBackend
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: S3
+                Version: '1'
+              Configuration:
+                BucketName: !Ref DeploymentBucketName
+                Extract: false
+                ObjectKey: !Sub 'backend-deployments/${Environment}'
+              InputArtifacts:
+                - Name: BackendBuildOutput
+              RunOrder: 2
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: AutoNinja
+        - Key: ManagedBy
+          Value: CloudFormation
+
+
+Outputs:
+  PipelineName:
+    Description: 'Name of the CodePipeline'
+    Value: !Ref CodePipeline
+    Export:
+      Name: !Sub '${AWS::StackName}-PipelineName'
+
+  PipelineArn:
+    Description: 'ARN of the CodePipeline'
+    Value: !Sub 'arn:aws:codepipeline:${AWS::Region}:${AWS::AccountId}:${CodePipeline}'
+    Export:
+      Name: !Sub '${AWS::StackName}-PipelineArn'
+
+  FrontendBuildProjectName:
+    Description: 'Name of the frontend CodeBuild project'
+    Value: !Ref FrontendBuildProject
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendBuildProjectName'
+
+  BackendBuildProjectName:
+    Description: 'Name of the backend CodeBuild project'
+    Value: !Ref BackendBuildProject
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendBuildProjectName'
+
+  PipelineArtifactsBucketName:
+    Description: 'Name of the S3 bucket for pipeline artifacts'
+    Value: !Ref PipelineArtifactsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-ArtifactsBucketName'
+
+  PipelineArtifactsBucketArn:
+    Description: 'ARN of the S3 bucket for pipeline artifacts'
+    Value: !GetAtt PipelineArtifactsBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-ArtifactsBucketArn'
+
+  FrontendBuildProjectArn:
+    Description: 'ARN of the frontend CodeBuild project'
+    Value: !GetAtt FrontendBuildProject.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendBuildProjectArn'
+
+  BackendBuildProjectArn:
+    Description: 'ARN of the backend CodeBuild project'
+    Value: !GetAtt BackendBuildProject.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendBuildProjectArn'
+
+  CodePipelineRoleArn:
+    Description: 'ARN of the IAM role for CodePipeline'
+    Value: !GetAtt CodePipelineRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-CodePipelineRoleArn'
+
+  FrontendCodeBuildRoleArn:
+    Description: 'ARN of the IAM role for frontend CodeBuild'
+    Value: !GetAtt FrontendCodeBuildRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-FrontendCodeBuildRoleArn'
+
+  BackendCodeBuildRoleArn:
+    Description: 'ARN of the IAM role for backend CodeBuild'
+    Value: !GetAtt BackendCodeBuildRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BackendCodeBuildRoleArn'
