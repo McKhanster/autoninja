@@ -13,13 +13,109 @@ from shared.persistence.s3_client import S3Client
 from shared.utils.logger import get_logger
 from shared.utils.agentcore_rate_limiter import apply_rate_limiting
 from shared.models.code_artifacts import CodeArtifacts
+import boto3
 
 
 # Initialize clients
 dynamodb_client = DynamoDBClient()
 s3_client = S3Client()
+bedrock_agent_runtime = boto3.client('bedrock-agent-runtime')
 logger = get_logger(__name__)
 foundational_model = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
+
+
+def invoke_bedrock_agent(agent_id: str, alias_id: str, session_id: str, input_text: str) -> str:
+    """Invoke Bedrock Agent and return response"""
+    try:
+        response = bedrock_agent_runtime.invoke_agent(
+            agentId=agent_id,
+            agentAliasId=alias_id,
+            sessionId=session_id,
+            inputText=input_text
+        )
+        
+        completion = ""
+        for event in response['completion']:
+            if 'chunk' in event:
+                completion += event['chunk']['bytes'].decode()
+        
+        return completion
+    except Exception as e:
+        logger.error(f"Bedrock Agent invocation failed: {e}")
+        raise
+
+
+def validate_requirements_structure(requirements: Dict[str, Any]) -> None:
+    """Validate requirements have expected structure"""
+    required_sections = ['executive_summary', 'for_solution_architect', 'for_code_generator', 
+                        'for_quality_validator', 'for_deployment_manager', 'validation_criteria']
+    
+    for section in required_sections:
+        if section not in requirements:
+            raise ValueError(f"Missing required section: {section}")
+
+
+def generate_fallback_requirements(user_request: str) -> Dict[str, Any]:
+    """Generate fallback requirements if AI parsing fails"""
+    return {
+        "executive_summary": {
+            "agent_name": f"Agent for {user_request}",
+            "purpose": f"Handle user request: {user_request}",
+            "business_value": "Automate user interactions",
+            "complexity_level": "medium",
+            "estimated_effort": "2-3 days"
+        },
+        "for_solution_architect": {
+            "performance_requirements": {
+                "response_time_ms": "2000",
+                "throughput_rpm": "100",
+                "availability_percent": "99.5%"
+            },
+            "integration_requirements": {
+                "external_apis": [],
+                "data_sources": ["Session state"],
+                "aws_services": ["Bedrock", "Lambda", "S3"]
+            }
+        },
+        "for_code_generator": {
+            "functional_specifications": {
+                "core_capabilities": ["Process user input", "Generate responses"],
+                "user_interaction_patterns": ["Text-based conversation"],
+                "input_validation": ["Basic input sanitization"]
+            },
+            "agent_personality": {
+                "tone": "Professional and helpful",
+                "expertise_level": "General knowledge",
+                "conversation_style": "Formal"
+            }
+        },
+        "for_quality_validator": {
+            "security_requirements": {
+                "authentication_method": "AWS IAM",
+                "data_protection": "Encryption at rest and in transit"
+            },
+            "quality_gates": {
+                "performance_benchmarks": ["Response time < 2s"],
+                "reliability_targets": ["99.5% uptime"]
+            }
+        },
+        "for_deployment_manager": {
+            "infrastructure_specifications": {
+                "compute_requirements": {
+                    "lambda_memory_mb": "512",
+                    "lambda_timeout_seconds": "60"
+                }
+            },
+            "operational_requirements": {
+                "monitoring_needs": ["CloudWatch metrics"],
+                "logging_requirements": ["Application logs"]
+            }
+        },
+        "validation_criteria": {
+            "success_metrics": ["Successful response generation"],
+            "acceptance_tests": ["Basic functionality test"]
+        }
+    }
 
 
 def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
@@ -173,30 +269,22 @@ def handle_extract_requirements(
         # Extract requirements from user request
         logger.info(f"Extracting requirements for job: {job_name}")
         
-        requirements = {
-            "agent_purpose": user_request,
-            "capabilities": ["Process user requests"],
-            "interactions": ["API-based"],
-            "data_needs": ["Session state"],
-            "integrations": ["AWS Bedrock Agent runtime"],
-            "system_prompts": f"You are an AI agent for: {user_request}",
-            "lambda_requirements": {
-                "runtime": "python3.12",
-                "memory": 512,
-                "timeout": 60,
-                "actions": [{"name": "primary_action", "description": "Main action"}]
-            },
-            "architecture_requirements": {
-                "compute": {"lambda_functions": 1, "memory_mb": 512, "timeout_seconds": 60},
-                "storage": {"dynamodb_tables": 0, "s3_buckets": 0},
-                "bedrock": {"agent_count": 1, "foundation_model": foundational_model, "action_groups": 1}
-            },
-            "deployment_requirements": {
-                "deployment_method": "cloudformation",
-                "region": "us-east-2"
-            },
-            "complexity": "low"
-        }
+        # Call Bedrock Agent with enhanced prompt
+        try:
+            bedrock_response = invoke_bedrock_agent(
+                agent_id=os.environ.get('BEDROCK_AGENT_ID'),
+                alias_id=os.environ.get('BEDROCK_AGENT_ALIAS_ID', 'TSTALIASID'),
+                session_id=session_id,
+                input_text=user_request
+            )
+            
+            # Parse AI response into structured format
+            requirements = json.loads(bedrock_response)
+            validate_requirements_structure(requirements)
+            
+        except (json.JSONDecodeError, KeyError, ValueError, Exception) as parse_error:
+            logger.warning(f"Failed to parse AI response: {parse_error}")
+            requirements = generate_fallback_requirements(user_request)
         
         # Prepare response
         result = {

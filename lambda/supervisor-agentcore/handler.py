@@ -152,6 +152,274 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
 
 
+def orchestrate_requirements_analyst(job_name: str, user_request: str) -> Dict[str, Any]:
+    """Orchestrate Requirements Analyst phase"""
+    try:
+        logger.info("=== STEP 1: Requirements Analyst ===")
+        
+        # Step 1a: Extract Requirements
+        logger.info("=== STEP 1a: Extract Requirements ===")
+        apply_rate_limiting('supervisor-to-requirements-extract')
+        
+        requirements_extract = invoke_agent_lambda(
+            'requirements-analyst',
+            '/extract-requirements',
+            job_name,
+            {'user_request': user_request}
+        )
+        
+        # Step 1b: Analyze Complexity
+        logger.info("=== STEP 1b: Analyze Complexity ===")
+        apply_rate_limiting('requirements-extract-to-complexity')
+        
+        complexity_analysis = invoke_agent_lambda(
+            'requirements-analyst',
+            '/analyze-complexity',
+            job_name,
+            {'requirements': json.dumps(requirements_extract)}
+        )
+        
+        # Step 1c: Validate Requirements
+        logger.info("=== STEP 1c: Validate Requirements ===")
+        apply_rate_limiting('complexity-to-validation')
+        
+        requirements_validation = invoke_agent_lambda(
+            'requirements-analyst',
+            '/validate-requirements',
+            job_name,
+            {'requirements': json.dumps(requirements_extract)}
+        )
+        
+        return {
+            'extract': requirements_extract,
+            'complexity': complexity_analysis,
+            'validation': requirements_validation
+        }
+        
+    except Exception as e:
+        logger.error(f"Requirements Analyst phase failed: {str(e)}")
+        raise ValueError(f"Requirements analysis failed: {str(e)}")
+
+
+def orchestrate_solution_architect(job_name: str, req_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Orchestrate Solution Architect phase"""
+    try:
+        logger.info("=== STEP 2: Solution Architect ===")
+        
+        # Step 2a: Design Architecture
+        logger.info("=== STEP 2a: Design Architecture ===")
+        apply_rate_limiting('requirements-to-architecture-design')
+        
+        architecture_design = invoke_agent_lambda(
+            'solution-architect',
+            '/design-architecture',
+            job_name,
+            req_data['for_solution_architect']
+        )
+        
+        # Step 2b: Select Services
+        logger.info("=== STEP 2b: Select Services ===")
+        apply_rate_limiting('architecture-design-to-services')
+        
+        service_selection = invoke_agent_lambda(
+            'solution-architect',
+            '/select-services',
+            job_name,
+            req_data['for_solution_architect']
+        )
+        
+        # Step 2c: Generate IaC
+        logger.info("=== STEP 2c: Generate Infrastructure as Code ===")
+        apply_rate_limiting('services-to-iac')
+        
+        iac_generation = invoke_agent_lambda(
+            'solution-architect',
+            '/generate-iac',
+            job_name,
+            req_data['for_solution_architect']
+        )
+        
+        return {
+            'design': architecture_design,
+            'services': service_selection,
+            'iac': iac_generation
+        }
+        
+    except Exception as e:
+        logger.error(f"Solution Architect phase failed: {str(e)}")
+        raise ValueError(f"Architecture design failed: {str(e)}")
+
+
+def orchestrate_code_generator(job_name: str, req_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Orchestrate Code Generator phase"""
+    try:
+        logger.info("=== STEP 3: Code Generator ===")
+        
+        # Step 3a: Generate Lambda Code
+        logger.info("=== STEP 3a: Generate Lambda Code ===")
+        apply_rate_limiting('architecture-to-lambda-code')
+        
+        lambda_code = invoke_agent_lambda(
+            'code-generator',
+            '/generate-lambda-code',
+            job_name,
+            req_data['for_code_generator']
+        )
+        
+        # Step 3b: Generate Agent Config
+        logger.info("=== STEP 3b: Generate Agent Config ===")
+        apply_rate_limiting('lambda-code-to-agent-config')
+        
+        agent_config = invoke_agent_lambda(
+            'code-generator',
+            '/generate-agent-config',
+            job_name,
+            req_data['for_code_generator']
+        )
+        
+        # Step 3c: Generate OpenAPI Schema
+        logger.info("=== STEP 3c: Generate OpenAPI Schema ===")
+        apply_rate_limiting('agent-config-to-openapi')
+        
+        openapi_schema = invoke_agent_lambda(
+            'code-generator',
+            '/generate-openapi-schema',
+            job_name,
+            req_data['for_code_generator']
+        )
+        
+        return {
+            'lambda_code': lambda_code,
+            'agent_config': agent_config,
+            'openapi_schema': openapi_schema
+        }
+        
+    except Exception as e:
+        logger.error(f"Code Generator phase failed: {str(e)}")
+        raise ValueError(f"Code generation failed: {str(e)}")
+
+
+def orchestrate_quality_validator(job_name: str, req_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Orchestrate Quality Validator phase"""
+    try:
+        logger.info("=== STEP 4: Quality Validator ===")
+        
+        # Step 4a: Validate Code
+        logger.info("=== STEP 4a: Validate Code ===")
+        apply_rate_limiting('code-to-validation')
+        
+        code_validation = invoke_agent_lambda(
+            'quality-validator',
+            '/validate-code',
+            job_name,
+            req_data['for_quality_validator']
+        )
+        
+        # Step 4b: Security Scan
+        logger.info("=== STEP 4b: Security Scan ===")
+        apply_rate_limiting('validation-to-security')
+        
+        security_scan = invoke_agent_lambda(
+            'quality-validator',
+            '/security-scan',
+            job_name,
+            req_data['for_quality_validator']
+        )
+        
+        # Step 4c: Compliance Check
+        logger.info("=== STEP 4c: Compliance Check ===")
+        apply_rate_limiting('security-to-compliance')
+        
+        compliance_check = invoke_agent_lambda(
+            'quality-validator',
+            '/compliance-check',
+            job_name,
+            req_data['for_quality_validator']
+        )
+        
+        return {
+            'code_validation': code_validation,
+            'security_scan': security_scan,
+            'compliance_check': compliance_check,
+            'is_valid': code_validation.get('is_valid', False)
+        }
+        
+    except Exception as e:
+        logger.error(f"Quality Validator phase failed: {str(e)}")
+        raise ValueError(f"Quality validation failed: {str(e)}")
+
+
+def orchestrate_deployment_manager(job_name: str, req_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Orchestrate Deployment Manager phase"""
+    try:
+        logger.info("=== STEP 5: Deployment Manager ===")
+        
+        # Step 5a: Generate CloudFormation
+        logger.info("=== STEP 5a: Generate CloudFormation ===")
+        apply_rate_limiting('validation-to-cloudformation')
+        
+        cloudformation_gen = invoke_agent_lambda(
+            'deployment-manager',
+            '/generate-cloudformation',
+            job_name,
+            req_data['for_deployment_manager']
+        )
+        
+        # Step 5b: Deploy Stack
+        logger.info("=== STEP 5b: Deploy Stack ===")
+        apply_rate_limiting('cloudformation-to-deploy')
+        
+        stack_deployment = invoke_agent_lambda(
+            'deployment-manager',
+            '/deploy-stack',
+            job_name,
+            {
+                'cloudformation_template': json.dumps(cloudformation_gen) if isinstance(cloudformation_gen, dict) else str(cloudformation_gen),
+                'stack_name': f"{job_name}-stack"
+            }
+        )
+        
+        # Step 5c: Configure Agent
+        logger.info("=== STEP 5c: Configure Agent ===")
+        apply_rate_limiting('deploy-to-configure')
+        
+        agent_configuration = invoke_agent_lambda(
+            'deployment-manager',
+            '/configure-agent',
+            job_name,
+            {
+                'agent_config': json.dumps(req_data['for_code_generator']) if isinstance(req_data['for_code_generator'], dict) else str(req_data['for_code_generator']),
+                'lambda_arns': json.dumps(stack_deployment) if isinstance(stack_deployment, dict) else str(stack_deployment)
+            }
+        )
+        
+        # Step 5d: Test Deployment
+        logger.info("=== STEP 5d: Test Deployment ===")
+        apply_rate_limiting('configure-to-test')
+        
+        deployment_test = invoke_agent_lambda(
+            'deployment-manager',
+            '/test-deployment',
+            job_name,
+            {
+                'agent_id': agent_configuration.get('agent_id') if isinstance(agent_configuration, dict) else 'test-agent-id',
+                'alias_id': agent_configuration.get('alias_id') if isinstance(agent_configuration, dict) else 'test-alias-id',
+                'test_inputs': json.dumps(req_data['for_deployment_manager']) if isinstance(req_data['for_deployment_manager'], dict) else str(req_data['for_deployment_manager'])
+            }
+        )
+        
+        return {
+            'cloudformation': cloudformation_gen,
+            'stack_deployment': stack_deployment,
+            'agent_configuration': agent_configuration,
+            'deployment_test': deployment_test
+        }
+        
+    except Exception as e:
+        logger.error(f"Deployment Manager phase failed: {str(e)}")
+        raise ValueError(f"Deployment failed: {str(e)}")
+
+
 def handle_orchestrate(
     event: Dict[str, Any],
     params: Dict[str, str],
@@ -160,7 +428,7 @@ def handle_orchestrate(
 ) -> Dict[str, Any]:
     """
     Handle orchestrate action.
-    Orchestrates 5 collaborator agents using direct Lambda invocation with AgentCore Memory rate limiting.
+    Orchestrates 5 agents using modular functions with proper error handling.
     
     Args:
         event: Full Bedrock Agent event
@@ -190,326 +458,62 @@ def handle_orchestrate(
     )['timestamp']
     
     try:
-        logger.info(f"Starting direct Lambda orchestration for job: {job_name}")
+        logger.info(f"Starting modular orchestration for job: {job_name}")
         logger.info(f"User request: {user_request}")
         
-        results = {}
+        # Step 1: Requirements Analyst
+        requirements = orchestrate_requirements_analyst(job_name, user_request)
+        logger.info("Requirements Analyst phase completed")
         
-        # Step 1: Requirements Analyst (3 sequential calls)
-        logger.info("=== STEP 1: Requirements Analyst ===")
+        # Validate requirements structure
+        if not requirements.get('extract') or not isinstance(requirements['extract'], dict):
+            raise ValueError("Requirements Analyst returned invalid or empty requirements")
         
-        # Step 1a: Extract Requirements
-        logger.info("=== STEP 1a: Extract Requirements ===")
-        apply_rate_limiting('supervisor-to-requirements-extract')
+        req_data = requirements['extract']
         
-        requirements_extract = invoke_agent_lambda(
-            'requirements-analyst',
-            '/extract-requirements',
-            job_name,
-            {'user_request': user_request}
-        )
-        logger.info(f"Requirements extraction completed: {type(requirements_extract).__name__}")
+        # Validate required sections for downstream agents
+        required_sections = ['for_solution_architect', 'for_code_generator', 'for_quality_validator', 'for_deployment_manager']
+        missing_sections = [section for section in required_sections if section not in req_data]
+        if missing_sections:
+            raise ValueError(f"Requirements missing sections: {missing_sections}")
         
-        # Step 1b: Analyze Complexity
-        logger.info("=== STEP 1b: Analyze Complexity ===")
-        apply_rate_limiting('requirements-extract-to-complexity')
+        # Step 2: Solution Architect
+        architecture = orchestrate_solution_architect(job_name, req_data)
+        logger.info("Solution Architect phase completed")
         
-        complexity_analysis = invoke_agent_lambda(
-            'requirements-analyst',
-            '/analyze-complexity',
-            job_name,
-            {
-                'requirements': json.dumps(requirements_extract) if isinstance(requirements_extract, dict) else str(requirements_extract)
-            }
-        )
-        logger.info(f"Complexity analysis completed: {type(complexity_analysis).__name__}")
+        # Step 3: Code Generator
+        code = orchestrate_code_generator(job_name, req_data)
+        logger.info("Code Generator phase completed")
         
-        # Step 1c: Validate Requirements
-        logger.info("=== STEP 1c: Validate Requirements ===")
-        apply_rate_limiting('complexity-to-validation')
+        # Step 4: Quality Validator
+        validation = orchestrate_quality_validator(job_name, req_data)
+        logger.info(f"Quality Validator phase completed: is_valid={validation.get('is_valid')}")
         
-        requirements_validation = invoke_agent_lambda(
-            'requirements-analyst',
-            '/validate-requirements',
-            job_name,
-            {
-                'requirements': json.dumps(requirements_extract) if isinstance(requirements_extract, dict) else str(requirements_extract)
-            }
-        )
-        logger.info(f"Requirements validation completed: is_valid={requirements_validation.get('is_valid')}")
-        
-        # Combine all Requirements Analyst results
-        requirements = {
-            'extract': requirements_extract,
-            'complexity': complexity_analysis,
-            'validation': requirements_validation
-        }
-        results['requirements'] = requirements
-        logger.info(f"Requirements Analyst phase completed with 3 interactions")
-        
-        # Step 2: Solution Architect (3 sequential calls)
-        logger.info("=== STEP 2: Solution Architect ===")
-        
-        # Step 2a: Design Architecture
-        logger.info("=== STEP 2a: Design Architecture ===")
-        apply_rate_limiting('requirements-to-architecture-design')
-        
-        architecture_design = invoke_agent_lambda(
-            'solution-architect',
-            '/design-architecture',
-            job_name,
-            {
-                'requirements': json.dumps(requirements['extract']) if isinstance(requirements['extract'], dict) else str(requirements['extract']),
-                'code_file_references': '{}'
-            }
-        )
-        logger.info(f"Architecture design completed: {type(architecture_design).__name__}")
-        
-        # Step 2b: Select Services
-        logger.info("=== STEP 2b: Select Services ===")
-        apply_rate_limiting('architecture-design-to-services')
-        
-        service_selection = invoke_agent_lambda(
-            'solution-architect',
-            '/select-services',
-            job_name,
-            {
-                'requirements': json.dumps(requirements['extract']) if isinstance(requirements['extract'], dict) else str(requirements['extract'])
-            }
-        )
-        logger.info(f"Service selection completed: {type(service_selection).__name__}")
-        
-        # Step 2c: Generate IaC
-        logger.info("=== STEP 2c: Generate Infrastructure as Code ===")
-        apply_rate_limiting('services-to-iac')
-        
-        iac_generation = invoke_agent_lambda(
-            'solution-architect',
-            '/generate-iac',
-            job_name,
-            {
-                'architecture': json.dumps(architecture_design) if isinstance(architecture_design, dict) else str(architecture_design),
-                'code_references': '{}'
-            }
-        )
-        logger.info(f"IaC generation completed: {type(iac_generation).__name__}")
-        
-        # Combine all Solution Architect results
-        architecture = {
-            'design': architecture_design,
-            'services': service_selection,
-            'iac': iac_generation
-        }
-        results['architecture'] = architecture
-        logger.info(f"Solution Architect phase completed with 3 interactions")
-        
-        # Step 3: Code Generator (3 sequential calls)
-        logger.info("=== STEP 3: Code Generator ===")
-        
-        # Step 3a: Generate Lambda Code
-        logger.info("=== STEP 3a: Generate Lambda Code ===")
-        apply_rate_limiting('architecture-to-lambda-code')
-        
-        lambda_code = invoke_agent_lambda(
-            'code-generator',
-            '/generate-lambda-code',
-            job_name,
-            {
-                'requirements': json.dumps(requirements['extract']) if isinstance(requirements['extract'], dict) else str(requirements['extract']),
-                'function_spec': json.dumps(architecture['design']) if isinstance(architecture['design'], dict) else str(architecture['design'])
-            }
-        )
-        logger.info(f"Lambda code generation completed: {type(lambda_code).__name__}")
-        
-        # Step 3b: Generate Agent Config
-        logger.info("=== STEP 3b: Generate Agent Config ===")
-        apply_rate_limiting('lambda-code-to-agent-config')
-        
-        agent_config = invoke_agent_lambda(
-            'code-generator',
-            '/generate-agent-config',
-            job_name,
-            {
-                'requirements': json.dumps(requirements['extract']) if isinstance(requirements['extract'], dict) else str(requirements['extract'])
-            }
-        )
-        logger.info(f"Agent config generation completed: {type(agent_config).__name__}")
-        
-        # Step 3c: Generate OpenAPI Schema
-        logger.info("=== STEP 3c: Generate OpenAPI Schema ===")
-        apply_rate_limiting('agent-config-to-openapi')
-        
-        openapi_schema = invoke_agent_lambda(
-            'code-generator',
-            '/generate-openapi-schema',
-            job_name,
-            {
-                'action_group_spec': json.dumps(agent_config) if isinstance(agent_config, dict) else str(agent_config)
-            }
-        )
-        logger.info(f"OpenAPI schema generation completed: {type(openapi_schema).__name__}")
-        
-        # Combine all Code Generator results
-        code = {
-            'lambda_code': lambda_code,
-            'agent_config': agent_config,
-            'openapi_schema': openapi_schema
-        }
-        results['code'] = code
-        logger.info(f"Code Generator phase completed with 3 interactions")
-        
-        # Step 4: Quality Validator (3 sequential calls)
-        logger.info("=== STEP 4: Quality Validator ===")
-        
-        # Step 4a: Validate Code
-        logger.info("=== STEP 4a: Validate Code ===")
-        apply_rate_limiting('code-to-validation')
-        
-        code_validation = invoke_agent_lambda(
-            'quality-validator',
-            '/validate-code',
-            job_name,
-            {
-                'code': json.dumps(code['lambda_code']) if isinstance(code['lambda_code'], dict) else str(code['lambda_code']),
-                'language': 'python'
-            }
-        )
-        logger.info(f"Code validation completed: is_valid={code_validation.get('is_valid')}")
-        
-        # Step 4b: Security Scan
-        logger.info("=== STEP 4b: Security Scan ===")
-        apply_rate_limiting('validation-to-security')
-        
-        security_scan = invoke_agent_lambda(
-            'quality-validator',
-            '/security-scan',
-            job_name,
-            {
-                'code': json.dumps(code['lambda_code']) if isinstance(code['lambda_code'], dict) else str(code['lambda_code']),
-                'architecture': json.dumps(architecture['design']) if isinstance(architecture['design'], dict) else str(architecture['design'])
-            }
-        )
-        logger.info(f"Security scan completed: {type(security_scan).__name__}")
-        
-        # Step 4c: Compliance Check
-        logger.info("=== STEP 4c: Compliance Check ===")
-        apply_rate_limiting('security-to-compliance')
-        
-        compliance_check = invoke_agent_lambda(
-            'quality-validator',
-            '/compliance-check',
-            job_name,
-            {
-                'code': json.dumps(code['lambda_code']) if isinstance(code['lambda_code'], dict) else str(code['lambda_code']),
-                'requirements': json.dumps(requirements['extract']) if isinstance(requirements['extract'], dict) else str(requirements['extract'])
-            }
-        )
-        logger.info(f"Compliance check completed: {type(compliance_check).__name__}")
-        
-        # Combine all Quality Validator results
-        validation = {
-            'code_validation': code_validation,
-            'security_scan': security_scan,
-            'compliance_check': compliance_check,
-            'is_valid': code_validation.get('is_valid', False)  # Overall validation status
-        }
-        results['validation'] = validation
-        logger.info(f"Quality Validator phase completed with 3 interactions: is_valid={validation.get('is_valid')}")
-        
-        # Step 5: Deployment Manager (4 sequential calls - only if validation passes)
+        # Step 5: Deployment Manager (only if validation passes)
         if validation.get('is_valid', False):
-            logger.info("=== STEP 5: Deployment Manager (Validation Passed) ===")
-            
-            # Step 5a: Generate CloudFormation
-            logger.info("=== STEP 5a: Generate CloudFormation ===")
-            apply_rate_limiting('validation-to-cloudformation')
-            
-            cloudformation_gen = invoke_agent_lambda(
-                'deployment-manager',
-                '/generate-cloudformation',
-                job_name,
-                {
-                    'requirements': json.dumps(requirements['extract']) if isinstance(requirements['extract'], dict) else str(requirements['extract']),
-                    'code': json.dumps(code['lambda_code']) if isinstance(code['lambda_code'], dict) else str(code['lambda_code']),
-                    'architecture': json.dumps(architecture['design']) if isinstance(architecture['design'], dict) else str(architecture['design']),
-                    'validation_status': 'passed'
-                }
-            )
-            logger.info(f"CloudFormation generation completed: {type(cloudformation_gen).__name__}")
-            
-            # Step 5b: Deploy Stack
-            logger.info("=== STEP 5b: Deploy Stack ===")
-            apply_rate_limiting('cloudformation-to-deploy')
-            
-            stack_deployment = invoke_agent_lambda(
-                'deployment-manager',
-                '/deploy-stack',
-                job_name,
-                {
-                    'cloudformation_template': json.dumps(cloudformation_gen) if isinstance(cloudformation_gen, dict) else str(cloudformation_gen),
-                    'stack_name': f"{job_name}-stack"
-                }
-            )
-            logger.info(f"Stack deployment completed: {type(stack_deployment).__name__}")
-            
-            # Step 5c: Configure Agent
-            logger.info("=== STEP 5c: Configure Agent ===")
-            apply_rate_limiting('deploy-to-configure')
-            
-            agent_configuration = invoke_agent_lambda(
-                'deployment-manager',
-                '/configure-agent',
-                job_name,
-                {
-                    'agent_config': json.dumps(code['agent_config']) if isinstance(code['agent_config'], dict) else str(code['agent_config']),
-                    'lambda_arns': json.dumps(stack_deployment) if isinstance(stack_deployment, dict) else str(stack_deployment)
-                }
-            )
-            logger.info(f"Agent configuration completed: {type(agent_configuration).__name__}")
-            
-            # Step 5d: Test Deployment
-            logger.info("=== STEP 5d: Test Deployment ===")
-            apply_rate_limiting('configure-to-test')
-            
-            deployment_test = invoke_agent_lambda(
-                'deployment-manager',
-                '/test-deployment',
-                job_name,
-                {
-                    'agent_id': agent_configuration.get('agent_id') if isinstance(agent_configuration, dict) else 'test-agent-id',
-                    'alias_id': agent_configuration.get('alias_id') if isinstance(agent_configuration, dict) else 'test-alias-id',
-                    'test_inputs': json.dumps(requirements['extract']) if isinstance(requirements['extract'], dict) else str(requirements['extract'])
-                }
-            )
-            logger.info(f"Deployment testing completed: {type(deployment_test).__name__}")
-            
-            # Combine all Deployment Manager results
-            deployment = {
-                'cloudformation': cloudformation_gen,
-                'stack_deployment': stack_deployment,
-                'agent_configuration': agent_configuration,
-                'deployment_test': deployment_test
-            }
-            results['deployment'] = deployment
-            logger.info(f"Deployment Manager phase completed with 4 interactions")
+            logger.info("=== VALIDATION PASSED: Proceeding to Deployment ===")
+            deployment = orchestrate_deployment_manager(job_name, req_data)
+            logger.info("Deployment Manager phase completed")
             
             final_result = {
                 "job_name": job_name,
                 "status": "deployed",
-                "agent_arn": deployment.get('agent_configuration', {}).get('agent_arn', 'generated'),
-                "results": results,
-                "workflow_completed": True
+                "requirements": requirements,
+                "architecture": architecture,
+                "code": code,
+                "validation": validation,
+                "deployment": deployment
             }
-            logger.info(f"=== ORCHESTRATION COMPLETED SUCCESSFULLY ===")
-            
         else:
-            logger.warning("=== ORCHESTRATION STOPPED: Validation Failed ===")
+            logger.warning("=== VALIDATION FAILED: Skipping Deployment ===")
             final_result = {
                 "job_name": job_name,
                 "status": "validation_failed",
-                "validation_issues": validation.get('issues', []),
-                "results": results,
-                "workflow_completed": False
+                "requirements": requirements,
+                "architecture": architecture,
+                "code": code,
+                "validation": validation,
+                "deployment": None
             }
         
         # Log final output to DynamoDB
