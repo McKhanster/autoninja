@@ -36,3 +36,38 @@ paths:
                     type: string
                   agent_arn:
                     type: string
+
+  # /getJobName:
+  #   post:
+  #     summary: Generate job name for a user request
+  #     description: Returns the job_name that would be generated for a given user request without starting orchestration
+  #     operationId: getJobName
+  #     requestBody:
+  #       required: true
+  #       content:
+  #         application/json:
+  #           schema:
+  #             type: object
+  #             required:
+  #               - user_request
+  #             properties:
+  #               user_request:
+  #                 type: string
+  #                 description: User request for agent creation
+      # responses:
+      #   '200':
+      #     description: Job name generated
+      #     content:
+      #       application/json:
+      #         schema:
+      #           type: object
+      #           required:
+      #             - job_name
+      #             - user_request
+      #           properties:
+      #             job_name:
+      #               type: string
+      #               description: Generated unique job identifier
+      #             user_request:
+      #               type: string
+      #               description: Original user request

@@ -69,7 +69,12 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         # Convert properties array to dict
         params = {prop['name']: prop['value'] for prop in properties}
-        job_name = params.get('job_name', 'unknown')
+        job_name = params.get('job_name')
+        
+        # Generate job_name if not provided or unknown
+        if not job_name or job_name == 'unknown':
+            user_request = params.get('user_request', '')
+            job_name = generate_job_name(user_request) if user_request else f"job-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         
         # Set logger context
         logger.set_context(
@@ -80,6 +85,9 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         # Apply rate limiting before processing
         apply_rate_limiting('supervisor')
+        
+        # Add job_name to params for downstream handlers
+        params['job_name'] = job_name
         
         # Log raw input to DynamoDB immediately
         raw_request = json.dumps(event, default=str)
@@ -152,271 +160,176 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
 
 
-def orchestrate_requirements_analyst(job_name: str, user_request: str) -> Dict[str, Any]:
-    """Orchestrate Requirements Analyst phase"""
+def orchestrate_requirements_analyst(job_name: str, user_request: str, max_retries: int = 2) -> Dict[str, Any]:
+    """Orchestrate Requirements Analyst with quality gate and retry logic"""
+    # Import the requirements analyst module
+    from collaborators import requirements_analyst
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"=== Requirements Analyst (Attempt {attempt + 1}/{max_retries}) ===")
+            
+            # Call requirements analyst module directly
+            session_id = f"{job_name}-requirements-analyst"
+            result = requirements_analyst.analyze(job_name, user_request, session_id)
+            
+            requirements = result.get('requirements', {})
+            
+            # Rate limit before QV call
+            apply_rate_limiting('requirements-to-validation')
+            
+            # Quality Gate: Validate with QV
+            logger.info("Quality Gate: Validating requirements...")
+            from collaborators import quality_validator
+            validation = quality_validator.validate(
+                job_name=job_name,
+                validation_type='requirements',
+                data=requirements,
+                session_id=f"{job_name}-qv-requirements"
+            )
+            
+            if validation.get('is_valid', False):
+                logger.info("✓ Requirements approved by Quality Validator")
+                return requirements
+            else:
+                logger.warning(f"✗ Requirements validation failed: {validation.get('issues', [])}")
+                if attempt < max_retries - 1:
+                    logger.info("Retrying requirements analysis...")
+                    continue
+                else:
+                    raise ValueError(f"Requirements validation failed after {max_retries} attempts")
+                    
+        except Exception as e:
+            logger.error(f"Requirements Analyst attempt {attempt + 1} failed: {str(e)}")
+            if attempt < max_retries - 1:
+                continue
+            else:
+                raise ValueError(f"Requirements analysis failed after {max_retries} attempts: {str(e)}")
+
+
+def orchestrate_solution_architect(job_name: str, requirements: Dict[str, Any], max_retries: int = 2) -> Dict[str, Any]:
+    """Orchestrate Solution Architect with quality gate and retry logic"""
+    from collaborators import solution_architect
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"=== Solution Architect (Attempt {attempt + 1}/{max_retries}) ===")
+            
+            # Call solution architect module directly
+            session_id = f"{job_name}-solution-architect"
+            result = solution_architect.design(
+                job_name, 
+                requirements.get('for_solution_architect', requirements),
+                session_id
+            )
+            
+            architecture = result.get('architecture', {})
+            
+            # Rate limit before QV call
+            apply_rate_limiting('architecture-to-validation')
+            
+            # Quality Gate: Validate with QV
+            logger.info("Quality Gate: Validating architecture...")
+            from collaborators import quality_validator
+            validation = quality_validator.validate(
+                job_name=job_name,
+                validation_type='architecture',
+                data=architecture,
+                requirements=requirements,
+                session_id=f"{job_name}-qv-architecture"
+            )
+            
+            if validation.get('is_valid', False):
+                logger.info("✓ Architecture approved by Quality Validator")
+                return architecture
+            else:
+                logger.warning(f"✗ Architecture validation failed: {validation.get('issues', [])}")
+                if attempt < max_retries - 1:
+                    logger.info("Retrying architecture design...")
+                    continue
+                else:
+                    raise ValueError(f"Architecture validation failed after {max_retries} attempts")
+                    
+        except Exception as e:
+            logger.error(f"Solution Architect attempt {attempt + 1} failed: {str(e)}")
+            if attempt < max_retries - 1:
+                continue
+            else:
+                raise ValueError(f"Architecture design failed after {max_retries} attempts: {str(e)}")
+
+
+def orchestrate_code_generator(job_name: str, requirements: Dict[str, Any], architecture: Dict[str, Any], max_retries: int = 2) -> Dict[str, Any]:
+    """Orchestrate Code Generator with quality gate and retry logic"""
+    from collaborators import code_generator
+    
+    for attempt in range(max_retries):
+        try:
+            logger.info(f"=== Code Generator (Attempt {attempt + 1}/{max_retries}) ===")
+            
+            # Call code generator module directly
+            session_id = f"{job_name}-code-generator"
+            result = code_generator.generate(
+                job_name,
+                requirements.get('for_code_generator', requirements),
+                architecture.get('for_code_generator', architecture),
+                session_id
+            )
+            
+            code = result.get('code', {})
+            
+            # Rate limit before QV call
+            apply_rate_limiting('code-to-validation')
+            
+            # Quality Gate: Validate with QV
+            logger.info("Quality Gate: Validating code...")
+            from collaborators import quality_validator
+            validation = quality_validator.validate(
+                job_name=job_name,
+                validation_type='code',
+                data=code,
+                requirements=requirements,
+                architecture=architecture,
+                session_id=f"{job_name}-qv-code"
+            )
+            
+            if validation.get('is_valid', False):
+                logger.info("✓ Code approved by Quality Validator")
+                return code
+            else:
+                logger.warning(f"✗ Code validation failed: {validation.get('issues', [])}")
+                if attempt < max_retries - 1:
+                    logger.info("Retrying code generation...")
+                    continue
+                else:
+                    raise ValueError(f"Code validation failed after {max_retries} attempts")
+                    
+        except Exception as e:
+            logger.error(f"Code Generator attempt {attempt + 1} failed: {str(e)}")
+            if attempt < max_retries - 1:
+                continue
+            else:
+                raise ValueError(f"Code generation failed after {max_retries} attempts: {str(e)}")
+
+
+def orchestrate_deployment_manager(job_name: str, code: Dict[str, Any]) -> Dict[str, Any]:
+    """Orchestrate Deployment Manager - single deploy action"""
+    from collaborators import deployment_manager
+    
     try:
-        logger.info("=== STEP 1: Requirements Analyst ===")
+        logger.info("=== Deployment Manager ===")
         
-        # Step 1a: Extract Requirements
-        logger.info("=== STEP 1a: Extract Requirements ===")
-        apply_rate_limiting('supervisor-to-requirements-extract')
+        # Rate limit before DM call
+        apply_rate_limiting('code-to-deployment')
         
-        requirements_extract = invoke_agent_lambda(
-            'requirements-analyst',
-            '/extract-requirements',
-            job_name,
-            {'user_request': user_request}
-        )
+        # Call deployment manager module directly
+        session_id = f"{job_name}-deployment-manager"
+        result = deployment_manager.deploy(job_name, code, session_id)
         
-        # Step 1b: Analyze Complexity
-        logger.info("=== STEP 1b: Analyze Complexity ===")
-        apply_rate_limiting('requirements-extract-to-complexity')
-        
-        complexity_analysis = invoke_agent_lambda(
-            'requirements-analyst',
-            '/analyze-complexity',
-            job_name,
-            {'requirements': json.dumps(requirements_extract)}
-        )
-        
-        # Step 1c: Validate Requirements
-        logger.info("=== STEP 1c: Validate Requirements ===")
-        apply_rate_limiting('complexity-to-validation')
-        
-        requirements_validation = invoke_agent_lambda(
-            'requirements-analyst',
-            '/validate-requirements',
-            job_name,
-            {'requirements': json.dumps(requirements_extract)}
-        )
-        
-        return {
-            'extract': requirements_extract,
-            'complexity': complexity_analysis,
-            'validation': requirements_validation
-        }
+        logger.info(f"Deployment completed: {result.get('stack_status')}")
+        return result
         
     except Exception as e:
-        logger.error(f"Requirements Analyst phase failed: {str(e)}")
-        raise ValueError(f"Requirements analysis failed: {str(e)}")
-
-
-def orchestrate_solution_architect(job_name: str, req_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Orchestrate Solution Architect phase"""
-    try:
-        logger.info("=== STEP 2: Solution Architect ===")
-        
-        # Step 2a: Design Architecture
-        logger.info("=== STEP 2a: Design Architecture ===")
-        apply_rate_limiting('requirements-to-architecture-design')
-        
-        architecture_design = invoke_agent_lambda(
-            'solution-architect',
-            '/design-architecture',
-            job_name,
-            req_data['for_solution_architect']
-        )
-        
-        # Step 2b: Select Services
-        logger.info("=== STEP 2b: Select Services ===")
-        apply_rate_limiting('architecture-design-to-services')
-        
-        service_selection = invoke_agent_lambda(
-            'solution-architect',
-            '/select-services',
-            job_name,
-            req_data['for_solution_architect']
-        )
-        
-        # Step 2c: Generate IaC
-        logger.info("=== STEP 2c: Generate Infrastructure as Code ===")
-        apply_rate_limiting('services-to-iac')
-        
-        iac_generation = invoke_agent_lambda(
-            'solution-architect',
-            '/generate-iac',
-            job_name,
-            req_data['for_solution_architect']
-        )
-        
-        return {
-            'design': architecture_design,
-            'services': service_selection,
-            'iac': iac_generation
-        }
-        
-    except Exception as e:
-        logger.error(f"Solution Architect phase failed: {str(e)}")
-        raise ValueError(f"Architecture design failed: {str(e)}")
-
-
-def orchestrate_code_generator(job_name: str, req_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Orchestrate Code Generator phase"""
-    try:
-        logger.info("=== STEP 3: Code Generator ===")
-        
-        # Step 3a: Generate Lambda Code
-        logger.info("=== STEP 3a: Generate Lambda Code ===")
-        apply_rate_limiting('architecture-to-lambda-code')
-        
-        lambda_code = invoke_agent_lambda(
-            'code-generator',
-            '/generate-lambda-code',
-            job_name,
-            req_data['for_code_generator']
-        )
-        
-        # Step 3b: Generate Agent Config
-        logger.info("=== STEP 3b: Generate Agent Config ===")
-        apply_rate_limiting('lambda-code-to-agent-config')
-        
-        agent_config = invoke_agent_lambda(
-            'code-generator',
-            '/generate-agent-config',
-            job_name,
-            req_data['for_code_generator']
-        )
-        
-        # Step 3c: Generate OpenAPI Schema
-        logger.info("=== STEP 3c: Generate OpenAPI Schema ===")
-        apply_rate_limiting('agent-config-to-openapi')
-        
-        openapi_schema = invoke_agent_lambda(
-            'code-generator',
-            '/generate-openapi-schema',
-            job_name,
-            req_data['for_code_generator']
-        )
-        
-        return {
-            'lambda_code': lambda_code,
-            'agent_config': agent_config,
-            'openapi_schema': openapi_schema
-        }
-        
-    except Exception as e:
-        logger.error(f"Code Generator phase failed: {str(e)}")
-        raise ValueError(f"Code generation failed: {str(e)}")
-
-
-def orchestrate_quality_validator(job_name: str, req_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Orchestrate Quality Validator phase"""
-    try:
-        logger.info("=== STEP 4: Quality Validator ===")
-        
-        # Step 4a: Validate Code
-        logger.info("=== STEP 4a: Validate Code ===")
-        apply_rate_limiting('code-to-validation')
-        
-        code_validation = invoke_agent_lambda(
-            'quality-validator',
-            '/validate-code',
-            job_name,
-            req_data['for_quality_validator']
-        )
-        
-        # Step 4b: Security Scan
-        logger.info("=== STEP 4b: Security Scan ===")
-        apply_rate_limiting('validation-to-security')
-        
-        security_scan = invoke_agent_lambda(
-            'quality-validator',
-            '/security-scan',
-            job_name,
-            req_data['for_quality_validator']
-        )
-        
-        # Step 4c: Compliance Check
-        logger.info("=== STEP 4c: Compliance Check ===")
-        apply_rate_limiting('security-to-compliance')
-        
-        compliance_check = invoke_agent_lambda(
-            'quality-validator',
-            '/compliance-check',
-            job_name,
-            req_data['for_quality_validator']
-        )
-        
-        return {
-            'code_validation': code_validation,
-            'security_scan': security_scan,
-            'compliance_check': compliance_check,
-            'is_valid': code_validation.get('is_valid', False)
-        }
-        
-    except Exception as e:
-        logger.error(f"Quality Validator phase failed: {str(e)}")
-        raise ValueError(f"Quality validation failed: {str(e)}")
-
-
-def orchestrate_deployment_manager(job_name: str, req_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Orchestrate Deployment Manager phase"""
-    try:
-        logger.info("=== STEP 5: Deployment Manager ===")
-        
-        # Step 5a: Generate CloudFormation
-        logger.info("=== STEP 5a: Generate CloudFormation ===")
-        apply_rate_limiting('validation-to-cloudformation')
-        
-        cloudformation_gen = invoke_agent_lambda(
-            'deployment-manager',
-            '/generate-cloudformation',
-            job_name,
-            req_data['for_deployment_manager']
-        )
-        
-        # Step 5b: Deploy Stack
-        logger.info("=== STEP 5b: Deploy Stack ===")
-        apply_rate_limiting('cloudformation-to-deploy')
-        
-        stack_deployment = invoke_agent_lambda(
-            'deployment-manager',
-            '/deploy-stack',
-            job_name,
-            {
-                'cloudformation_template': json.dumps(cloudformation_gen) if isinstance(cloudformation_gen, dict) else str(cloudformation_gen),
-                'stack_name': f"{job_name}-stack"
-            }
-        )
-        
-        # Step 5c: Configure Agent
-        logger.info("=== STEP 5c: Configure Agent ===")
-        apply_rate_limiting('deploy-to-configure')
-        
-        agent_configuration = invoke_agent_lambda(
-            'deployment-manager',
-            '/configure-agent',
-            job_name,
-            {
-                'agent_config': json.dumps(req_data['for_code_generator']) if isinstance(req_data['for_code_generator'], dict) else str(req_data['for_code_generator']),
-                'lambda_arns': json.dumps(stack_deployment) if isinstance(stack_deployment, dict) else str(stack_deployment)
-            }
-        )
-        
-        # Step 5d: Test Deployment
-        logger.info("=== STEP 5d: Test Deployment ===")
-        apply_rate_limiting('configure-to-test')
-        
-        deployment_test = invoke_agent_lambda(
-            'deployment-manager',
-            '/test-deployment',
-            job_name,
-            {
-                'agent_id': agent_configuration.get('agent_id') if isinstance(agent_configuration, dict) else 'test-agent-id',
-                'alias_id': agent_configuration.get('alias_id') if isinstance(agent_configuration, dict) else 'test-alias-id',
-                'test_inputs': json.dumps(req_data['for_deployment_manager']) if isinstance(req_data['for_deployment_manager'], dict) else str(req_data['for_deployment_manager'])
-            }
-        )
-        
-        return {
-            'cloudformation': cloudformation_gen,
-            'stack_deployment': stack_deployment,
-            'agent_configuration': agent_configuration,
-            'deployment_test': deployment_test
-        }
-        
-    except Exception as e:
-        logger.error(f"Deployment Manager phase failed: {str(e)}")
+        logger.error(f"Deployment Manager failed: {str(e)}")
         raise ValueError(f"Deployment failed: {str(e)}")
 
 
@@ -440,12 +353,10 @@ def handle_orchestrate(
         Dict with final orchestration results
     """
     user_request = params.get('user_request')
+    job_name = params.get('job_name')
     
     if not user_request:
         raise ValueError("Missing required parameter: user_request")
-    
-    # Generate unique job_name
-    job_name = generate_job_name(user_request)
     
     # Log input to DynamoDB immediately
     timestamp = dynamodb_client.log_inference_input(
@@ -458,63 +369,34 @@ def handle_orchestrate(
     )['timestamp']
     
     try:
-        logger.info(f"Starting modular orchestration for job: {job_name}")
+        logger.info(f"Starting orchestration with quality gates for job: {job_name}")
         logger.info(f"User request: {user_request}")
         
-        # Step 1: Requirements Analyst
+        # Step 1: Requirements Analyst (with built-in quality gate)
         requirements = orchestrate_requirements_analyst(job_name, user_request)
         logger.info("Requirements Analyst phase completed")
+        req_data = requirements
         
-        # Validate requirements structure
-        if not requirements.get('extract') or not isinstance(requirements['extract'], dict):
-            raise ValueError("Requirements Analyst returned invalid or empty requirements")
-        
-        req_data = requirements['extract']
-        
-        # Validate required sections for downstream agents
-        required_sections = ['for_solution_architect', 'for_code_generator', 'for_quality_validator', 'for_deployment_manager']
-        missing_sections = [section for section in required_sections if section not in req_data]
-        if missing_sections:
-            raise ValueError(f"Requirements missing sections: {missing_sections}")
-        
-        # Step 2: Solution Architect
+        # Step 2: Solution Architect (with built-in quality gate)
         architecture = orchestrate_solution_architect(job_name, req_data)
         logger.info("Solution Architect phase completed")
         
-        # Step 3: Code Generator
-        code = orchestrate_code_generator(job_name, req_data)
+        # Step 3: Code Generator (with built-in quality gate)
+        code = orchestrate_code_generator(job_name, req_data, architecture)
         logger.info("Code Generator phase completed")
         
-        # Step 4: Quality Validator
-        validation = orchestrate_quality_validator(job_name, req_data)
-        logger.info(f"Quality Validator phase completed: is_valid={validation.get('is_valid')}")
+        # Step 4: Deploy
+        deployment = orchestrate_deployment_manager(job_name, code)
+        logger.info("Deployment completed successfully")
         
-        # Step 5: Deployment Manager (only if validation passes)
-        if validation.get('is_valid', False):
-            logger.info("=== VALIDATION PASSED: Proceeding to Deployment ===")
-            deployment = orchestrate_deployment_manager(job_name, req_data)
-            logger.info("Deployment Manager phase completed")
-            
-            final_result = {
-                "job_name": job_name,
-                "status": "deployed",
-                "requirements": requirements,
-                "architecture": architecture,
-                "code": code,
-                "validation": validation,
-                "deployment": deployment
-            }
-        else:
-            logger.warning("=== VALIDATION FAILED: Skipping Deployment ===")
-            final_result = {
-                "job_name": job_name,
-                "status": "validation_failed",
-                "requirements": requirements,
-                "architecture": architecture,
-                "code": code,
-                "validation": validation,
-                "deployment": None
-            }
+        final_result = {
+            "job_name": job_name,
+            "status": "deployed",
+            "requirements": req_data,
+            "architecture": architecture,
+            "code": code,
+            "deployment": deployment
+        }
         
         # Log final output to DynamoDB
         duration = time.time() - start_time

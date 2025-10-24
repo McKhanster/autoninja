@@ -93,7 +93,8 @@ class S3Client:
                 Bucket=self.bucket_name,
                 Key=s3_key,
                 Body=content.encode('utf-8'),
-                ContentType='application/json'
+                ContentType='application/json',
+                ServerSideEncryption='aws:kms'
             )
             
             s3_uri = f"s3://{self.bucket_name}/{s3_key}"
@@ -140,7 +141,8 @@ class S3Client:
                 Bucket=self.bucket_name,
                 Key=s3_key,
                 Body=content.encode('utf-8'),
-                ContentType=content_type
+                ContentType=content_type,
+                ServerSideEncryption='aws:kms'
             )
             
             s3_uri = f"s3://{self.bucket_name}/{s3_key}"

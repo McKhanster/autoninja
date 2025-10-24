@@ -164,7 +164,7 @@ Resources:
         InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
         ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
 
-  # Custom Orchestration Stack - Rate Limiting Lambda
+  # Custom Orchestration Stack - No lonimiting Lambda
   CustomOrchestrationStack:
     Type: AWS::CloudFormation::Stack
     Properties:

@@ -1,14 +1,14 @@
 openapi: 3.0.0
 info:
-  title: Solution Architect Action Group API
-  description: API for designing AWS architecture, selecting services, and generating infrastructure-as-code
+  title: Solution Architect API
   version: 1.0.0
+  description: Comprehensive AWS architecture design for AI agents
 
 paths:
-  /design-architecture:
+  /design:
     post:
-      summary: Design complete AWS architecture
-      description: Creates comprehensive AWS architecture design based on requirements and code files
+      summary: Comprehensive Architecture Design
+      description: Designs complete AWS architecture following Well-Architected Framework principles
       operationId: designArchitecture
       requestBody:
         required: true
@@ -22,128 +22,42 @@ paths:
               properties:
                 job_name:
                   type: string
-                  description: Unique job identifier in format job-{keyword}-{YYYYMMDD-HHMMSS}
+                  description: Unique job identifier
                 requirements:
                   type: string
-                  description: JSON string containing requirements from Requirements Analyst
-                code_file_references:
-                  type: string
-                  description: JSON string containing references to code files from Code Generator
+                  description: JSON string of requirements from Requirements Analyst
       responses:
         '200':
-          description: Architecture successfully designed
+          description: Comprehensive architecture design completed
           content:
             application/json:
               schema:
                 type: object
+                required:
+                  - job_name
+                  - architecture
+                  - status
                 properties:
                   job_name:
                     type: string
-                    description: Job identifier
                   architecture:
-                    type: string
-                    description: JSON string containing complete architecture design
-                  diagram:
-                    type: string
-                    description: Architecture diagram in text format
+                    type: object
+                    description: Customer-focused architecture design
+                    properties:
+                      executive_summary:
+                        type: object
+                      for_code_generator:
+                        type: object
+                        description: Service specifications and code patterns
+                      for_quality_validator:
+                        type: object
+                        description: Security architecture and compliance framework
+                      for_deployment_manager:
+                        type: object
+                        description: Infrastructure specifications and deployment topology
+                      cost_analysis:
+                        type: object
+                        description: Cost estimates and optimization opportunities
                   status:
                     type: string
-                    description: Status of operation
-        '400':
-          description: Invalid request
-        '500':
-          description: Internal server error
-
-  /select-services:
-    post:
-      summary: Select appropriate AWS services
-      description: Analyzes requirements and selects optimal AWS services with rationale
-      operationId: selectServices
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - job_name
-                - requirements
-              properties:
-                job_name:
-                  type: string
-                  description: Unique job identifier
-                requirements:
-                  type: string
-                  description: JSON string containing requirements from Requirements Analyst
-      responses:
-        '200':
-          description: Services successfully selected
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  job_name:
-                    type: string
-                    description: Job identifier
-                  services:
-                    type: array
-                    items:
-                      type: string
-                    description: List of selected AWS services
-                  rationale:
-                    type: string
-                    description: JSON string containing justification for each service selection
-                  status:
-                    type: string
-                    description: Status of operation
-        '400':
-          description: Invalid request
-        '500':
-          description: Internal server error
-
-  /generate-iac:
-    post:
-      summary: Generate infrastructure-as-code templates
-      description: Creates CloudFormation templates that reference Lambda code files and include all architecture components
-      operationId: generateIac
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - job_name
-                - architecture
-              properties:
-                job_name:
-                  type: string
-                  description: Unique job identifier
-                architecture:
-                  type: string
-                  description: JSON string containing architecture design from design_architecture action
-                code_references:
-                  type: string
-                  description: JSON string containing references to Lambda code and agent config files
-      responses:
-        '200':
-          description: IaC templates successfully generated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  job_name:
-                    type: string
-                    description: Job identifier
-                  cloudformation_template:
-                    type: string
-                    description: CloudFormation template in YAML format
-                  status:
-                    type: string
-                    description: Status of operation
-        '400':
-          description: Invalid request
-        '500':
-          description: Internal server error
+                    enum: [success, error]

@@ -13,7 +13,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 # Rate limiting configuration
-AGENT_INVOKE_DELAY = 10.0  # 10 seconds between agent invocations
+AGENT_INVOKE_DELAY = 15.0  # 15 seconds between agent invocations (increased to avoid throttling)
 MAX_RETRIES = 5
 MEMORY_ID = os.environ.get('MEMORY_ID', 'autoninja_rate_limiter_production')
 
@@ -49,7 +49,6 @@ def apply_rate_limiting(agent_name: str, custom_delay: Optional[float] = None):
                 namespace='rate_limiting',
                 searchCriteria={
                     'searchQuery': 'lastInvocation',
-                    'topK': 10
                 }
             )
             
@@ -103,8 +102,10 @@ def apply_rate_limiting(agent_name: str, custom_delay: Optional[float] = None):
                 eventTimestamp=datetime.fromtimestamp(current_time),  # Use datetime object
                 payload=[{
                     'conversational': {  # lowercase 'conversational'
-                        'role': 'system',
-                        'content': f'lastInvocation:{current_time}:agent:{agent_name}'
+                        'role': 'ASSISTANT',  # Valid role: USER, OTHER, TOOL, ASSISTANT
+                        'content': {
+                            'text': f'lastInvocation:{current_time}:agent:{agent_name}'
+                        }
                     }
                 }]
             )
@@ -131,7 +132,6 @@ def get_last_invocation_time() -> float:
             namespace='rate_limiting',
             searchCriteria={
                 'searchQuery': 'lastInvocation',
-                'topK': 10
             }
         )
         

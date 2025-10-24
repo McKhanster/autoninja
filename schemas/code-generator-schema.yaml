@@ -1,15 +1,15 @@
 openapi: 3.0.0
 info:
-  title: Code Generator Action Group API
-  description: API for generating Lambda code, agent configurations, and OpenAPI schemas
+  title: Code Generator API
   version: 1.0.0
+  description: Comprehensive code generation for AI agents
 
 paths:
-  /generate-lambda-code:
+  /generate:
     post:
-      summary: Generate Lambda function code
-      description: Generates production-ready Python Lambda function code with error handling, logging, and persistence
-      operationId: generateLambdaCode
+      summary: Comprehensive Code Generation
+      description: Generates complete Lambda code, agent configuration, and OpenAPI schema
+      operationId: generateCode
       requestBody:
         required: true
         content:
@@ -19,123 +19,47 @@ paths:
               required:
                 - job_name
                 - requirements
-              properties:
-                job_name:
-                  type: string
-                  description: Unique job identifier in format job-{keyword}-{YYYYMMDD-HHMMSS}
-                requirements:
-                  type: string
-                  description: JSON string containing requirements from Requirements Analyst
-                function_spec:
-                  type: string
-                  description: JSON string containing specific function specifications
-      responses:
-        '200':
-          description: Lambda code successfully generated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  job_name:
-                    type: string
-                    description: Job identifier
-                  lambda_code:
-                    type: string
-                    description: JSON string containing map of filename to code content
-                  requirements_txt:
-                    type: string
-                    description: Python dependencies file content
-                  status:
-                    type: string
-                    description: Status of operation
-        '400':
-          description: Invalid request
-        '500':
-          description: Internal server error
-
-  /generate-agent-config:
-    post:
-      summary: Generate Bedrock Agent configuration
-      description: Creates Bedrock Agent configuration JSON with agent name, instructions, foundation model, and action groups
-      operationId: generateAgentConfig
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - job_name
-                - requirements
+                - architecture
               properties:
                 job_name:
                   type: string
                   description: Unique job identifier
                 requirements:
                   type: string
-                  description: JSON string containing requirements from Requirements Analyst
+                  description: JSON string of requirements from Requirements Analyst
+                architecture:
+                  type: string
+                  description: JSON string of architecture from Solution Architect
       responses:
         '200':
-          description: Agent configuration successfully generated
+          description: Comprehensive code generation completed
           content:
             application/json:
               schema:
                 type: object
+                required:
+                  - job_name
+                  - code
+                  - status
                 properties:
                   job_name:
                     type: string
-                    description: Job identifier
-                  agent_config:
-                    type: string
-                    description: JSON string containing agent configuration
+                  code:
+                    type: object
+                    description: Complete code package
+                    properties:
+                      lambda_code:
+                        type: object
+                        description: Lambda function code and dependencies
+                      agent_config:
+                        type: object
+                        description: Bedrock Agent configuration
+                      openapi_schema:
+                        type: object
+                        description: OpenAPI schema for agent actions
+                      documentation:
+                        type: object
+                        description: Code documentation and usage guides
                   status:
                     type: string
-                    description: Status of operation
-        '400':
-          description: Invalid request
-        '500':
-          description: Internal server error
-
-  /generate-openapi-schema:
-    post:
-      summary: Generate OpenAPI schema for action groups
-      description: Creates OpenAPI 3.0 schema defining all endpoints, parameters, and request/response formats
-      operationId: generateOpenapiSchema
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - job_name
-                - action_group_spec
-              properties:
-                job_name:
-                  type: string
-                  description: Unique job identifier
-                action_group_spec:
-                  type: string
-                  description: JSON string containing specification for the action group
-      responses:
-        '200':
-          description: OpenAPI schema successfully generated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  job_name:
-                    type: string
-                    description: Job identifier
-                  openapi_schema:
-                    type: string
-                    description: OpenAPI 3.0 schema in YAML format
-                  status:
-                    type: string
-                    description: Status of operation
-        '400':
-          description: Invalid request
-        '500':
-          description: Internal server error
+                    enum: [success, error]

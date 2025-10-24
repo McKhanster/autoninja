@@ -49,7 +49,7 @@ if ! aws s3 ls "s3://${DEPLOYMENT_BUCKET}" --region "$REGION" --profile "$PROFIL
         --create-bucket-configuration LocationConstraint="$REGION"
 
 
-    echo -e "${GREEN}✓ S3 bucket created and versioning enabled${NC}"
+    echo -e "${GREEN}✓ S3 bucket created ${NC}"
 else
     echo -e "${GREEN}✓ S3 bucket already exists${NC}"
 fi
@@ -77,6 +77,8 @@ echo -e "${YELLOW}Step 3: Uploading Lambda deployment packages...${NC}"
 
 # Build Lambda packages if not exist
 for agent in requirements-analyst code-generator solution-architect quality-validator deployment-manager custom-orchestration; do
+#for agent in custom-orchestration; do
+    
     if [ ! -f "build/${agent}.zip" ]; then
         echo "Building $agent..."
         
@@ -113,6 +115,8 @@ done
 
 # Upload Lambda packages
 for agent in requirements-analyst code-generator solution-architect quality-validator deployment-manager custom-orchestration; do
+#for agent in custom-orchestration; do
+
     if [ -f "build/${agent}.zip" ]; then
         aws s3 cp "build/${agent}.zip" \
             "s3://${DEPLOYMENT_BUCKET}/lambda/${agent}.zip" \

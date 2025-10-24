@@ -1,15 +1,15 @@
 openapi: 3.0.0
 info:
-  title: Deployment Manager Action Group API
-  description: API for generating CloudFormation templates, deploying stacks, configuring agents, and testing deployments
+  title: Deployment Manager API
   version: 1.0.0
+  description: Deploy Bedrock Agents to AWS
 
 paths:
-  /generate-cloudformation:
+  /deploy:
     post:
-      summary: Generate complete CloudFormation template
-      description: Creates comprehensive CloudFormation template including Lambda functions, Bedrock Agent, action groups, and IAM roles
-      operationId: generateCloudformation
+      summary: Deploy Bedrock Agent
+      description: Package code, upload to S3, generate CloudFormation, and deploy to AWS
+      operationId: deployAgent
       requestBody:
         required: true
         content:
@@ -18,202 +18,56 @@ paths:
               type: object
               required:
                 - job_name
-              properties:
-                job_name:
-                  type: string
-                  description: Unique job identifier in format job-{keyword}-{YYYYMMDD-HHMMSS}
-                requirements:
-                  type: string
-                  description: JSON string containing requirements from Requirements Analyst
-                code:
-                  type: string
-                  description: JSON string containing code artifacts from Code Generator
-                architecture:
-                  type: string
-                  description: JSON string containing architecture design from Solution Architect
-                validation_status:
-                  type: string
-                  description: Validation status from Quality Validator
-      responses:
-        '200':
-          description: CloudFormation template successfully generated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  job_name:
-                    type: string
-                    description: Job identifier
-                  cloudformation_template:
-                    type: string
-                    description: Complete CloudFormation template in YAML format
-                  status:
-                    type: string
-                    description: Status of operation
-        '400':
-          description: Invalid request
-        '500':
-          description: Internal server error
-
-  /deploy-stack:
-    post:
-      summary: Deploy CloudFormation stack to AWS
-      description: Deploys the CloudFormation stack and waits for completion
-      operationId: deployStack
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - job_name
-                - cloudformation_template
-                - stack_name
+                - code
               properties:
                 job_name:
                   type: string
                   description: Unique job identifier
-                cloudformation_template:
+                code:
                   type: string
-                  description: CloudFormation template to deploy
-                stack_name:
-                  type: string
-                  description: Name for the CloudFormation stack
-                parameters:
-                  type: string
-                  description: JSON string containing stack parameters
+                  description: JSON string containing lambda_code, agent_config, and openapi_schema from Code Generator
       responses:
         '200':
-          description: Stack deployment completed
+          description: Deployment completed
           content:
             application/json:
               schema:
                 type: object
+                required:
+                  - job_name
+                  - status
                 properties:
                   job_name:
                     type: string
-                    description: Job identifier
+                  stack_name:
+                    type: string
+                    description: CloudFormation stack name
                   stack_id:
                     type: string
                     description: CloudFormation stack ID
-                  status:
+                  stack_status:
                     type: string
-                    description: Deployment status
-                  outputs:
-                    type: string
-                    description: JSON string containing stack outputs
-                  error_message:
-                    type: string
-                    description: Error details if deployment failed
-        '400':
-          description: Invalid request
-        '500':
-          description: Internal server error
-
-  /configure-agent:
-    post:
-      summary: Configure Bedrock Agent
-      description: Creates and configures Bedrock Agent with action groups and creates agent alias
-      operationId: configureAgent
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - job_name
-                - agent_config
-                - lambda_arns
-              properties:
-                job_name:
-                  type: string
-                  description: Unique job identifier
-                agent_config:
-                  type: string
-                  description: JSON string containing agent configuration from Code Generator
-                lambda_arns:
-                  type: string
-                  description: JSON string containing map of action group names to Lambda ARNs
-      responses:
-        '200':
-          description: Agent successfully configured
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  job_name:
-                    type: string
-                    description: Job identifier
+                    description: Stack deployment status
                   agent_id:
                     type: string
-                    description: Bedrock Agent ID
-                  agent_arn:
+                    description: Deployed Bedrock Agent ID
+                  agent_alias_id:
                     type: string
-                    description: Bedrock Agent ARN
-                  alias_id:
+                    description: Production alias ID
+                  lambda_arn:
                     type: string
-                    description: Agent alias ID
+                    description: Deployed Lambda function ARN
+                  s3_locations:
+                    type: object
+                    description: S3 locations of uploaded artifacts
+                    properties:
+                      lambda_code:
+                        type: string
+                      schema:
+                        type: string
                   status:
                     type: string
-                    description: Status of operation
-        '400':
-          description: Invalid request
-        '500':
-          description: Internal server error
-
-  /test-deployment:
-    post:
-      summary: Test deployed agent
-      description: Tests the deployed agent with sample inputs to verify functionality
-      operationId: testDeployment
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - job_name
-                - agent_id
-                - alias_id
-              properties:
-                job_name:
-                  type: string
-                  description: Unique job identifier
-                agent_id:
-                  type: string
-                  description: Bedrock Agent ID to test
-                alias_id:
-                  type: string
-                  description: Agent alias ID to test
-                test_inputs:
-                  type: string
-                  description: JSON string containing array of sample inputs for testing
-      responses:
-        '200':
-          description: Testing completed
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  job_name:
+                    enum: [success, error]
+                  error:
                     type: string
-                    description: Job identifier
-                  test_results:
-                    type: string
-                    description: JSON string containing results from test invocations
-                  is_successful:
-                    type: boolean
-                    description: Whether all tests passed
-                  status:
-                    type: string
-                    description: Status of operation
-        '400':
-          description: Invalid request
-        '500':
-          description: Internal server error
+                    description: Error message if deployment failed

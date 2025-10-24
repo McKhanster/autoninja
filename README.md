@@ -4,19 +4,21 @@ A production-grade, serverless multi-agent system built entirely on **AWS Bedroc
 
 ## Overview
 
-AutoNinja leverages AWS Bedrock's **native multi-agent collaboration** (GA March 2025) to orchestrate 6 specialized agents that work together to design, generate, validate, and deploy production-ready AI agents from simple natural language descriptions.
+AutoNinja uses a **Supervisor Lambda + Bedrock Agents** architecture to orchestrate 5 specialized Bedrock Agents that work together to design, generate, validate, and deploy production-ready AI agents from simple natural language descriptions.
 
 **User Input:** "I would like a friend agent"
 **System Output:** Fully deployed AWS Bedrock Agent with Lambda functions, CloudFormation stack, and complete documentation
 
+**Architecture:** A single Supervisor Lambda function orchestrates 5 Bedrock Agents, calling them directly via the Bedrock Agent Runtime API. The supervisor handles all response parsing, artifact extraction, and persistence to S3/DynamoDB.
+
 ## Key Features
 
 ### Multi-Agent Architecture
-- ✅ **Native AWS Bedrock Agents** - 6 specialized agents (1 supervisor/orchestrator + 5 collaborators)
-- ✅ **Supervisor Orchestration** - Automatic task delegation and coordination
-- ✅ **Parallel Processing** - Agents can work concurrently when possible
-- ✅ **Conversation History** - Automatic context sharing between agents
-- ✅ **Built-in Retry Logic** - Automatic error handling and recovery
+- ✅ **5 Specialized Bedrock Agents** - Requirements Analyst, Solution Architect, Code Generator, Quality Validator, Deployment Manager
+- ✅ **Supervisor Lambda Orchestration** - Coordinates agent invocations, parses responses, persists artifacts
+- ✅ **Sequential Processing with Quality Gates** - Each phase validated before proceeding
+- ✅ **Direct Bedrock Agent Invocation** - No intermediate Lambda functions, cleaner architecture
+- ✅ **Built-in Retry Logic** - Automatic error handling and recovery with quality validation
 
 ### Complete Persistence & Audit Trail
 - ✅ **DynamoDB Inference Storage** - Every prompt and response saved with job tracking
@@ -46,42 +48,51 @@ AutoNinja leverages AWS Bedrock's **native multi-agent collaboration** (GA March
 ```
 User Request: "I would like a friend agent"
        ↓
-[Supervisor Bedrock Agent]
+[Supervisor Lambda]
    ├── Analyzes request
-   ├── Generates job-friend-20251013-143022
-   └── Delegates to collaborators:
+   ├── Generates job-friend-20251023-143022
+   └── Orchestrates Bedrock Agents directly:
        ↓
-       ├──> [Requirements Analyst Agent]
-       │    └─> Lambda: Extract requirements, save to DynamoDB/S3
-       │         Returns: Structured specifications
+       ├──> [Requirements Analyst Bedrock Agent]
+       │    └─> Returns: Structured requirements JSON
+       │         Supervisor parses & saves to DynamoDB/S3
        ↓
-       ├──> [Solution Architect Agent]
-       │    └─> Lambda: Design AWS architecture, save to DynamoDB/S3
-       │         Returns: Architecture design + services
+       ├──> [Solution Architect Bedrock Agent]
+       │    └─> Returns: Architecture design JSON
+       │         Supervisor parses & saves to DynamoDB/S3
        ↓
-       ├──> [Code Generator Agent]
-       │    └─> Lambda: Generate code + configs, save to DynamoDB/S3
-       │         Returns: Lambda code, agent config, OpenAPI schemas
+       ├──> [Code Generator Bedrock Agent]
+       │    └─> Returns: Lambda code, agent config, OpenAPI schemas
+       │         Supervisor parses & saves individual files to S3
+       │         (handler.py, requirements.txt, agent_config.yaml, etc.)
        ↓
-       ├──> [Quality Validator Agent]
-       │    └─> Lambda: Validate quality/security, save to DynamoDB/S3
-       │         Returns: Quality report + recommendations
+       ├──> [Quality Validator Bedrock Agent]
+       │    └─> Returns: Validation results JSON
+       │         Supervisor parses & saves to DynamoDB/S3
        ↓
-       └──> [Deployment Manager Agent]
-            └─> Lambda: Generate CloudFormation, deploy, save to DynamoDB/S3
+       └──> [Deployment Manager Bedrock Agent]
+            └─> Returns: CloudFormation template + deployment status
+                 Supervisor parses & saves template as YAML to S3
                  Returns: Deployed Bedrock Agent ARN + endpoints
 ```
 
-### The 6 Bedrock Agents
+**Key Architecture Changes:**
+- ✅ **Supervisor Lambda** calls Bedrock Agents directly via `bedrock-agent-runtime.invoke_agent()`
+- ✅ **No Lambda agents** - Each Bedrock Agent returns JSON responses directly
+- ✅ **Supervisor handles all parsing** - Extracts code files, configs, templates from responses
+- ✅ **Supervisor handles all persistence** - Saves artifacts to S3, logs to DynamoDB
+- ✅ **Cleaner architecture** - No circular Lambda invocations, simpler flow
 
-| Agent | Role | Lambda Actions | Outputs |
-|-------|------|----------------|---------|
-| **Supervisor** | Orchestrates workflow, delegates tasks | None (coordination only) | Task assignments, consolidated results |
-| **Requirements Analyst** | Analyzes user requests | `extract_requirements`, `analyze_complexity`, `validate_requirements` | Requirements JSON, complexity assessment |
-| **Solution Architect** | Designs AWS architecture | `design_architecture`, `select_services`, `generate_iac` | Architecture diagram, service list, IaC templates |
-| **Code Generator** | Generates production code | `generate_lambda_code`, `generate_agent_config`, `generate_openapi_schema` | Lambda functions, Bedrock Agent configs |
-| **Quality Validator** | Validates quality/security | `validate_code`, `security_scan`, `compliance_check` | Quality report, security findings |
-| **Deployment Manager** | Deploys to AWS | `generate_cloudformation`, `deploy_stack`, `configure_agent`, `test_deployment` | CloudFormation template, deployed agent ARN |
+### The 6 Components
+
+| Component | Type | Role | Outputs |
+|-----------|------|------|---------|
+| **Supervisor** | Lambda Function | Orchestrates workflow, calls Bedrock Agents, parses responses, persists artifacts | Task assignments, consolidated results, all artifacts |
+| **Requirements Analyst** | Bedrock Agent | Analyzes user requests | Requirements JSON |
+| **Solution Architect** | Bedrock Agent | Designs AWS architecture | Architecture design JSON |
+| **Code Generator** | Bedrock Agent | Generates production code | Lambda code, agent config, OpenAPI schemas (as JSON) |
+| **Quality Validator** | Bedrock Agent | Validates quality/security | Validation results JSON |
+| **Deployment Manager** | Bedrock Agent | Generates deployment templates | CloudFormation template JSON |
 
 ## Data Persistence Architecture
 
@@ -207,17 +218,14 @@ aws cloudformation describe-stacks \
 ```
 
 **The CloudFormation template creates:**
-- ✅ 5 Lambda functions (one per collaborator agent)
-- ✅ 6 Bedrock Agents (1 supervisor + 5 collaborators)
-- ✅ 6 Bedrock Agent Aliases (production versions)
-- ✅ Agent collaborator associations (supervisor → collaborators)
-- ✅ 5 Lambda action groups (one per agent)
+- ✅ 1 Supervisor Lambda function (orchestrates everything)
+- ✅ 5 Bedrock Agents (Requirements Analyst, Solution Architect, Code Generator, Quality Validator, Deployment Manager)
+- ✅ 5 Bedrock Agent Aliases (production versions)
 - ✅ DynamoDB table `autoninja-inference-records`
 - ✅ S3 bucket `autoninja-artifacts-{account-id}`
 - ✅ IAM roles and policies (least privilege)
 - ✅ CloudWatch log groups with retention policies
-- ✅ Lambda layers for shared code
-- ✅ Lambda resource-based policies for Bedrock invocation
+- ✅ Lambda layers for shared code (persistence, logging, rate limiting)
 
 **Alternative: Deploy with Terraform**
 
@@ -290,21 +298,17 @@ autoninja-bedrock-agents/
 │   └── cdk/                    # AWS CDK (alternative)
 │
 ├── lambda/                      # Lambda function source code
-│   ├── requirements-analyst/
-│   │   ├── handler.py          # Lambda entry point
-│   │   ├── business_logic.py   # Core logic
-│   │   └── requirements.txt    # Dependencies
-│   ├── solution-architect/
-│   ├── code-generator/
-│   ├── quality-validator/
-│   └── deployment-manager/
+│   └── supervisor-agentcore/   # Main orchestrator Lambda
+│       ├── handler.py          # Lambda entry point
+│       ├── requirements.txt    # Dependencies
+│       └── README.md           # Supervisor documentation
 │
-├── schemas/                     # OpenAPI schemas for action groups
-│   ├── requirements-analyst-schema.yaml
-│   ├── solution-architect-schema.yaml
-│   ├── code-generator-schema.yaml
-│   ├── quality-validator-schema.yaml
-│   └── deployment-manager-schema.yaml
+├── infrastructure/cloudformation/prompts/  # Bedrock Agent prompts
+│   ├── requirements-analyst-base-prompt.json
+│   ├── solution-architect-base-prompt.json
+│   ├── code-generator-base-prompt.json
+│   ├── quality-validator-base-prompt.json
+│   └── deployment-manager-base-prompt.json
 │
 ├── shared/                      # Shared libraries (Lambda Layer)
 │   ├── persistence/
@@ -577,49 +581,49 @@ AutoNinja's main CloudFormation template (`autoninja-complete.yaml`) includes:
 - `S3BucketName` - Optional custom bucket name
 - `LogRetentionDays` - CloudWatch log retention (default: 30)
 
-### Resources Created (60+ resources)
+### Resources Created (40+ resources)
 | Resource Type | Count | Description |
 |---------------|-------|-------------|
-| AWS::Bedrock::Agent | 6 | Supervisor + 5 collaborators |
-| AWS::Bedrock::AgentAlias | 6 | Production aliases |
-| AWS::Lambda::Function | 5 | One per collaborator |
-| AWS::Lambda::LayerVersion | 1 | Shared code library |
-| AWS::Lambda::Permission | 5 | Bedrock invocation permissions |
-| AWS::IAM::Role | 6 | Bedrock + Lambda roles |
-| AWS::IAM::Policy | 11 | Least-privilege policies |
+| AWS::Bedrock::Agent | 5 | Requirements Analyst, Solution Architect, Code Generator, Quality Validator, Deployment Manager |
+| AWS::Bedrock::AgentAlias | 5 | Production aliases |
+| AWS::Lambda::Function | 1 | Supervisor orchestrator |
+| AWS::Lambda::LayerVersion | 1 | Shared code library (persistence, logging, rate limiting) |
+| AWS::IAM::Role | 6 | Bedrock agent roles + Lambda role |
+| AWS::IAM::Policy | 6 | Least-privilege policies |
 | AWS::DynamoDB::Table | 1 | Inference record storage |
 | AWS::S3::Bucket | 1 | Artifact storage |
 | AWS::S3::BucketPolicy | 1 | Bucket access control |
-| AWS::Logs::LogGroup | 11 | CloudWatch log groups |
+| AWS::Logs::LogGroup | 6 | CloudWatch log groups |
 
 ### Outputs
-- `SupervisorAgentId` - Supervisor agent ID
-- `SupervisorAgentArn` - Supervisor agent ARN
-- `SupervisorAliasId` - Production alias ID
-- `RequirementsAnalystAgentId` - Requirements analyst ID
-- `SolutionArchitectAgentId` - Solution architect ID
-- `CodeGeneratorAgentId` - Code generator ID
-- `QualityValidatorAgentId` - Quality validator ID
-- `DeploymentManagerAgentId` - Deployment manager ID
+- `SupervisorLambdaArn` - Supervisor Lambda function ARN
+- `RequirementsAnalystAgentId` - Requirements analyst Bedrock Agent ID
+- `RequirementsAnalystAliasId` - Requirements analyst alias ID
+- `SolutionArchitectAgentId` - Solution architect Bedrock Agent ID
+- `SolutionArchitectAliasId` - Solution architect alias ID
+- `CodeGeneratorAgentId` - Code generator Bedrock Agent ID
+- `CodeGeneratorAliasId` - Code generator alias ID
+- `QualityValidatorAgentId` - Quality validator Bedrock Agent ID
+- `QualityValidatorAliasId` - Quality validator alias ID
+- `DeploymentManagerAgentId` - Deployment manager Bedrock Agent ID
+- `DeploymentManagerAliasId` - Deployment manager alias ID
 - `DynamoDBTableName` - Inference records table
 - `S3BucketName` - Artifacts bucket
-- `InvocationCommand` - CLI command to invoke system
+- `InvocationCommand` - CLI command to invoke supervisor
 
 ### Stack Dependencies
 ```
-autoninja-complete.yaml
+autoninja-collaborators-production (main stack)
 ├── Creates all resources in order:
 │   1. IAM Roles & Policies
 │   2. DynamoDB Table & S3 Bucket
-│   3. Lambda Layer (shared code)
-│   4. Lambda Functions (5)
+│   3. Lambda Layer (shared code: persistence, logging, rate limiting)
+│   4. Supervisor Lambda Function
 │   5. CloudWatch Log Groups
-│   6. Bedrock Collaborator Agents (5)
+│   6. Bedrock Agents (5): Requirements Analyst, Solution Architect, 
+│      Code Generator, Quality Validator, Deployment Manager
 │   7. Bedrock Agent Aliases (5)
-│   8. Bedrock Supervisor Agent (1)
-│   9. Supervisor Agent Alias (1)
-│   10. Agent Collaborator Associations (5)
-└── Exports for use by generated agents
+└── Exports agent IDs for supervisor to invoke
 ```
 
 ## Roadmap
