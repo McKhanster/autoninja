@@ -41,45 +41,48 @@ Parameters:
   BedrockModel:
     Type: String
     Description: Foundation model ID for Bedrock Agents (Supervisor)
-    Default: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+    Default: us.amazon.nova-premier-v1:0
 
   RequirementsAnalystModel:
     Type: String
     Description: Foundation model ID for Requirements Analyst
-    Default: us.anthropic.claude-3-5-haiku-20241022-v1:0
+    Default: us.amazon.nova-premier-v1:0
 
   CodeGeneratorModel:
     Type: String
     Description: Foundation model ID for Code Generator
-    Default: qwen2.5-72b-instruct-v1:0
+    Default: us.amazon.nova-premier-v1:0
 
   SolutionArchitectModel:
     Type: String
     Description: Foundation model ID for Solution Architect
-    Default: qwen2.5-14b-instruct-v1:0
+    Default: us.amazon.nova-premier-v1:0
 
   QualityValidatorModel:
     Type: String
     Description: Foundation model ID for Quality Validator
-    Default: us.anthropic.claude-3-5-haiku-20241022-v1:0
+    Default: us.amazon.nova-premier-v1:0
 
   DeploymentManagerModel:
     Type: String
     Description: Foundation model ID for Deployment Manager
-    Default: deepseek-ai.deepseek-r1-distill-llama-70b-v1:0
+    Default: us.amazon.nova-premier-v1:0
     AllowedValues:
-      # Global cross-region profiles (highest throughput)
-      - us.anthropic.claude-3-7-sonnet-20250219-v1:0
+      # Amazon Nova models (1M context window)
+      - us.amazon.nova-premier-v1:0
+      - us.amazon.nova-pro-v1:0
+      - us.amazon.nova-lite-v1:0
+      - us.amazon.nova-micro-v1:0
+      # Anthropic Claude models
+      - us.amazon.nova-premier-v1:0
       - global.anthropic.claude-haiku-4-5-20251001-v1:0
-      # US cross-region profiles
-      - us.anthropic.claude-3-7-sonnet-20250219-v1:0
       - us.anthropic.claude-3-5-sonnet-20241022-v2:0
       - us.anthropic.claude-3-5-haiku-20241022-v1:0
-      # Qwen models (good quota)
+      # Qwen models
       - qwen2.5-72b-instruct-v1:0
       - qwen2.5-14b-instruct-v1:0
       - qwen2.5-7b-instruct-v1:0
-      # DeepSeek models (good quota)
+      # DeepSeek models
       - deepseek-ai.deepseek-v3-base
       - deepseek-ai.deepseek-r1-distill-llama-70b-v1:0
       - deepseek-ai.deepseek-r1-distill-qwen-32b-v1:0

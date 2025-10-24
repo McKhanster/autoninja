@@ -161,7 +161,7 @@ The following are explicitly out of scope for this fix:
 - **Region**: us-east-2 (confirmed available)
 
 ### DEP-2: Claude Sonnet 4.5 Model
-- **Model ID**: `us.anthropic.claude-3-7-sonnet-20250219-v1:0`
+- **Model ID**: ` us.amazon.nova-premier-v1:0`
 - **Rate Limit**: ~1 RPM for on-demand
 - **Status**: Available in us-east-2
 

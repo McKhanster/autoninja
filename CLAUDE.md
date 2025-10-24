@@ -321,7 +321,7 @@ Default AWS configuration:
 - Region: `us-east-2`
 - Profile: `AdministratorAccess-784327326356`
 - Account ID: `784327326356`
-- Bedrock Model: `anthropic.claude-3-7-sonnet-20250219-v1:0` (or `us.anthropic.claude-3-7-sonnet-20250219-v1:0` for some regions)
+- Bedrock Model: `anthropic.claude-3-7-sonnet-20250219-v1:0` (or ` us.amazon.nova-premier-v1:0` for some regions)
 
 ## When in Doubt
 

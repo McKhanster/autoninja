@@ -18,7 +18,7 @@ from shared.utils.rate_limiter import BedrockRateLimiter
 AGENT_ID = "ENFYY6GZGF"  # Code Generator Agent ID
 AGENT_ALIAS_ID = "TSTALIASID"  # test alias pointing to DRAFT
 REGION = "us-east-2"
-foundational_model = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
+foundational_model = " us.amazon.nova-premier-v1:0"
 
 def invoke_agent(prompt: str, session_id: str = None):
     """
@@ -90,7 +90,7 @@ def invoke_agent(prompt: str, session_id: str = None):
                         observation = orch_trace['observation']
                         if 'actionGroupInvocationOutput' in observation:
                             action_output = observation['actionGroupInvocationOutput']
-                            print(f"[TRACE] Action completed with status: {action_output.get('text', 'N/A')[:100]}")
+                            print(f"[TRACE] Action completed with status: {action_output.get('text', 'N/A')}")
         
         print("\n" + "-" * 80)
         print(f"\n✅ Agent invocation completed successfully!")

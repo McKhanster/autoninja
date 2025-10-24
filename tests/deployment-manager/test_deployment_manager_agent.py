@@ -89,7 +89,7 @@ def invoke_agent(prompt: str, session_id: str = None):
                         observation = orch_trace['observation']
                         if 'actionGroupInvocationOutput' in observation:
                             action_output = observation['actionGroupInvocationOutput']
-                            print(f"[TRACE] Action completed with status: {action_output.get('text', 'N/A')[:100]}")
+                            print(f"[TRACE] Action completed with status: {action_output.get('text', 'N/A')}")
         
         print("\n" + "-" * 80)
         print(f"\n✅ Agent invocation completed successfully!")

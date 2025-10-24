@@ -83,7 +83,17 @@ def extract_json_from_markdown(text: str) -> str:
             return potential_json
     
     # If no code blocks, return as-is (might already be pure JSON)
-    return text.strip()
+    result = text.strip()
+    
+    # Fix: If response starts with a quote (missing opening brace), prepend {
+    if result.startswith('"') and not result.startswith('{"'):
+        result = '{' + result
+    
+    # Fix: If response ends without closing brace, append }
+    if result.startswith('{') and not result.endswith('}'):
+        result = result + '}'
+    
+    return result
 
 
 def validate_requirements_structure(requirements: Dict[str, Any]) -> None:
@@ -149,7 +159,7 @@ def analyze(job_name: str, user_request: str, session_id: str) -> Dict[str, Any]
     
     # Extract JSON from markdown if needed
     json_text = extract_json_from_markdown(bedrock_response)
-    logger.info(f"RA extracted JSON (first 500 chars): {json_text[:500]}")
+    logger.info(f"RA extracted JSON (first 500 chars): {json_text}")
     
     # Parse AI response
     requirements = json.loads(json_text)

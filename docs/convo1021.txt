@@ -98,7 +98,7 @@
 ● Search(pattern: "anthropic.claude-sonnet", path: "infrastructure/cloudformation", output_mode: "content")
   ⎿  Found 219 lines (ctrl+o to expand)
 
-● Good! I can see the templates are using us.anthropic.claude-3-7-sonnet-20250219-v1:0 which is the correct inference profile ID (with the "us." prefix). However, the
+● Good! I can see the templates are using  us.amazon.nova-premier-v1:0 which is the correct inference profile ID (with the "us." prefix). However, the
   error message says "anthropic.claude-3-7-sonnet-20250219-v1:0" without the "us." prefix.
 
   This suggests that somewhere in the deployed agents, the model ID is being set to the foundation model ID instead of the inference profile. Let me check if there's a
@@ -115,7 +115,7 @@
    foundation model ID, when the model requires an inference profile.
 
   Now let me check what the actual BedrockModel parameter value is being set to when the stack is deployed. The issue might be that the stack was deployed with
-  anthropic.claude-3-7-sonnet-20250219-v1:0 instead of us.anthropic.claude-3-7-sonnet-20250219-v1:0.
+  anthropic.claude-3-7-sonnet-20250219-v1:0 instead of  us.amazon.nova-premier-v1:0.
 
   Let me summarize my findings and create an action plan:
 
@@ -126,10 +126,10 @@
 
   The Problem:
   - Error shows: anthropic.claude-3-7-sonnet-20250219-v1:0 (foundation model ID, NO "us." prefix)
-  - Template default: us.anthropic.claude-3-7-sonnet-20250219-v1:0 (inference profile ID, WITH "us." prefix)
+  - Template default:  us.amazon.nova-premier-v1:0 (inference profile ID, WITH "us." prefix)
 
   Conclusion:The collaborator agents were likely deployed with the parameter value anthropic.claude-3-7-sonnet-20250219-v1:0 instead of
-  us.anthropic.claude-3-7-sonnet-20250219-v1:0.
+   us.amazon.nova-premier-v1:0.
 
   Solution:Redeploy the collaborators stack with the correct inference profile ID that includes the "us." prefix.
 
@@ -146,20 +146,20 @@
   Retry your request with the ID or ARN of an inference profile that contains this model.
 
   The Problem: The collaborator agents (Requirements Analyst, etc.) are configured with the foundation model ID anthropic.claude-3-7-sonnet-20250219-v1:0 (without "us."
-   prefix) instead of the inference profile ID us.anthropic.claude-3-7-sonnet-20250219-v1:0 (with "us." prefix).
+   prefix) instead of the inference profile ID  us.amazon.nova-premier-v1:0 (with "us." prefix).
 
   According to AWS Bedrock documentation:
   - Foundation models with on-demand throughput cannot be invoked directly by agents
   - You must use an inference profile ARN or ID instead
-  - For us-east-2 region, Claude Sonnet 4.5's inference profile ID is: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  - For us-east-2 region, Claude Sonnet 4.5's inference profile ID is:  us.amazon.nova-premier-v1:0
 
   The Fix
 
   The collaborators stack needs to be redeployed with the correct BedrockModel parameter value:
   - Current (wrong): anthropic.claude-3-7-sonnet-20250219-v1:0
-  - Correct: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  - Correct:  us.amazon.nova-premier-v1:0
 
-  The CloudFormation templates are correctly defaulting to us.anthropic.claude-3-7-sonnet-20250219-v1:0, but during deployment, the parameter was likely overridden with
+  The CloudFormation templates are correctly defaulting to  us.amazon.nova-premier-v1:0, but during deployment, the parameter was likely overridden with
    the wrong value.
 
   I notice there are several background deployment processes running. We need to redeploy the collaborators stack with the correct model ID parameter.
@@ -178,7 +178,7 @@
   aws bedrock-agent update-agent \
     --agent-id COIRVWOLUP \
     --agent-name autoninja-requirements-analyst-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --instruction "You are a requirements analyst for the AutoNinja system..." \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
@@ -187,7 +187,7 @@
   aws bedrock-agent update-agent \
     --agent-id WPEDLIJE2K \
     --agent-name autoninja-code-generator-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --instruction "You are a code generator for the AutoNinja system..." \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
@@ -196,7 +196,7 @@
   aws bedrock-agent update-agent \
     --agent-id 8BSQ59K3RO \
     --agent-name autoninja-solution-architect-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --instruction "You are a solution architect for the AutoNinja system..." \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
@@ -205,7 +205,7 @@
   aws bedrock-agent update-agent \
     --agent-id I0E1LEIHEE \
     --agent-name autoninja-quality-validator-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --instruction "You are a quality validator for the AutoNinja system..." \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
@@ -214,7 +214,7 @@
   aws bedrock-agent update-agent \
     --agent-id NVPH3RIYGD \
     --agent-name autoninja-deployment-manager-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --instruction "You are a deployment manager for the AutoNinja system..." \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
@@ -238,7 +238,7 @@
   aws bedrock-agent update-agent \
     --agent-id COIRVWOLUP \
     --agent-name autoninja-requirements-analyst-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
 
@@ -246,7 +246,7 @@
   aws bedrock-agent update-agent \
     --agent-id WPEDLIJE2K \
     --agent-name autoninja-code-generator-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
 
@@ -254,7 +254,7 @@
   aws bedrock-agent update-agent \
     --agent-id 8BSQ59K3RO \
     --agent-name autoninja-solution-architect-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
 
@@ -262,7 +262,7 @@
   aws bedrock-agent update-agent \
     --agent-id I0E1LEIHEE \
     --agent-name autoninja-quality-validator-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
 
@@ -270,7 +270,7 @@
   aws bedrock-agent update-agent \
     --agent-id NVPH3RIYGD \
     --agent-name autoninja-deployment-manager-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
 
@@ -294,23 +294,23 @@
   Option 1: Update and re-prepare (creates new versions)
   # For each agent, update draft then prepare to create new version
   aws bedrock-agent update-agent --agent-id COIRVWOLUP --agent-name autoninja-requirements-analyst-production --foundation-model
-  us.anthropic.claude-3-7-sonnet-20250219-v1:0 --region us-east-2 --profile AdministratorAccess-784327326356
+   us.amazon.nova-premier-v1:0 --region us-east-2 --profile AdministratorAccess-784327326356
   aws bedrock-agent prepare-agent --agent-id COIRVWOLUP --region us-east-2 --profile AdministratorAccess-784327326356
 
-  aws bedrock-agent update-agent --agent-id WPEDLIJE2K --agent-name autoninja-code-generator-production --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  aws bedrock-agent update-agent --agent-id WPEDLIJE2K --agent-name autoninja-code-generator-production --foundation-model  us.amazon.nova-premier-v1:0
   --region us-east-2 --profile AdministratorAccess-784327326356
   aws bedrock-agent prepare-agent --agent-id WPEDLIJE2K --region us-east-2 --profile AdministratorAccess-784327326356
 
   aws bedrock-agent update-agent --agent-id 8BSQ59K3RO --agent-name autoninja-solution-architect-production --foundation-model
-  us.anthropic.claude-3-7-sonnet-20250219-v1:0 --region us-east-2 --profile AdministratorAccess-784327326356
+   us.amazon.nova-premier-v1:0 --region us-east-2 --profile AdministratorAccess-784327326356
   aws bedrock-agent prepare-agent --agent-id 8BSQ59K3RO --region us-east-2 --profile AdministratorAccess-784327326356
 
   aws bedrock-agent update-agent --agent-id I0E1LEIHEE --agent-name autoninja-quality-validator-production --foundation-model
-  us.anthropic.claude-3-7-sonnet-20250219-v1:0 --region us-east-2 --profile AdministratorAccess-784327326356
+   us.amazon.nova-premier-v1:0 --region us-east-2 --profile AdministratorAccess-784327326356
   aws bedrock-agent prepare-agent --agent-id I0E1LEIHEE --region us-east-2 --profile AdministratorAccess-784327326356
 
   aws bedrock-agent update-agent --agent-id NVPH3RIYGD --agent-name autoninja-deployment-manager-production --foundation-model
-  us.anthropic.claude-3-7-sonnet-20250219-v1:0 --region us-east-2 --profile AdministratorAccess-784327326356
+   us.amazon.nova-premier-v1:0 --region us-east-2 --profile AdministratorAccess-784327326356
   aws bedrock-agent prepare-agent --agent-id NVPH3RIYGD --region us-east-2 --profile AdministratorAccess-784327326356
 
   Option 2: Update the aliases to point to the new versions
@@ -352,7 +352,7 @@
   aws bedrock-agent update-agent \
     --agent-id COIRVWOLUP \
     --agent-name autoninja-requirements-analyst-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
 
@@ -360,7 +360,7 @@
   aws bedrock-agent update-agent \
     --agent-id WPEDLIJE2K \
     --agent-name autoninja-code-generator-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
 
@@ -368,7 +368,7 @@
   aws bedrock-agent update-agent \
     --agent-id 8BSQ59K3RO \
     --agent-name autoninja-solution-architect-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
 
@@ -376,7 +376,7 @@
   aws bedrock-agent update-agent \
     --agent-id I0E1LEIHEE \
     --agent-name autoninja-quality-validator-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
 
@@ -384,7 +384,7 @@
   aws bedrock-agent update-agent \
     --agent-id NVPH3RIYGD \
     --agent-name autoninja-deployment-manager-production \
-    --foundation-model us.anthropic.claude-3-7-sonnet-20250219-v1:0 \
+    --foundation-model  us.amazon.nova-premier-v1:0 \
     --region us-east-2 \
     --profile AdministratorAccess-784327326356
 
@@ -459,7 +459,7 @@
      # Update Bedrock Agent Foundation Models
      #
      # This script updates all collaborator agents to use the correct inference
-     # profile ID (us.anthropic.claude-3-7-sonnet-20250219-v1:0) instead of the
+     # profile ID ( us.amazon.nova-premier-v1:0) instead of the
      # foundation model ID (anthropic.claude-3-7-sonnet-20250219-v1:0).
      #
      … +162 lines (ctrl+o to expand)
@@ -476,7 +476,7 @@
   What the script does:
 
   1. Backs up current agent configurations to /tmp/agent-backups/
-  2. Updates all 5 collaborator agents with the correct inference profile model ID: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  2. Updates all 5 collaborator agents with the correct inference profile model ID:  us.amazon.nova-premier-v1:0
   3. Prepares each agent (creates version 2 with the new model)
   4. Updates all production aliases to point to version 2
   5. Verifies that all updates were successful
@@ -687,7 +687,7 @@ doesn't exist. Retry the request with a different resource identifier.
 > Nothing changed. The only difference is the description is missing; ==========================================
 Region: us-east-2
 Profile: AdministratorAccess-784327326356
-New Model: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+New Model:  us.amazon.nova-premier-v1:0
 
 Step 1: Backing up current agent configurations...
   - Backing up quality-validator (I0E1LEIHEE)...
@@ -752,27 +752,27 @@ Step 4: Updating aliases to point to latest version...
 Verification
 ==========================================
 quality-validator (I0E1LEIHEE):
-  Model: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  Model:  us.amazon.nova-premier-v1:0
   Alias Version: 1
   ✓ Model updated correctly
 
 requirements-analyst (COIRVWOLUP):
-  Model: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  Model:  us.amazon.nova-premier-v1:0
   Alias Version: 1
   ✓ Model updated correctly
 
 solution-architect (8BSQ59K3RO):
-  Model: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  Model:  us.amazon.nova-premier-v1:0
   Alias Version: 1
   ✓ Model updated correctly
 
 code-generator (WPEDLIJE2K):
-  Model: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  Model:  us.amazon.nova-premier-v1:0
   Alias Version: 1
   ✓ Model updated correctly
 
 deployment-manager (NVPH3RIYGD):
-  Model: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  Model:  us.amazon.nova-premier-v1:0
   Alias Version: 1
   ✓ Model updated correctly
 
@@ -784,7 +784,7 @@ Next steps:
 1. Test the supervisor agent: python tests/supervisor/test_supervisor.py
 2. Check CloudWatch logs for any errors 
 
-● Excellent! The script ran successfully and all 5 collaborator agents now have the correct inference profile model ID (us.anthropic.claude-3-7-sonnet-20250219-v1:0).
+● Excellent! The script ran successfully and all 5 collaborator agents now have the correct inference profile model ID ( us.amazon.nova-premier-v1:0).
 
   The only issue is the missing descriptions. Let me create a quick script to restore those from the CloudFormation templates:
 
@@ -822,11 +822,11 @@ Next steps:
   ⎿  anthropic.claude-3-7-sonnet-20250219-v1:0
 
 ● Bash(aws bedrock-agent get-agent --agent-id COIRVWOLUP --region us-east-2 --profile AdministratorAccess-784327326356 --query 'agent.foundationModel' --output text)
-  ⎿  us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  ⎿   us.amazon.nova-premier-v1:0
 
 ● Perfect! Now I see the issue clearly:
 
-  - Draft agent: Has the NEW model us.anthropic.claude-3-7-sonnet-20250219-v1:0 ✓
+  - Draft agent: Has the NEW model  us.amazon.nova-premier-v1:0 ✓
   - Version 1: Still has the OLD model anthropic.claude-3-7-sonnet-20250219-v1:0 ✗
 
   The prepare-agent command detected that the draft was different from version 1, but it overwrote version 1 instead of creating version 2. This is because there's no
@@ -896,7 +896,7 @@ Next steps:
   2. Or delete and recreate the entire agent stack
 
   Since we can't create version 2, the best option is to redeploy the collaborators CloudFormation stack, which will create fresh agents with the correct model ID from
-  the start. The templates already have the correct model ID (us.anthropic.claude-3-7-sonnet-20250219-v1:0).
+  the start. The templates already have the correct model ID ( us.amazon.nova-premier-v1:0).
 
   Would you like me to clean up the collaborators stack and redeploy it fresh?
 
@@ -1024,7 +1024,7 @@ Next steps:
   Let me check the supervisor agent's model:
 
 ● Bash(aws bedrock-agent get-agent --agent-id LOS0AF5NG3 --region us-east-2 --profile AdministratorAccess-784327326356 --query 'agent.foundationModel' --output text)
-  ⎿  us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  ⎿   us.amazon.nova-premier-v1:0
 
 ● The supervisor agent draft has the correct model. But the test output shows it's using the OLD model without the "us." prefix. This means the supervisor alias is 
   still pointing to version 1 with the old model. You said you updated the supervisor - did you create a new version and update the alias to point to it?
@@ -1038,7 +1038,7 @@ Next steps:
      … +15 lines (ctrl+o to expand)
 
 ● Perfect! The supervisor alias is pointing to DRAFT, which has the correct model. The test is using alias TSTALIASID which is the test alias pointing to DRAFT. Since
-  DRAFT has the correct model (us.anthropic.claude-3-7-sonnet-20250219-v1:0), the supervisor itself should be fine.
+  DRAFT has the correct model ( us.amazon.nova-premier-v1:0), the supervisor itself should be fine.
 
   The error in the log.md is showing the Lambda is trying to invoke Requirements Analyst with the wrong model. This log is old though. Let me get the fresh CloudWatch
   logs from the most recent test run to see what's actually happening now.

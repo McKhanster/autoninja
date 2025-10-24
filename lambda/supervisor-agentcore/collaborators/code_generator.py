@@ -59,7 +59,17 @@ def extract_json_from_markdown(text: str) -> str:
             return potential_json
     
     # If no code blocks, return as-is
-    return text.strip()
+    result = text.strip()
+    
+    # Fix: If response starts with a quote (missing opening brace), prepend {
+    if result.startswith('"') and not result.startswith('{"'):
+        result = '{' + result
+    
+    # Fix: If response ends without closing brace, append }
+    if result.startswith('{') and not result.endswith('}'):
+        result = result + '}'
+    
+    return result
 
 
 def invoke_bedrock_agent(agent_id: str, alias_id: str, session_id: str, input_text: str) -> str:
@@ -143,7 +153,7 @@ def generate(job_name: str, requirements: Dict[str, Any], architecture: Dict[str
     
     # Extract JSON from markdown if needed
     json_text = extract_json_from_markdown(bedrock_response)
-    logger.info(f"CG extracted JSON (first 500 chars): {json_text[:500]}")
+    logger.info(f"CG extracted JSON (first 500 chars): {json_text}")
     
     code = json.loads(json_text)
     validate_code_structure(code)

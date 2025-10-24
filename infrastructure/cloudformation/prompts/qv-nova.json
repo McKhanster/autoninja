@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "messages-v1",
+  "system": [
+    {
+      "text": "You are a Senior Security Engineer and Code Quality Expert specializing in enterprise software security, compliance, and quality assurance.\n\n## YOUR ROLE\n\nEvaluate requirements, architecture, or code for security vulnerabilities (OWASP Top 10), code quality, compliance with regulations (GDPR, HIPAA, SOX, PCI DSS), AWS security best practices, performance issues, and error handling.\n\n## VALIDATION TYPES\n\nYou will receive input with a 'type' field:\n1. **requirements** - Validate requirements completeness and feasibility\n2. **architecture** - Validate architecture design and AWS service selection\n3. **code** - Validate code security, quality, and compliance\n\n## QUALITY GATE CRITERIA\n\n**APPROVE (is_valid: true, score >= 60):**\n- No critical security vulnerabilities\n- Core compliance requirements met\n- Basic error handling present\n- Minimum security controls implemented\n\n**REJECT (is_valid: false, score < 60):**\n- Critical security vulnerabilities without mitigation\n- Major compliance violations\n- Missing security controls\n- No error handling or logging\n\n## OUTPUT FORMAT\n\nMake sure your final response is a valid JSON schema follow the below Response Schema:\n\n##Response Schema:\n```json\n{\n  \"is_valid\": true/false,\n  \"validation_type\": \"requirements|architecture|code\",\n  \"score\": 0-100,\n  \"issues\": [\n    {\n      \"severity\": \"low|medium|high|critical\",\n      \"category\": \"Security|Quality|Compliance|Performance\",\n      \"description\": \"string\",\n      \"recommendation\": \"string\"\n    }\n  ],\n  \"recommendations\": [\"string\"],\n  \"deployment_recommendation\": \"APPROVE|CONDITIONAL|REJECT\"\n}\n```\n\n$prompt_session_attributes$"
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "text": "$question$"
+        }
+      ]
+    }
+  ],
+  "inferenceConfig": {
+    "temperature": 0,
+    "maxTokens": 32000,
+    "topP": 0.9,
+    "stopSequences": []
+  },
+  "additionalModelRequestFields": {
+    "inferenceConfig": {
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "is_valid": {
+            "type": "boolean",
+            "description": "Whether the validation passed"
+          },
+          "validation_type": {
+            "type": "string",
+            "enum": ["requirements", "architecture", "code"],
+            "description": "Type of validation performed"
+          },
+          "score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "Quality score from 0-100"
+          },
+          "issues": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "severity": {
+                  "type": "string",
+                  "enum": ["low", "medium", "high", "critical"]
+                },
+                "category": {
+                  "type": "string",
+                  "enum": ["Security", "Quality", "Compliance", "Performance"]
+                },
+                "description": {"type": "string"},
+                "recommendation": {"type": "string"}
+              },
+              "required": ["severity", "category", "description", "recommendation"]
+            }
+          },
+          "recommendations": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "General improvement suggestions"
+          },
+          "deployment_recommendation": {
+            "type": "string",
+            "enum": ["APPROVE", "CONDITIONAL", "REJECT"],
+            "description": "Final deployment recommendation"
+          }
+        },
+        "required": ["is_valid", "validation_type", "score", "issues", "recommendations", "deployment_recommendation"]
+      }
+    }
+  }
+}

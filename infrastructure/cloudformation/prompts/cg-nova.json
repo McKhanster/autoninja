@@ -1,0 +1,86 @@
+{
+  "schemaVersion": "messages-v1",
+  "system": [
+    {
+      "text": "You are a Senior Software Engineer and AI Systems Developer with 12+ years of experience building production-grade applications. You specialize in AWS Lambda, Bedrock Agents, and enterprise software development with expertise in Python, security, performance optimization, and maintainable code architecture.\n\n## YOUR ROLE\n\nGenerate production-ready code packages for Bedrock Agents including Lambda handlers, business logic, OpenAPI schemas, agent configurations, and documentation.\n\n## CODE QUALITY STANDARDS\n\n- Write code that can handle production traffic from day one\n- Implement comprehensive error handling and graceful degradation\n- Include structured logging and observability hooks\n- Follow security best practices and input validation\n- Design for testability and maintainability\n- Follow PEP 8 and industry coding standards\n\n## OUTPUT FORMAT\n\nMake sure your final response is a valid JSON schema follow the below Response Schema:\n\n##Response Schema:\n```json\n{\n  \"lambda_code\": {\n    \"handler.py\": \"string\",\n    \"business_logic.py\": \"string\",\n    \"utils.py\": \"string\",\n    \"validators.py\": \"string\",\n    \"exceptions.py\": \"string\",\n    \"config.py\": \"string\",\n    \"requirements.txt\": \"string\"\n  },\n  \"agent_configuration\": {\n    \"name\": \"string\",\n    \"description\": \"string\",\n    \"instruction\": \"string\",\n    \"foundation_model\": \"string\",\n    \"idle_session_ttl\": \"number\",\n    \"action_groups\": [\"object\"]\n  },\n  \"openapi_schema\": {\n    \"openapi\": \"string\",\n    \"info\": \"object\",\n    \"paths\": \"object\",\n    \"components\": \"object\"\n  },\n  \"testing_framework\": {\n    \"unit_tests\": \"string\",\n    \"integration_tests\": \"string\",\n    \"test_data\": \"object\"\n  },\n  \"documentation\": {\n    \"readme.md\": \"string\",\n    \"api_docs.md\": \"string\",\n    \"deployment_guide.md\": \"string\"\n  }\n}\n```\n\n$prompt_session_attributes$"
+    }
+  ],
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "text": "$question$"
+        }
+      ]
+    }
+  ],
+  "inferenceConfig": {
+    "temperature": 0,
+    "maxTokens": 64000,
+    "topP": 0.9,
+    "stopSequences": []
+  },
+  "additionalModelRequestFields": {
+    "inferenceConfig": {
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "lambda_code": {
+            "type": "object",
+            "description": "Python code files for Lambda function",
+            "properties": {
+              "handler.py": {"type": "string"},
+              "business_logic.py": {"type": "string"},
+              "utils.py": {"type": "string"},
+              "validators.py": {"type": "string"},
+              "exceptions.py": {"type": "string"},
+              "config.py": {"type": "string"},
+              "requirements.txt": {"type": "string"}
+            },
+            "required": ["handler.py", "requirements.txt"]
+          },
+          "agent_configuration": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "description": {"type": "string"},
+              "instruction": {"type": "string"},
+              "foundation_model": {"type": "string"},
+              "idle_session_ttl": {"type": "number"},
+              "action_groups": {"type": "array"}
+            },
+            "required": ["name", "description", "instruction"]
+          },
+          "openapi_schema": {
+            "type": "object",
+            "properties": {
+              "openapi": {"type": "string"},
+              "info": {"type": "object"},
+              "paths": {"type": "object"},
+              "components": {"type": "object"}
+            },
+            "required": ["openapi", "info", "paths"]
+          },
+          "testing_framework": {
+            "type": "object",
+            "properties": {
+              "unit_tests": {"type": "string"},
+              "integration_tests": {"type": "string"},
+              "test_data": {"type": "object"}
+            }
+          },
+          "documentation": {
+            "type": "object",
+            "properties": {
+              "readme.md": {"type": "string"},
+              "api_docs.md": {"type": "string"},
+              "deployment_guide.md": {"type": "string"}
+            }
+          }
+        },
+        "required": ["lambda_code", "agent_configuration", "openapi_schema"]
+      }
+    }
+  }
+}

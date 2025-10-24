@@ -12,7 +12,7 @@ Parameters:
   BedrockModel:
     Type: String
     Description: Foundation model ID for Bedrock Agents
-    Default: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+    Default: us.amazon.nova-premier-v1:0
 
   DynamoDBBillingMode:
     Type: String
@@ -194,6 +194,7 @@ Resources:
             - !Ref DeploymentBucket
       Parameters:
         Environment: !Ref Environment
+        BedrockModel: !Ref BedrockModel
         DeploymentBucket: !If
           - UseDefaultDeploymentBucket
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
@@ -219,6 +220,7 @@ Resources:
             - !Ref DeploymentBucket
       Parameters:
         Environment: !Ref Environment
+        BedrockModel: !Ref BedrockModel
         DeploymentBucket: !If
           - UseDefaultDeploymentBucket
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
@@ -244,6 +246,7 @@ Resources:
             - !Ref DeploymentBucket
       Parameters:
         Environment: !Ref Environment
+        BedrockModel: !Ref BedrockModel
         DeploymentBucket: !If
           - UseDefaultDeploymentBucket
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
@@ -269,6 +272,7 @@ Resources:
             - !Ref DeploymentBucket
       Parameters:
         Environment: !Ref Environment
+        BedrockModel: !Ref BedrockModel
         DeploymentBucket: !If
           - UseDefaultDeploymentBucket
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
@@ -294,6 +298,7 @@ Resources:
             - !Ref DeploymentBucket
       Parameters:
         Environment: !Ref Environment
+        BedrockModel: !Ref BedrockModel
         DeploymentBucket: !If
           - UseDefaultDeploymentBucket
           - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
