@@ -372,7 +372,7 @@ def test_e2e_orchestration():
     get_supervisor_agent_ids()
 
     # Test prompt
-    prompt = "Build a simple friend agent for emotional support"
+    prompt = "Build a customer service agent for a department store."
 
     # Track test results
     results = {

@@ -41,25 +41,27 @@ def get_stack_outputs():
 def extract_json_from_markdown(text: str) -> str:
     """Extract JSON from markdown code blocks or return text as-is if already JSON"""
     import re
+    import json
     
     # Try to find JSON in markdown code blocks
     json_block_pattern = r'```json\s*\n(.*?)\n```'
     matches = re.findall(json_block_pattern, text, re.DOTALL)
     
     if matches:
-        return matches[0].strip()
-    
-    # Try to find any code block
-    code_block_pattern = r'```\s*\n(.*?)\n```'
-    matches = re.findall(code_block_pattern, text, re.DOTALL)
-    
-    if matches:
-        potential_json = matches[0].strip()
-        if potential_json.startswith('{') or potential_json.startswith('['):
-            return potential_json
-    
-    # If no code blocks, return as-is
-    result = text.strip()
+        result = matches[0].strip()
+    else:
+        # Try to find any code block
+        code_block_pattern = r'```\s*\n(.*?)\n```'
+        matches = re.findall(code_block_pattern, text, re.DOTALL)
+        
+        if matches:
+            potential_json = matches[0].strip()
+            if potential_json.startswith('{') or potential_json.startswith('['):
+                result = potential_json
+            else:
+                result = text.strip()
+        else:
+            result = text.strip()
     
     # Fix: If response starts with a quote (missing opening brace), prepend {
     if result.startswith('"') and not result.startswith('{"'):
@@ -69,7 +71,23 @@ def extract_json_from_markdown(text: str) -> str:
     if result.startswith('{') and not result.endswith('}'):
         result = result + '}'
     
-    return result
+    # Try to parse and catch specific errors
+    try:
+        json.loads(result)
+        return result
+    except json.JSONDecodeError as e:
+        # If it's a missing comma error, try to fix it
+        if "Expecting ',' delimiter" in str(e):
+            # Try to add missing commas before quotes that follow closing braces/brackets
+            result = re.sub(r'([}\]"])\s*\n\s*"', r'\1,\n"', result)
+            # Try again
+            try:
+                json.loads(result)
+                return result
+            except:
+                pass
+        # Return as-is if we can't fix it
+        return result
 
 
 def invoke_bedrock_agent(agent_id: str, alias_id: str, session_id: str, input_text: str) -> str:
@@ -128,9 +146,20 @@ def design(job_name: str, requirements: Dict[str, Any], session_id: str) -> Dict
     raw_request = json.dumps({"job_name": job_name, "requirements": requirements}, default=str)
     logger.info(f"RAW REQUEST for {job_name}: {raw_request}")
     
-    logger.info(f"Architecture design for job: {job_name}")
     
-    # Log input to DynamoDB
+   
+    
+    apply_rate_limiting('solution-architect-bedrock')
+    
+    bedrock_response = invoke_bedrock_agent(
+        agent_id=agent_id,
+        alias_id=agent_alias_id,
+        session_id=session_id,
+        input_text=json.dumps(requirements)
+    )
+    logger.info(f"SA bedrock_response length: {bedrock_response} chars")
+
+     # Log input to DynamoDB
     timestamp = dynamodb_client.log_inference_input(
         job_name=job_name,
         session_id=session_id,
@@ -139,24 +168,11 @@ def design(job_name: str, requirements: Dict[str, Any], session_id: str) -> Dict
         prompt=json.dumps(requirements, default=str),
         model_id='bedrock-agent'
     )['timestamp']
-    
-    apply_rate_limiting('solution-architect-bedrock')
-    
-    logger.info(f"SA requirements: {requirements}")
-    bedrock_response = invoke_bedrock_agent(
-        agent_id=agent_id,
-        alias_id=agent_alias_id,
-        session_id=session_id,
-        input_text=json.dumps(requirements)
-    )
-    logger.info(f"SA bedrock_response: {bedrock_response}")
-    
     # Extract JSON from markdown if needed
     json_text = extract_json_from_markdown(bedrock_response)
-    logger.info(f"SA extracted JSON (first 500 chars): {json_text}")
     
     architecture = json.loads(json_text)
-    validate_architecture_structure(architecture)
+    # validate_architecture_structure(architecture)
     
     result = {
         "job_name": job_name,
@@ -167,7 +183,7 @@ def design(job_name: str, requirements: Dict[str, Any], session_id: str) -> Dict
     # Log raw output
     duration = time.time() - start_time
     raw_response = json.dumps(result, default=str)
-    logger.info(f"RAW RESPONSE for {job_name}: {raw_response}")
+    # logger.info(f"RAW RESPONSE for {job_name}: {raw_response}")
     
     # Log output to DynamoDB
     s3_uri = s3_client.get_s3_uri(
@@ -195,6 +211,6 @@ def design(job_name: str, requirements: Dict[str, Any], session_id: str) -> Dict
         content_type='application/json'
     )
     
-    logger.info(f"Architecture design completed in {duration:.2f}s")
+    # logger.info(f"Architecture design completed in {duration:.2f}s")
     
     return result

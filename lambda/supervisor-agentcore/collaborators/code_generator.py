@@ -39,37 +39,18 @@ def get_stack_outputs():
 
 
 def extract_json_from_markdown(text: str) -> str:
-    """Extract JSON from markdown code blocks or return text as-is if already JSON"""
+    """Extract JSON from markdown code blocks, ignoring everything else"""
     import re
     
-    # Try to find JSON in markdown code blocks
-    json_block_pattern = r'```json\s*\n(.*?)\n```'
-    matches = re.findall(json_block_pattern, text, re.DOTALL)
+    # Find content between ``` markers (with optional json/JSON label)
+    pattern = r'```(?:json|JSON)?\s*\n(.*?)\n```'
+    match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
     
-    if matches:
-        return matches[0].strip()
+    if match:
+        return match.group(1).strip()
     
-    # Try to find any code block
-    code_block_pattern = r'```\s*\n(.*?)\n```'
-    matches = re.findall(code_block_pattern, text, re.DOTALL)
-    
-    if matches:
-        potential_json = matches[0].strip()
-        if potential_json.startswith('{') or potential_json.startswith('['):
-            return potential_json
-    
-    # If no code blocks, return as-is
-    result = text.strip()
-    
-    # Fix: If response starts with a quote (missing opening brace), prepend {
-    if result.startswith('"') and not result.startswith('{"'):
-        result = '{' + result
-    
-    # Fix: If response ends without closing brace, append }
-    if result.startswith('{') and not result.endswith('}'):
-        result = result + '}'
-    
-    return result
+    # No code blocks found, return text as-is
+    return text.strip()
 
 
 def invoke_bedrock_agent(agent_id: str, alias_id: str, session_id: str, input_text: str) -> str:
@@ -95,14 +76,14 @@ def invoke_bedrock_agent(agent_id: str, alias_id: str, session_id: str, input_te
 
 def validate_code_structure(code: Dict[str, Any]) -> None:
     """Validate code has expected structure"""
-    required_sections = ['lambda_code', 'agent_config', 'openapi_schema']
+    required_sections = ['lambda_code', 'agent_configuration', 'openapi_schema']
     
     for section in required_sections:
         if section not in code:
             raise ValueError(f"Missing required section: {section}")
 
 
-def generate(job_name: str, requirements: Dict[str, Any], architecture: Dict[str, Any], session_id: str) -> Dict[str, Any]:
+def generate(job_name: str, requirements: Dict[str, Any], session_id: str) -> Dict[str, Any]:
     """
     Generate code based on requirements and architecture
     
@@ -126,34 +107,28 @@ def generate(job_name: str, requirements: Dict[str, Any], architecture: Dict[str
     
     logger.info(f"Code generation for job: {job_name}")
     
-    # Log input to DynamoDB
-    input_data = {
-        "requirements": requirements,
-        "architecture": architecture
-    }
     timestamp = dynamodb_client.log_inference_input(
         job_name=job_name,
         session_id=session_id,
         agent_name='code-generator',
         action_name='generate',
-        prompt=json.dumps(input_data, default=str),
+        prompt=json.dumps(requirements, default=str),
         model_id='bedrock-agent'
     )['timestamp']
     
     apply_rate_limiting('code-generator-bedrock')
     
-    logger.info(f"CG input_data: {input_data}")
     bedrock_response = invoke_bedrock_agent(
         agent_id=agent_id,
         alias_id=agent_alias_id,
         session_id=session_id,
-        input_text=json.dumps(input_data)
+        input_text=json.dumps(requirements, default=str)
     )
-    logger.info(f"CG bedrock_response: {bedrock_response}")
+    
     
     # Extract JSON from markdown if needed
     json_text = extract_json_from_markdown(bedrock_response)
-    logger.info(f"CG extracted JSON (first 500 chars): {json_text}")
+
     
     code = json.loads(json_text)
     validate_code_structure(code)
@@ -191,6 +166,5 @@ def generate(job_name: str, requirements: Dict[str, Any], architecture: Dict[str
         content_type='application/json'
     )
     
-    logger.info(f"Code generation completed in {duration:.2f}s")
     
     return result

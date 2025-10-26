@@ -117,7 +117,7 @@ def deploy(job_name: str, code: Dict[str, Any], session_id: str) -> Dict[str, An
     # Get deployment bucket from environment or construct from current region
     current_region = os.environ.get('AWS_REGION', boto3.Session().region_name or 'us-east-2')
     deployment_bucket = os.environ.get('DEPLOYMENT_BUCKET', f'autoninja-deployment-artifacts-{current_region}')
-    agent_config = code.get('agent_config', {})
+    agent_config = code.get('agent_configuration', code.get('agent_config', {}))
     agent_name = agent_config.get('name', job_name)
     lambda_code = code.get('lambda_code', {})
     openapi_schema = code.get('openapi_schema', {})

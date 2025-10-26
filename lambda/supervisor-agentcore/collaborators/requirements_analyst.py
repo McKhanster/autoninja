@@ -61,39 +61,27 @@ def invoke_bedrock_agent(agent_id: str, alias_id: str, session_id: str, input_te
         raise
 
 
-def extract_json_from_markdown(text: str) -> str:
-    """Extract JSON from markdown code blocks or return text as-is if already JSON"""
-    import re
+def parse_markdown_response(markdown_text: str) -> dict:
+    """
+    Parse markdown response from Requirements Analyst.
     
-    # Try to find JSON in markdown code blocks - more flexible pattern
-    # Matches ```json ... ``` with any whitespace
-    json_block_pattern = r'```json\s*(.*?)```'
-    matches = re.findall(json_block_pattern, text, re.DOTALL)
+    Args:
+        markdown_text: Full markdown document from the agent
     
-    if matches:
-        return matches[0].strip()
+    Returns:
+        Dictionary with structured requirements
+    """
+    from shared.utils.markdown_parser import markdown_to_dict
     
-    # Try to find any code block - more flexible pattern
-    code_block_pattern = r'```\s*(.*?)```'
-    matches = re.findall(code_block_pattern, text, re.DOTALL)
-    
-    if matches:
-        potential_json = matches[0].strip()
-        if potential_json.startswith('{') or potential_json.startswith('['):
-            return potential_json
-    
-    # If no code blocks, return as-is (might already be pure JSON)
-    result = text.strip()
-    
-    # Fix: If response starts with a quote (missing opening brace), prepend {
-    if result.startswith('"') and not result.startswith('{"'):
-        result = '{' + result
-    
-    # Fix: If response ends without closing brace, append }
-    if result.startswith('{') and not result.endswith('}'):
-        result = result + '}'
-    
-    return result
+    try:
+        # Convert markdown to dictionary
+        result = markdown_to_dict(markdown_text)
+        logger.info(f"Successfully parsed markdown response with {len(result)} top-level sections")
+        return result
+    except Exception as e:
+        logger.error(f"Failed to parse markdown response: {e}")
+        logger.error(f"Markdown preview (first 500 chars): {markdown_text[:500]}")
+        raise ValueError(f"Failed to parse Requirements Analyst markdown response: {e}")
 
 
 def validate_requirements_structure(requirements: Dict[str, Any]) -> None:
@@ -145,7 +133,7 @@ def analyze(job_name: str, user_request: str, session_id: str) -> Dict[str, Any]
     logger.info(f"Requirements analysis for job: {job_name}")
     
     # Rate limit before calling Bedrock Agent
-    apply_rate_limiting('requirements-analyst-bedrock')
+    # apply_rate_limiting('requirements-analyst-bedrock')
     
     # Call Bedrock Agent
     logger.info(f"RA user_request: {user_request}")
@@ -155,15 +143,11 @@ def analyze(job_name: str, user_request: str, session_id: str) -> Dict[str, Any]
         session_id=session_id,
         input_text=user_request
     )
-    logger.info(f"RA bedrock_response: {bedrock_response}")
     
-    # Extract JSON from markdown if needed
-    json_text = extract_json_from_markdown(bedrock_response)
-    logger.info(f"RA extracted JSON (first 500 chars): {json_text}")
-    
-    # Parse AI response
-    requirements = json.loads(json_text)
-    validate_requirements_structure(requirements)
+    # Parse markdown response
+    logger.info(f"RA response preview (first 500 chars): {bedrock_response[:500]}")
+    requirements = parse_markdown_response(bedrock_response)
+    # validate_requirements_structure(requirements)
     
     # Prepare result
     result = {
@@ -175,7 +159,7 @@ def analyze(job_name: str, user_request: str, session_id: str) -> Dict[str, Any]
     # Log raw output
     duration = time.time() - start_time
     raw_response = json.dumps(result, default=str)
-    logger.info(f"RAW RESPONSE for {job_name}: {raw_response}")
+    # logger.info(f"RAW RESPONSE for {job_name}: {raw_response}")
     
     # Log to DynamoDB
     s3_uri = s3_client.get_s3_uri(
@@ -204,6 +188,6 @@ def analyze(job_name: str, user_request: str, session_id: str) -> Dict[str, Any]
         content_type='application/json'
     )
     
-    logger.info(f"Requirements analysis completed in {duration:.2f}s")
+    # logger.info(f"Requirements analysis completed in {duration:.2f}s")
     
     return result

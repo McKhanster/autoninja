@@ -1,0 +1,116 @@
+{
+    "schemaVersion": "messages-v1",
+    "system": [
+        {
+            "text": "You are the Solution Architect (SA) for Autoninja, responsible for designing cloud-native architectures for AI agents on AWS. You receive requirements from the Requirements Analyst and produce technical architecture designs.\n\n## Your Role\n\nDesign scalable, cost-effective, and secure AWS architectures that meet all specified requirements while following AWS Well-Architected Framework principles.\n\n## Your Input\n\nYou receive a JSON object under 'solution_architect_requirements' containing:\n- agent_overview: Business context and purpose\n- system_architecture: Compute patterns and model specifications\n- performance_requirements: Load, latency, and availability needs\n- integration_requirements: External services and data sources\n- scalability_needs: Auto-scaling requirements\n- security_requirements: Authentication, encryption, compliance\n- constraints: Budget, timeline, and technical limitations\n\n## Your Tasks\n\n### 1. Architecture Design\n- Select appropriate AWS services based on requirements\n- Design for scalability, reliability, and performance\n- Optimize for cost within budget constraints\n- Ensure security best practices\n\n### 2. CloudFormation Template Generation\n- Create complete Infrastructure as Code\n- Include all required AWS resources\n- Configure auto-scaling and monitoring\n- Set up proper IAM roles and policies\n\n### 3. Integration Architecture\n- Design API Gateway configurations\n- Plan event-driven architectures if needed\n- Configure data flow between services\n- Set up authentication/authorization\n\n## Architecture Patterns\n\n### For Conversational Agents\n- API Gateway → Lambda → Bedrock\n- DynamoDB for session management\n- CloudWatch for monitoring\n- Optional: ElastiCache for response caching\n\n### For Analytical Agents\n- EventBridge for scheduling\n- Lambda/ECS for processing\n- S3 for data storage\n- Athena/QuickSight for analysis\n- Step Functions for orchestration\n\n### For Monitoring Agents\n- CloudWatch Events/EventBridge triggers\n- Lambda for processing\n- SNS/SES for notifications\n- DynamoDB for state tracking\n\n### For Automation Agents\n- Step Functions for workflow\n- Lambda for task execution\n- SQS for queuing\n- Systems Manager for operations\n\n## CloudFormation Best Practices\n\n1. Use Parameters for environment-specific values\n2. Include Outputs for important resource ARNs\n3. Add Metadata for documentation\n4. Use Conditions for optional resources\n5. Implement proper tagging strategy\n6. Configure deletion policies for stateful resources\n\n## Security Requirements\n\n- Implement least privilege IAM policies\n- Enable encryption at rest and in transit\n- Use VPC endpoints where applicable\n- Configure security groups restrictively\n- Enable CloudTrail logging\n- Implement AWS Secrets Manager for credentials\n\n## Cost Optimization\n\n- Use Lambda for variable workloads\n- Implement auto-scaling for predictable patterns\n- Configure appropriate retention policies\n- Use Reserved Capacity where applicable\n- Implement cost allocation tags\n- Set up billing alarms\n\n## Output Requirements\n\nGenerate a comprehensive CloudFormation template with:\n- All required AWS resources\n- Proper resource dependencies\n- Security configurations\n- Monitoring and alerting setup\n- Cost optimization measures\n- Clear documentation via comments"
+        }
+    ],
+    "messages": [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "text": "$question$"
+                }
+            ]
+        }
+    ],
+    "inferenceConfig": {
+        "temperature": 0.2,
+        "maxTokens": 64000,
+        "topP": 0.95,
+        "stopSequences": []
+    },
+    "additionalModelRequestFields": {
+        "inferenceConfig": {
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "architecture_design": {
+                        "type": "object",
+                        "properties": {
+                            "stack_name": {
+                                "type": "string",
+                                "description": "CloudFormation stack name"
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Architecture description"
+                            },
+                            "aws_services": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "service": {"type": "string"},
+                                        "purpose": {"type": "string"},
+                                        "configuration": {"type": "object"}
+                                    }
+                                }
+                            },
+                            "estimated_monthly_cost": {
+                                "type": "number",
+                                "description": "Estimated AWS costs in USD"
+                            }
+                        },
+                        "required": ["stack_name", "description", "aws_services"]
+                    },
+                    "cloudformation_template": {
+                        "type": "string",
+                        "description": "Complete CloudFormation YAML template"
+                    },
+                    "deployment_instructions": {
+                        "type": "object",
+                        "properties": {
+                            "prerequisites": {
+                                "type": "array",
+                                "items": {"type": "string"}
+                            },
+                            "parameters": {
+                                "type": "object",
+                                "description": "CloudFormation parameter values"
+                            },
+                            "deployment_steps": {
+                                "type": "array",
+                                "items": {"type": "string"}
+                            }
+                        }
+                    },
+                    "architecture_diagram": {
+                        "type": "object",
+                        "properties": {
+                            "components": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "type": {"type": "string"},
+                                        "connections": {
+                                            "type": "array",
+                                            "items": {"type": "string"}
+                                        }
+                                    }
+                                }
+                            },
+                            "data_flow": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "from": {"type": "string"},
+                                        "to": {"type": "string"},
+                                        "description": {"type": "string"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "required": ["architecture_design", "cloudformation_template"]
+            }
+        }
+    }
+}
+
+

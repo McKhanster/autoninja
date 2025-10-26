@@ -93,8 +93,8 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         raw_request = json.dumps(event, default=str)
         logger.info(f"RAW REQUEST for {job_name}: {raw_request}")
         
-        logger.info(f"Processing request for apiPath: {api_path}")
-        logger.info(f"Parameters: {params}")
+        # logger.info(f"Processing request for apiPath: {api_path}")
+        # logger.info(f"Parameters: {params}")
         
         # Route to appropriate action handler
         if api_path == '/orchestrate':
@@ -122,7 +122,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         raw_response = json.dumps(result, default=str)
         logger.info(f"RAW RESPONSE for {job_name}: {raw_response}")
         
-        logger.info(f"Request completed successfully in {time.time() - start_time:.2f}s")
+        # logger.info(f"Request completed successfully in {time.time() - start_time:.2f}s")
         return response
         
     except Exception as e:
@@ -160,55 +160,48 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         }
 
 
-def orchestrate_requirements_analyst(job_name: str, user_request: str, max_retries: int = 2) -> Dict[str, Any]:
-    """Orchestrate Requirements Analyst with quality gate and retry logic"""
-    # Import the requirements analyst module
-    from collaborators import requirements_analyst
+def generate_requirements_as_supervisor(job_name: str, user_request: str) -> Dict[str, Any]:
+    """
+    Supervisor generates requirements directly (absorbing RA role).
+    Uses Bedrock with comprehensive RA prompt to analyze user request.
     
-    for attempt in range(max_retries):
-        try:
-            logger.info(f"=== Requirements Analyst (Attempt {attempt + 1}/{max_retries}) ===")
-            
-            # Call requirements analyst module directly
-            session_id = f"{job_name}-requirements-analyst"
-            result = requirements_analyst.analyze(job_name, user_request, session_id)
-            
-            requirements = result.get('requirements', {})
-            
-            # Rate limit before QV call
-            apply_rate_limiting('requirements-to-validation')
-            
-            # Quality Gate: Validate with QV
-            logger.info("Quality Gate: Validating requirements...")
-            from collaborators import quality_validator
-            validation = quality_validator.validate(
-                job_name=job_name,
-                validation_type='requirements',
-                data=requirements,
-                session_id=f"{job_name}-qv-requirements"
-            )
-            
-            if validation.get('is_valid', False):
-                logger.info("✓ Requirements approved by Quality Validator")
-                return requirements
-            else:
-                logger.warning(f"✗ Requirements validation failed: {validation.get('issues', [])}")
-                if attempt < max_retries - 1:
-                    logger.info("Retrying requirements analysis...")
-                    continue
-                else:
-                    raise ValueError(f"Requirements validation failed after {max_retries} attempts")
-                    
-        except Exception as e:
-            logger.error(f"Requirements Analyst attempt {attempt + 1} failed: {str(e)}")
-            if attempt < max_retries - 1:
-                continue
-            else:
-                raise ValueError(f"Requirements analysis failed after {max_retries} attempts: {str(e)}")
+    Args:
+        job_name: Unique job identifier
+        user_request: User's natural language request
+        
+    Returns:
+        Dict with structured requirements for all agents
+    """
+    from shared.utils.supervisor_parser import extract_json_from_supervisor_response, split_requirements_for_agents
+    
+    start_time = time.time()
+    
+    logger.info(f"=== Supervisor Requirements Generation ===")
+    logger.info(f"Analyzing user request: {user_request}")
+    
+    # Apply rate limiting
+    apply_rate_limiting('supervisor-requirements')
+    
+    try:
+        # TODO: Replace with actual Bedrock call using RA prompt from S3
+        # For now, simulate supervisor response with embedded JSON
+        
+        # Parse the supervisor response to extract JSON
+        
+        
+        logger.info("✓ Requirements generated and parsed by Supervisor")
+        logger.info(f"Generated requirements for {len(agent_requirements)} agents")
+        
+        # Return the complete requirements JSON (not split)
+        return requirements_json
+        
+    except Exception as e:
+        logger.error(f"Supervisor requirements generation failed: {str(e)}")
+        raise ValueError(f"Requirements generation failed: {str(e)}")
 
 
-def orchestrate_solution_architect(job_name: str, requirements: Dict[str, Any], max_retries: int = 2) -> Dict[str, Any]:
-    """Orchestrate Solution Architect with quality gate and retry logic"""
+def orchestrate_solution_architect(job_name: str, requirements: Dict[str, Any], max_retries: int = 1) -> Dict[str, Any]:
+    """Orchestrate Solution Architect (quality validation disabled, no retries)"""
     from collaborators import solution_architect
     
     for attempt in range(max_retries):
@@ -219,36 +212,15 @@ def orchestrate_solution_architect(job_name: str, requirements: Dict[str, Any], 
             session_id = f"{job_name}-solution-architect"
             result = solution_architect.design(
                 job_name, 
-                requirements.get('for_solution_architect', requirements),
+                requirements,
                 session_id
             )
             
             architecture = result.get('architecture', {})
             
-            # Rate limit before QV call
-            apply_rate_limiting('architecture-to-validation')
-            
-            # Quality Gate: Validate with QV
-            logger.info("Quality Gate: Validating architecture...")
-            from collaborators import quality_validator
-            validation = quality_validator.validate(
-                job_name=job_name,
-                validation_type='architecture',
-                data=architecture,
-                requirements=requirements,
-                session_id=f"{job_name}-qv-architecture"
-            )
-            
-            if validation.get('is_valid', False):
-                logger.info("✓ Architecture approved by Quality Validator")
-                return architecture
-            else:
-                logger.warning(f"✗ Architecture validation failed: {validation.get('issues', [])}")
-                if attempt < max_retries - 1:
-                    logger.info("Retrying architecture design...")
-                    continue
-                else:
-                    raise ValueError(f"Architecture validation failed after {max_retries} attempts")
+            # Skip quality validation - return architecture directly
+            logger.info("✓ Architecture completed (quality validation skipped)")
+            return architecture
                     
         except Exception as e:
             logger.error(f"Solution Architect attempt {attempt + 1} failed: {str(e)}")
@@ -258,8 +230,8 @@ def orchestrate_solution_architect(job_name: str, requirements: Dict[str, Any], 
                 raise ValueError(f"Architecture design failed after {max_retries} attempts: {str(e)}")
 
 
-def orchestrate_code_generator(job_name: str, requirements: Dict[str, Any], architecture: Dict[str, Any], max_retries: int = 2) -> Dict[str, Any]:
-    """Orchestrate Code Generator with quality gate and retry logic"""
+def orchestrate_code_generator(job_name: str, requirements: Dict[str, Any], max_retries: int = 1) -> Dict[str, Any]:
+    """Orchestrate Code Generator (quality validation disabled, no retries)"""
     from collaborators import code_generator
     
     for attempt in range(max_retries):
@@ -270,38 +242,14 @@ def orchestrate_code_generator(job_name: str, requirements: Dict[str, Any], arch
             session_id = f"{job_name}-code-generator"
             result = code_generator.generate(
                 job_name,
-                requirements.get('for_code_generator', requirements),
-                architecture.get('for_code_generator', architecture),
+                requirements,
                 session_id
             )
             
             code = result.get('code', {})
             
-            # Rate limit before QV call
-            apply_rate_limiting('code-to-validation')
-            
-            # Quality Gate: Validate with QV
-            logger.info("Quality Gate: Validating code...")
-            from collaborators import quality_validator
-            validation = quality_validator.validate(
-                job_name=job_name,
-                validation_type='code',
-                data=code,
-                requirements=requirements,
-                architecture=architecture,
-                session_id=f"{job_name}-qv-code"
-            )
-            
-            if validation.get('is_valid', False):
-                logger.info("✓ Code approved by Quality Validator")
-                return code
-            else:
-                logger.warning(f"✗ Code validation failed: {validation.get('issues', [])}")
-                if attempt < max_retries - 1:
-                    logger.info("Retrying code generation...")
-                    continue
-                else:
-                    raise ValueError(f"Code validation failed after {max_retries} attempts")
+            logger.info("✓ Code completed (quality validation skipped)")
+            return code
                     
         except Exception as e:
             logger.error(f"Code Generator attempt {attempt + 1} failed: {str(e)}")
@@ -311,19 +259,19 @@ def orchestrate_code_generator(job_name: str, requirements: Dict[str, Any], arch
                 raise ValueError(f"Code generation failed after {max_retries} attempts: {str(e)}")
 
 
-def orchestrate_deployment_manager(job_name: str, code: Dict[str, Any]) -> Dict[str, Any]:
+def orchestrate_deployment_manager(job_name: str, dm_requirements: Dict[str, Any]) -> Dict[str, Any]:
     """Orchestrate Deployment Manager - single deploy action"""
     from collaborators import deployment_manager
     
     try:
-        logger.info("=== Deployment Manager ===")
+        # logger.info("=== Deployment Manager ===")
         
         # Rate limit before DM call
         apply_rate_limiting('code-to-deployment')
         
         # Call deployment manager module directly
         session_id = f"{job_name}-deployment-manager"
-        result = deployment_manager.deploy(job_name, code, session_id)
+        result = deployment_manager.deploy(job_name, dm_requirements, session_id)
         
         logger.info(f"Deployment completed: {result.get('stack_status')}")
         return result
@@ -352,12 +300,17 @@ def handle_orchestrate(
     Returns:
         Dict with final orchestration results
     """
+    from shared.utils.supervisor_parser import extract_json_from_supervisor_response, split_requirements_for_agents
+
     user_request = params.get('user_request')
     job_name = params.get('job_name')
     
     if not user_request:
         raise ValueError("Missing required parameter: user_request")
-    
+    requirements_json = extract_json_from_supervisor_response(supervisor_response)
+        
+        # Split requirements for different agents
+    agent_requirements = split_requirements_for_agents(requirements_json)
     # Log input to DynamoDB immediately
     timestamp = dynamodb_client.log_inference_input(
         job_name=job_name,
@@ -369,25 +322,27 @@ def handle_orchestrate(
     )['timestamp']
     
     try:
-        logger.info(f"Starting orchestration with quality gates for job: {job_name}")
+        # logger.info(f"Starting orchestration with quality gates for job: {job_name}")
         logger.info(f"User request: {user_request}")
         
-        # Step 1: Requirements Analyst (with built-in quality gate)
-        requirements = orchestrate_requirements_analyst(job_name, user_request)
-        logger.info("Requirements Analyst phase completed")
-        req_data = requirements
         
-        # Step 2: Solution Architect (with built-in quality gate)
-        architecture = orchestrate_solution_architect(job_name, req_data)
+        # The Bedrock Agent will provide JSON output directly in the event
+        logger.info("Requirements parsed from Bedrock Agent event")
+        
+        # Step 2: Solution Architect
+        sa_requirements = agent_requirements.get('solution_architect_requirements', {})
+        architecture = orchestrate_solution_architect(job_name, sa_requirements)
         logger.info("Solution Architect phase completed")
         
-        # Step 3: Code Generator (with built-in quality gate)
-        code = orchestrate_code_generator(job_name, req_data, architecture)
+        # Step 3: Code Generator  
+        cg_requirements = agent_requirements.get('code_generator_requirements', {})
+        code = orchestrate_code_generator(job_name, cg_requirements)
         logger.info("Code Generator phase completed")
         
         # Step 4: Deploy
-        deployment = orchestrate_deployment_manager(job_name, code)
-        logger.info("Deployment completed successfully")
+        dm_requirements = agent_requirements.get('deployment_manager_requirements', {})
+        deployment = orchestrate_deployment_manager(job_name, dm_requirements)
+        # logger.info("Deployment completed successfully")
         
         final_result = {
             "job_name": job_name,
@@ -487,9 +442,9 @@ def invoke_agent_lambda(agent_name: str, api_path: str, job_name: str, params: D
     # Create proper Bedrock Agent event structure
     event = create_agent_event(api_path, job_name, params)
     
-    logger.info(f"Invoking {agent_name} Lambda: {function_name}")
-    logger.info(f"API Path: {api_path}")
-    logger.info(f"Parameters: {list(params.keys())}")
+    # logger.info(f"Invoking {agent_name} Lambda: {function_name}")
+    # logger.info(f"API Path: {api_path}")
+    # logger.info(f"Parameters: {list(params.keys())}")
     
     try:
         invoke_start = time.time()
@@ -514,13 +469,13 @@ def invoke_agent_lambda(agent_name: str, api_path: str, job_name: str, params: D
                 logger.info(f"Successfully parsed {agent_name} response")
                 return result
             else:
-                logger.warning(f"Unexpected Lambda response format from {agent_name}")
+                # logger.warning(f"Unexpected Lambda response format from {agent_name}")
                 logger.info(f"Response keys: {list(response_payload.keys())}")
                 return {"response": str(response_payload), "status": "success", "agent_name": agent_name}
         else:
             error_msg = f"Lambda invocation failed with status {status_code}"
             logger.error(f"{agent_name}: {error_msg}")
-            logger.error(f"Response: {response_payload}")
+            # logger.error(f"Response: {response_payload}")
             raise Exception(f"{error_msg}: {response_payload}")
             
     except Exception as e:

@@ -1,0 +1,27 @@
+{
+    "schemaVersion": "messages-v1",
+    "system": [
+        {
+            "text": ""
+        }
+    ],
+    "messages": [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "text": "$question$"
+                }
+            ]
+        }
+    ],
+    "inferenceConfig": {
+        "temperature": 0,
+        "maxTokens": 30000,
+        "topP": 0.9,
+        "stopSequences": []
+    },
+    "additionalModelRequestFields": {
+       
+    }
+}

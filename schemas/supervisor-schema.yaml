@@ -23,19 +23,664 @@ paths:
                   type: string
                   description: User request for agent creation
       responses:
-        '200':
-          description: Orchestration completed
+        "200":
+          description: Comprehensive requirements analysis completed
           content:
             application/json:
               schema:
                 type: object
+                required:
+                  - metadata
+                  - solution_architect_requirements
+                  - code_generator_requirements
+                  - deployment_manager_requirements
+                  - validation_framework
                 properties:
-                  job_name:
-                    type: string
-                  status:
-                    type: string
-                  agent_arn:
-                    type: string
+                  metadata:
+                    type: object
+                    required:
+                      - request_id
+                      - agent_name
+                      - agent_type
+                      - complexity_level
+                      - estimated_development_hours
+                      - timestamp
+                      - version
+                    properties:
+                      request_id:
+                        type: string
+                        description: Generated UUID for this request
+                      agent_name:
+                        type: string
+                        description: Descriptive name based on purpose
+                      agent_type:
+                        type: string
+                        enum:
+                          [
+                            conversational,
+                            analytical,
+                            automation,
+                            monitoring,
+                            creative,
+                            hybrid,
+                          ]
+                      complexity_level:
+                        type: string
+                        enum: [simple, moderate, complex]
+                      estimated_development_hours:
+                        type: number
+                      timestamp:
+                        type: string
+                        format: date-time
+                      version:
+                        type: string
+                        default: "1.0"
+
+                  solution_architect_requirements:
+                    type: object
+                    required:
+                      - agent_overview
+                      - performance_requirements
+                      - integration_requirements
+                    properties:
+                      agent_overview:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          type:
+                            type: string
+                          business_purpose:
+                            type: string
+                          expected_users:
+                            type: number
+                          deployment_environment:
+                            type: string
+                            enum: [development, staging, production]
+                      system_architecture:
+                        type: object
+                        properties:
+                          compute_pattern:
+                            type: string
+                            enum: [serverless, containerized, server-based]
+                          suggested_model:
+                            type: string
+                          model_parameters:
+                            type: object
+                            properties:
+                              temperature:
+                                type: number
+                              max_tokens:
+                                type: number
+                              top_p:
+                                type: number
+                      performance_requirements:
+                        type: object
+                        properties:
+                          expected_requests_per_minute:
+                            type: number
+                          response_time_p95_ms:
+                            type: number
+                          availability_percentage:
+                            type: number
+                          concurrent_users:
+                            type: number
+                          data_volume_gb_per_month:
+                            type: number
+                      integration_requirements:
+                        type: object
+                        properties:
+                          external_apis:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                service:
+                                  type: string
+                                purpose:
+                                  type: string
+                                auth_method:
+                                  type: string
+                          aws_services:
+                            type: array
+                            items:
+                              type: string
+                          data_sources:
+                            type: array
+                            items:
+                              type: string
+                          event_sources:
+                            type: array
+                            items:
+                              type: string
+                      scalability_needs:
+                        type: object
+                        properties:
+                          auto_scaling:
+                            type: boolean
+                          min_instances:
+                            type: number
+                          max_instances:
+                            type: number
+                          scale_triggers:
+                            type: array
+                            items:
+                              type: string
+                      security_requirements:
+                        type: object
+                        properties:
+                          authentication:
+                            type: string
+                          authorization_model:
+                            type: string
+                          data_encryption:
+                            type: string
+                            enum: [at-rest, in-transit, both]
+                          compliance_standards:
+                            type: array
+                            items:
+                              type: string
+                          sensitive_data_handling:
+                            type: string
+                      constraints:
+                        type: object
+                        properties:
+                          budget_usd_per_month:
+                            type: number
+                          deployment_deadline:
+                            type: string
+                            format: date-time
+                          technical_limitations:
+                            type: array
+                            items:
+                              type: string
+                          regulatory_requirements:
+                            type: array
+                            items:
+                              type: string
+
+                  code_generator_requirements:
+                    type: object
+                    required:
+                      - agent_configuration
+                      - system_prompt_specification
+                      - functions_to_implement
+                    properties:
+                      agent_configuration:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                          primary_model:
+                            type: string
+                          fallback_model:
+                            type: string
+                          execution_environment:
+                            type: string
+                            enum: [lambda, ecs, ec2]
+                      system_prompt_specification:
+                        type: object
+                        properties:
+                          agent_persona:
+                            type: string
+                          capabilities_description:
+                            type: string
+                          behavioral_guidelines:
+                            type: array
+                            items:
+                              type: string
+                          knowledge_domain:
+                            type: string
+                          output_format_requirements:
+                            type: string
+                          example_interactions:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                user_input:
+                                  type: string
+                                expected_response:
+                                  type: string
+                      functions_to_implement:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            function_name:
+                              type: string
+                            purpose:
+                              type: string
+                            trigger:
+                              type: string
+                              enum: [api, event, scheduled]
+                            input_parameters:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  name:
+                                    type: string
+                                  type:
+                                    type: string
+                                  required:
+                                    type: boolean
+                                  validation:
+                                    type: string
+                            business_logic:
+                              type: string
+                            output_specification:
+                              type: object
+                              properties:
+                                type:
+                                  type: string
+                                format:
+                                  type: string
+                                example:
+                                  type: object
+                            error_handling:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  error_type:
+                                    type: string
+                                  handling_strategy:
+                                    type: string
+                            dependencies:
+                              type: array
+                              items:
+                                type: string
+                      data_schemas:
+                        type: object
+                        properties:
+                          input_schema:
+                            type: object
+                            properties:
+                              description:
+                                type: string
+                              properties:
+                                type: object
+                              required:
+                                type: array
+                                items:
+                                  type: string
+                          output_schema:
+                            type: object
+                            properties:
+                              description:
+                                type: string
+                              properties:
+                                type: object
+                              required:
+                                type: array
+                                items:
+                                  type: string
+                          state_management:
+                            type: object
+                            properties:
+                              stateful:
+                                type: boolean
+                              state_schema:
+                                type: object
+                              persistence_method:
+                                type: string
+                      integration_code:
+                        type: object
+                        properties:
+                          api_clients:
+                            type: array
+                            items:
+                              type: string
+                          database_connections:
+                            type: array
+                            items:
+                              type: string
+                          message_queue_handlers:
+                            type: array
+                            items:
+                              type: string
+                          authentication_handlers:
+                            type: array
+                            items:
+                              type: string
+                      code_quality_requirements:
+                        type: object
+                        properties:
+                          programming_language:
+                            type: string
+                            enum: [python, javascript, java]
+                          coding_standards:
+                            type: array
+                            items:
+                              type: string
+                          required_patterns:
+                            type: array
+                            items:
+                              type: string
+                          logging_level:
+                            type: string
+                            enum: [ERROR, WARN, INFO, DEBUG]
+                          test_coverage_percentage:
+                            type: number
+
+                  deployment_manager_requirements:
+                    type: object
+                    required:
+                      - deployment_configuration
+                      - infrastructure_specifications
+                    properties:
+                      deployment_configuration:
+                        type: object
+                        properties:
+                          agent_name:
+                            type: string
+                          environment:
+                            type: string
+                            enum: [development, staging, production]
+                          deployment_strategy:
+                            type: string
+                            enum: [blue-green, canary, rolling, direct]
+                          region:
+                            type: string
+                      infrastructure_specifications:
+                        type: object
+                        properties:
+                          compute:
+                            type: object
+                            properties:
+                              service:
+                                type: string
+                                enum: [lambda, ecs, ec2]
+                              memory_mb:
+                                type: number
+                              cpu_units:
+                                type: number
+                              timeout_seconds:
+                                type: number
+                              reserved_concurrency:
+                                type: number
+                              ephemeral_storage_mb:
+                                type: number
+                          storage:
+                            type: object
+                            properties:
+                              primary_storage:
+                                type: object
+                                properties:
+                                  service:
+                                    type: string
+                                    enum: [dynamodb, s3, rds, elasticache]
+                                  capacity:
+                                    type: string
+                                  backup_required:
+                                    type: boolean
+                                  retention_days:
+                                    type: number
+                              cache:
+                                type: object
+                                properties:
+                                  service:
+                                    type: string
+                                    enum: [elasticache, dynamodb]
+                                  ttl_seconds:
+                                    type: number
+                          networking:
+                            type: object
+                            properties:
+                              vpc_required:
+                                type: boolean
+                              subnets:
+                                type: array
+                                items:
+                                  type: string
+                              security_groups:
+                                type: array
+                                items:
+                                  type: string
+                              api_gateway:
+                                type: object
+                                properties:
+                                  required:
+                                    type: boolean
+                                  type:
+                                    type: string
+                                    enum: [rest, http, websocket]
+                                  cors_enabled:
+                                    type: boolean
+                      iam_requirements:
+                        type: object
+                        properties:
+                          execution_role_permissions:
+                            type: array
+                            items:
+                              type: string
+                          service_integrations:
+                            type: array
+                            items:
+                              type: string
+                          cross_account_access:
+                            type: boolean
+                          secrets_manager_access:
+                            type: array
+                            items:
+                              type: string
+                      monitoring_configuration:
+                        type: object
+                        properties:
+                          cloudwatch_metrics:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                metric_name:
+                                  type: string
+                                namespace:
+                                  type: string
+                                dimensions:
+                                  type: array
+                                  items:
+                                    type: string
+                          alarms:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                alarm_name:
+                                  type: string
+                                metric:
+                                  type: string
+                                threshold:
+                                  type: number
+                                comparison_operator:
+                                  type: string
+                                evaluation_periods:
+                                  type: number
+                                sns_topic:
+                                  type: string
+                          logging:
+                            type: object
+                            properties:
+                              log_group:
+                                type: string
+                              retention_days:
+                                type: number
+                              log_level:
+                                type: string
+                                enum: [ERROR, WARN, INFO, DEBUG]
+                          tracing:
+                            type: object
+                            properties:
+                              xray_enabled:
+                                type: boolean
+                              sampling_rate:
+                                type: number
+                      deployment_automation:
+                        type: object
+                        properties:
+                          infrastructure_as_code:
+                            type: string
+                            enum: [cloudformation, cdk, terraform]
+                          ci_cd_pipeline:
+                            type: string
+                            enum: [codepipeline, github-actions, jenkins]
+                          automated_testing:
+                            type: boolean
+                          rollback_strategy:
+                            type: string
+                            enum: [automatic, manual]
+
+                  validation_framework:
+                    type: object
+                    required:
+                      - acceptance_criteria
+                    properties:
+                      acceptance_criteria:
+                        type: object
+                        properties:
+                          functional_requirements:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                requirement_id:
+                                  type: string
+                                description:
+                                  type: string
+                                test_method:
+                                  type: string
+                                  enum: [unit, integration, e2e]
+                                expected_outcome:
+                                  type: string
+                                priority:
+                                  type: string
+                                  enum: [P0, P1, P2]
+                          non_functional_requirements:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                requirement_id:
+                                  type: string
+                                category:
+                                  type: string
+                                  enum: [performance, security, reliability]
+                                metric:
+                                  type: string
+                                target_value:
+                                  type: string
+                                measurement_method:
+                                  type: string
+                      test_scenarios:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            scenario_id:
+                              type: string
+                            scenario_name:
+                              type: string
+                            given:
+                              type: string
+                            when:
+                              type: string
+                            then:
+                              type: string
+                            test_data:
+                              type: object
+                      performance_benchmarks:
+                        type: object
+                        properties:
+                          latency:
+                            type: object
+                            properties:
+                              p50_ms:
+                                type: number
+                              p95_ms:
+                                type: number
+                              p99_ms:
+                                type: number
+                          throughput:
+                            type: object
+                            properties:
+                              requests_per_second:
+                                type: number
+                              concurrent_connections:
+                                type: number
+                          error_rates:
+                            type: object
+                            properties:
+                              acceptable_error_rate:
+                                type: number
+                              timeout_rate:
+                                type: number
+                          resource_utilization:
+                            type: object
+                            properties:
+                              cpu_threshold:
+                                type: number
+                              memory_threshold:
+                                type: number
+
+                  risk_assessment:
+                    type: object
+                    properties:
+                      technical_risks:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            risk:
+                              type: string
+                            probability:
+                              type: string
+                              enum: [low, medium, high]
+                            impact:
+                              type: string
+                              enum: [low, medium, high]
+                            mitigation:
+                              type: string
+                      operational_risks:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            risk:
+                              type: string
+                            probability:
+                              type: string
+                              enum: [low, medium, high]
+                            impact:
+                              type: string
+                              enum: [low, medium, high]
+                            mitigation:
+                              type: string
+                      compliance_risks:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            risk:
+                              type: string
+                            probability:
+                              type: string
+                              enum: [low, medium, high]
+                            impact:
+                              type: string
+                              enum: [low, medium, high]
+                            mitigation:
+                              type: string
+                      contingency_plans:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            scenario:
+                              type: string
+                            response_plan:
+                              type: string
+                            responsible_party:
+                              type: string
 
   # /getJobName:
   #   post:
@@ -54,20 +699,20 @@ paths:
   #               user_request:
   #                 type: string
   #                 description: User request for agent creation
-      # responses:
-      #   '200':
-      #     description: Job name generated
-      #     content:
-      #       application/json:
-      #         schema:
-      #           type: object
-      #           required:
-      #             - job_name
-      #             - user_request
-      #           properties:
-      #             job_name:
-      #               type: string
-      #               description: Generated unique job identifier
-      #             user_request:
-      #               type: string
-      #               description: Original user request
+  # responses:
+  #   '200':
+  #     description: Job name generated
+  #     content:
+  #       application/json:
+  #         schema:
+  #           type: object
+  #           required:
+  #             - job_name
+  #             - user_request
+  #           properties:
+  #             job_name:
+  #               type: string
+  #               description: Generated unique job identifier
+  #             user_request:
+  #               type: string
+  #               description: Original user request

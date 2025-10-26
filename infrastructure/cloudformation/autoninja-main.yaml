@@ -138,19 +138,19 @@ Resources:
   # ============================================================================
   # AgentCore Memory for Rate Limiting (shared across all agents)
   # ============================================================================
-  AgentCoreMemory:
-    Type: AWS::BedrockAgentCore::Memory
-    Properties:
-      Name: !Sub "autoninja_rate_limiter_${Environment}"
-      EventExpiryDuration: 30
-      Description: "AgentCore Memory store for AutoNinja global rate limiting across all agents"
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Application
-          Value: AutoNinja
-        - Key: Purpose
-          Value: RateLimiting
+  # AgentCoreMemory:
+  #   Type: AWS::BedrockAgentCore::Memory
+  #   Properties:
+  #     Name: !Sub "autoninja_rate_limiter_${Environment}"
+  #     EventExpiryDuration: 30
+  #     Description: "AgentCore Memory store for AutoNinja global rate limiting across all agents"
+  #     Tags:
+  #       - Key: Environment
+  #         Value: !Ref Environment
+  #       - Key: Application
+  #         Value: AutoNinja
+  #       - Key: Purpose
+  #         Value: RateLimiting
 
   # ============================================================================
   # Storage Stack - DynamoDB + S3
@@ -226,42 +226,7 @@ Resources:
         - Key: Application
           Value: AutoNinja
 
-  # ============================================================================
-  # Collaborator Agent Stacks (5 agents)
-  # ============================================================================
-  RequirementsAnalystStack:
-    Type: AWS::CloudFormation::Stack
-    DependsOn:
-      - StorageStack
-      - LambdaLayerStack
-      - AgentCoreMemory
-    Properties:
-      TemplateURL: !Sub
-        - "https://${Bucket}.s3.${AWS::Region}.amazonaws.com/stacks/requirements-analyst.yaml"
-        - Bucket: !If
-            - UseDefaultDeploymentBucket
-            - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-            - !Ref DeploymentBucket
-      Parameters:
-        Environment: !Ref Environment
-        DeploymentBucket: !If
-          - UseDefaultDeploymentBucket
-          - !Sub "autoninja-deployment-artifacts-${AWS::Region}"
-          - !Ref DeploymentBucket
-        InferenceRecordsTableName: !GetAtt StorageStack.Outputs.InferenceRecordsTableName
-        InferenceRecordsTableArn: !GetAtt StorageStack.Outputs.InferenceRecordsTableArn
-        ArtifactsBucketName: !GetAtt StorageStack.Outputs.ArtifactsBucketName
-        ArtifactsBucketArn: !GetAtt StorageStack.Outputs.ArtifactsBucketArn
-        LambdaLayerArn: !GetAtt LambdaLayerStack.Outputs.LayerArn
-        LambdaBasePolicyArn: !GetAtt LambdaLayerStack.Outputs.LambdaBasePolicyArn
-        LogRetentionDays: !Ref LogRetentionDays
-        AgentCoreMemoryId: !GetAtt AgentCoreMemory.MemoryId
-        AgentCoreMemoryArn: !GetAtt AgentCoreMemory.MemoryArn
-      Tags:
-        - Key: Environment
-          Value: !Ref Environment
-        - Key: Application
-          Value: AutoNinja
+  
 
   CodeGeneratorStack:
     Type: AWS::CloudFormation::Stack
@@ -405,7 +370,6 @@ Resources:
   SupervisorStack:
     Type: AWS::CloudFormation::Stack
     DependsOn:
-      - RequirementsAnalystStack
       - CodeGeneratorStack
       - SolutionArchitectStack
       - QualityValidatorStack
@@ -452,10 +416,6 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-SupervisorAgentAliasId"
 
-  # Collaborator Agent IDs
-  RequirementsAnalystAgentId:
-    Description: Requirements Analyst Agent ID
-    Value: !GetAtt RequirementsAnalystStack.Outputs.AgentId
 
   CodeGeneratorAgentId:
     Description: Code Generator Agent ID

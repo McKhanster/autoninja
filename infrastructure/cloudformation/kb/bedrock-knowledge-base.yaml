@@ -1,0 +1,463 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Generic Bedrock Knowledge Base template for creating knowledge bases from S3 documents.
+  Supports multiple chunking strategies (FIXED_SIZE, HIERARCHICAL, SEMANTIC), 
+  various embedding models (Titan, Cohere), and OpenSearch Serverless vector store.
+
+  Usage example:
+  aws cloudformation create-stack \
+    --stack-name my-knowledge-base \
+    --template-body file://bedrock-knowledge-base.yaml \
+    --parameters \
+      ParameterKey=KnowledgeBaseName,ParameterValue=my-kb \
+      ParameterKey=S3BucketName,ParameterValue=my-docs-bucket \
+      ParameterKey=S3KeyPrefix,ParameterValue=documents/ \
+      ParameterKey=ChunkingStrategy,ParameterValue=SEMANTIC \
+    --capabilities CAPABILITY_NAMED_IAM
+
+Conditions:
+  UseFixedSizeChunking: !Equals [!Ref ChunkingStrategy, "FIXED_SIZE"]
+  UseHierarchicalChunking: !Equals [!Ref ChunkingStrategy, "HIERARCHICAL"]
+  UseSemanticChunking: !Equals [!Ref ChunkingStrategy, "SEMANTIC"]
+  UseCustomParsing: !Not [!Equals [!Ref ParsingStrategy, ""]]
+  HasParsingModel: !Not [!Equals [!Ref ParsingModelArn, ""]]
+  HasS3KmsKey: !Not [!Equals [!Ref S3KmsKeyId, ""]]
+  HasS3KeyPrefix: !Not [!Equals [!Ref S3KeyPrefix, ""]]
+
+Parameters:
+  KnowledgeBaseName:
+    Type: String
+    Description: Name of the knowledge base
+    Default: "generic-knowledge-base"
+
+  KnowledgeBaseDescription:
+    Type: String
+    Description: Description of the knowledge base
+    Default: "Knowledge base created from S3 documents"
+
+  S3BucketName:
+    Type: String
+    Description: S3 bucket containing the documents
+
+  S3KeyPrefix:
+    Type: String
+    Description: S3 key prefix for documents (e.g., "docs/", "knowledge/")
+    Default: ""
+
+  EmbeddingModel:
+    Type: String
+    Description: Embedding model for the knowledge base
+    Default: "amazon.titan-embed-text-v2:0"
+    AllowedValues:
+      - "amazon.titan-embed-text-v1"
+      - "amazon.titan-embed-text-v2:0"
+      - "cohere.embed-english-v3"
+      - "cohere.embed-multilingual-v3"
+
+  VectorDimensions:
+    Type: Number
+    Description: Vector dimensions for the embedding model (1536 for Titan v1/v2, 1024 for Cohere)
+    Default: 1536
+
+  ChunkingStrategy:
+    Type: String
+    Description: Text chunking strategy
+    Default: "FIXED_SIZE"
+    AllowedValues:
+      - "FIXED_SIZE"
+      - "NONE"
+      - "HIERARCHICAL"
+      - "SEMANTIC"
+
+  MaxTokens:
+    Type: Number
+    Description: Maximum tokens per chunk (for FIXED_SIZE strategy)
+    Default: 300
+    MinValue: 1
+    MaxValue: 8192
+
+  OverlapPercentage:
+    Type: Number
+    Description: Overlap percentage between chunks (for FIXED_SIZE strategy)
+    Default: 20
+    MinValue: 1
+    MaxValue: 99
+
+  ParsingStrategy:
+    Type: String
+    Description: Document parsing strategy
+    Default: "BEDROCK_FOUNDATION_MODEL"
+    AllowedValues:
+      - "BEDROCK_FOUNDATION_MODEL"
+
+  ParsingModelArn:
+    Type: String
+    Description: ARN of the foundation model for parsing (optional)
+    Default: ""
+
+  S3KmsKeyId:
+    Type: String
+    Description: KMS key ID for S3 bucket encryption (optional)
+    Default: ""
+
+  DataDeletionPolicy:
+    Type: String
+    Description: Policy for handling data deletion
+    Default: "RETAIN"
+    AllowedValues:
+      - "RETAIN"
+      - "DELETE"
+
+  Environment:
+    Type: String
+    Description: Deployment environment
+    Default: "production"
+    AllowedValues:
+      - "development"
+      - "staging"
+      - "production"
+
+Resources:
+  # ============================================================================
+  # IAM Role for Knowledge Base
+  # ============================================================================
+  KnowledgeBaseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${KnowledgeBaseName}-kb-role-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                "aws:SourceAccount": !Ref AWS::AccountId
+      Policies:
+        - PolicyName: KnowledgeBasePermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: BedrockModelAccess
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                Resource: !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${EmbeddingModel}"
+              - Sid: OpenSearchAccess
+                Effect: Allow
+                Action:
+                  - aoss:APIAccessAll
+                Resource: !GetAtt VectorStore.CollectionArn
+              - Sid: S3DataSourceAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::${S3BucketName}"
+                  - !If
+                    - HasS3KeyPrefix
+                    - !Sub "arn:aws:s3:::${S3BucketName}/${S3KeyPrefix}*"
+                    - !Sub "arn:aws:s3:::${S3BucketName}/*"
+              - !If
+                - HasS3KmsKey
+                - Sid: KMSAccess
+                  Effect: Allow
+                  Action:
+                    - kms:Decrypt
+                    - kms:GenerateDataKey
+                  Resource: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/${S3KmsKeyId}"
+                - !Ref AWS::NoValue
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: BedrockKnowledgeBase
+
+  # ============================================================================
+  # IAM Role for Data Source
+  # ============================================================================
+  DataSourceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${KnowledgeBaseName}-ds-role-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: bedrock.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                "aws:SourceAccount": !Ref AWS::AccountId
+      Policies:
+        - PolicyName: DataSourcePermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: S3Access
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::${S3BucketName}"
+                  - !If
+                    - HasS3KeyPrefix
+                    - !Sub "arn:aws:s3:::${S3BucketName}/${S3KeyPrefix}*"
+                    - !Sub "arn:aws:s3:::${S3BucketName}/*"
+              - !If
+                - HasS3KmsKey
+                - Sid: KMSAccess
+                  Effect: Allow
+                  Action:
+                    - kms:Decrypt
+                    - kms:GenerateDataKey
+                  Resource: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/${S3KmsKeyId}"
+                - !Ref AWS::NoValue
+              - Sid: KnowledgeBaseAccess
+                Effect: Allow
+                Action:
+                  - bedrock:Retrieve
+                  - bedrock:RetrieveAndGenerate
+                Resource: !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:knowledge-base/*"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: BedrockKnowledgeBase
+
+  # ============================================================================
+  # OpenSearch Serverless Collection (Vector Store)
+  # ============================================================================
+  VectorStoreEncryptionPolicy:
+    Type: AWS::OpenSearchServerless::SecurityPolicy
+    Properties:
+      Name: !Sub "${KnowledgeBaseName}-encryption-policy-${Environment}"
+      Type: encryption
+      Policy: !Sub |
+        {
+          "Rules": [
+            {
+              "ResourceType": "collection",
+              "Resource": ["collection/${KnowledgeBaseName}-vector-store-${Environment}"]
+            }
+          ],
+          "AWSOwnedKey": true
+        }
+
+  VectorStoreNetworkPolicy:
+    Type: AWS::OpenSearchServerless::SecurityPolicy
+    Properties:
+      Name: !Sub "${KnowledgeBaseName}-network-policy-${Environment}"
+      Type: network
+      Policy: !Sub |
+        [
+          {
+            "Rules": [
+              {
+                "ResourceType": "collection",
+                "Resource": ["collection/${KnowledgeBaseName}-vector-store-${Environment}"],
+                "AllowFromPublic": true
+              },
+              {
+                "ResourceType": "dashboard",
+                "Resource": ["collection/${KnowledgeBaseName}-vector-store-${Environment}"],
+                "AllowFromPublic": true
+              }
+            ]
+          }
+        ]
+
+  VectorStoreDataAccessPolicy:
+    Type: AWS::OpenSearchServerless::AccessPolicy
+    Properties:
+      Name: !Sub "${KnowledgeBaseName}-data-access-policy-${Environment}"
+      Type: data
+      Policy: !Sub |
+        [
+          {
+            "Rules": [
+              {
+                "ResourceType": "collection",
+                "Resource": ["collection/${KnowledgeBaseName}-vector-store-${Environment}"],
+                "Permission": [
+                  "aoss:CreateCollectionItems",
+                  "aoss:DeleteCollectionItems",
+                  "aoss:UpdateCollectionItems",
+                  "aoss:DescribeCollectionItems"
+                ]
+              },
+              {
+                "ResourceType": "index",
+                "Resource": ["index/${KnowledgeBaseName}-vector-store-${Environment}/*"],
+                "Permission": [
+                  "aoss:CreateIndex",
+                  "aoss:DeleteIndex",
+                  "aoss:UpdateIndex",
+                  "aoss:DescribeIndex",
+                  "aoss:ReadDocument",
+                  "aoss:WriteDocument"
+                ]
+              }
+            ],
+            "Principal": [
+              "${KnowledgeBaseRole.Arn}",
+              "${AWS::AccountId}"
+            ]
+          }
+        ]
+
+  VectorStore:
+    Type: AWS::OpenSearchServerless::Collection
+    Properties:
+      Name: !Sub "${KnowledgeBaseName}-vector-store-${Environment}"
+      Type: VECTORSEARCH
+      Description: !Sub "Vector store for ${KnowledgeBaseName} knowledge base"
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: BedrockKnowledgeBase
+    DependsOn:
+      - VectorStoreEncryptionPolicy
+      - VectorStoreNetworkPolicy
+      - VectorStoreDataAccessPolicy
+
+  # ============================================================================
+  # Bedrock Knowledge Base
+  # ============================================================================
+  KnowledgeBase:
+    Type: AWS::Bedrock::KnowledgeBase
+    Properties:
+      Name: !Sub "${KnowledgeBaseName}-${Environment}"
+      Description: !Ref KnowledgeBaseDescription
+      RoleArn: !GetAtt KnowledgeBaseRole.Arn
+      KnowledgeBaseConfiguration:
+        Type: VECTOR
+        VectorKnowledgeBaseConfiguration:
+          EmbeddingModelArn: !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${EmbeddingModel}"
+          EmbeddingModelConfiguration:
+            BedrockEmbeddingModelConfiguration:
+              Dimensions: !Ref VectorDimensions
+      StorageConfiguration:
+        Type: OPENSEARCH_SERVERLESS
+        OpensearchServerlessConfiguration:
+          CollectionArn: !GetAtt VectorStore.Arn
+          VectorIndexName: !Sub "${KnowledgeBaseName}-index"
+          FieldMapping:
+            VectorField: "bedrock-knowledge-base-default-vector"
+            TextField: "AMAZON_BEDROCK_TEXT_CHUNK"
+            MetadataField: "AMAZON_BEDROCK_METADATA"
+      Tags:
+        Environment: !Ref Environment
+        Application: BedrockKnowledgeBase
+
+  # ============================================================================
+  # Data Source (S3)
+  # ============================================================================
+  S3DataSource:
+    Type: AWS::Bedrock::DataSource
+    Properties:
+      Name: !Sub "${KnowledgeBaseName}-s3-datasource-${Environment}"
+      Description: !Sub "S3 data source for ${KnowledgeBaseName}"
+      KnowledgeBaseId: !Ref KnowledgeBase
+      DataSourceConfiguration:
+        Type: S3
+        S3Configuration:
+          BucketArn: !Sub "arn:aws:s3:::${S3BucketName}"
+          InclusionPrefixes: !If
+            - HasS3KeyPrefix
+            - [!Ref S3KeyPrefix]
+            - !Ref AWS::NoValue
+          BucketOwnerAccountId: !Ref AWS::AccountId
+      DataDeletionPolicy: !Ref DataDeletionPolicy
+      VectorIngestionConfiguration:
+        ChunkingConfiguration:
+          ChunkingStrategy: !Ref ChunkingStrategy
+          FixedSizeChunkingConfiguration: !If
+            - UseFixedSizeChunking
+            - MaxTokens: !Ref MaxTokens
+              OverlapPercentage: !Ref OverlapPercentage
+            - !Ref AWS::NoValue
+          HierarchicalChunkingConfiguration: !If
+            - UseHierarchicalChunking
+            - LevelConfigurations:
+                - MaxTokens: !Ref MaxTokens
+              OverlapTokens: !Ref OverlapPercentage
+            - !Ref AWS::NoValue
+          SemanticChunkingConfiguration: !If
+            - UseSemanticChunking
+            - MaxTokens: !Ref MaxTokens
+              BufferSize: 0
+              BreakpointPercentileThreshold: 95
+            - !Ref AWS::NoValue
+        ParsingConfiguration: !If
+          - UseCustomParsing
+          - ParsingStrategy: !Ref ParsingStrategy
+            BedrockFoundationModelConfiguration: !If
+              - HasParsingModel
+              - ModelArn: !Ref ParsingModelArn
+              - !Ref AWS::NoValue
+          - !Ref AWS::NoValue
+      Tags:
+        Environment: !Ref Environment
+        Application: BedrockKnowledgeBase
+
+Outputs:
+  KnowledgeBaseId:
+    Description: Knowledge Base ID
+    Value: !Ref KnowledgeBase
+    Export:
+      Name: !Sub "${AWS::StackName}-KnowledgeBaseId"
+
+  KnowledgeBaseArn:
+    Description: Knowledge Base ARN
+    Value: !GetAtt KnowledgeBase.KnowledgeBaseArn
+    Export:
+      Name: !Sub "${AWS::StackName}-KnowledgeBaseArn"
+
+  DataSourceId:
+    Description: Data Source ID
+    Value: !Ref S3DataSource
+    Export:
+      Name: !Sub "${AWS::StackName}-DataSourceId"
+
+  VectorStoreEndpoint:
+    Description: OpenSearch Serverless Collection Endpoint
+    Value: !GetAtt VectorStore.CollectionEndpoint
+    Export:
+      Name: !Sub "${AWS::StackName}-VectorStoreEndpoint"
+
+  VectorStoreArn:
+    Description: OpenSearch Serverless Collection ARN
+    Value: !GetAtt VectorStore.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-VectorStoreArn"
+
+  QueryCommand:
+    Description: CLI command to query the knowledge base
+    Value: !Sub |
+      aws bedrock-agent-runtime retrieve \
+        --knowledge-base-id ${KnowledgeBase} \
+        --retrieval-query "Your query here" \
+        --region ${AWS::Region}
+
+  RetrieveAndGenerateCommand:
+    Description: CLI command to retrieve and generate from knowledge base
+    Value: !Sub |
+      aws bedrock-agent-runtime retrieve-and-generate \
+        --input '{"text":"Your question here"}' \
+        --retrieve-and-generate-configuration '{"type":"KNOWLEDGE_BASE","knowledgeBaseConfiguration":{"knowledgeBaseId":"${KnowledgeBase}","modelArn":"arn:aws:bedrock:${AWS::Region}::foundation-model/amazon.nova-pro-v1:0"}}' \
+        --region ${AWS::Region}
+
+  SyncDataSourceCommand:
+    Description: CLI command to sync the data source
+    Value: !Sub |
+      aws bedrock-agent start-ingestion-job \
+        --knowledge-base-id ${KnowledgeBase} \
+        --data-source-id ${S3DataSource} \
+        --region ${AWS::Region}

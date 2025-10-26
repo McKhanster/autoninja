@@ -1,70 +1,53 @@
-AWSTemplateFormatVersion: "2010-09-09"
-Description: >
-  AutoNinja Solution Architect Stack - Bedrock Agent, Lambda function, and IAM roles
-  for architecture design.
-
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  AutoNinja Solution Architect Stack - Bedrock Agent, Lambda function, and IAM roles for architecture design.
 Parameters:
   Environment:
     Type: String
     Description: Deployment environment
     Default: production
-
   BedrockModel:
     Type: String
     Description: Foundation model ID for Bedrock Agent
     Default: us.amazon.nova-premier-v1:0
-
   DeploymentBucket:
     Type: String
     Description: S3 bucket containing Lambda deployment packages and CloudFormation templates
     Default: autoninja-deployment-artifacts-us-east-2
-
   InferenceRecordsTableName:
     Type: String
     Description: DynamoDB inference records table name
-
   InferenceRecordsTableArn:
     Type: String
     Description: DynamoDB inference records table ARN
-
   ArtifactsBucketName:
     Type: String
     Description: S3 artifacts bucket name
-
   ArtifactsBucketArn:
     Type: String
     Description: S3 artifacts bucket ARN
-
   LambdaBasePolicyArn:
     Type: String
     Description: ARN of the base Lambda policy
-
   LambdaLayerArn:
     Type: String
     Description: ARN of the shared Lambda layer
-
   LogRetentionDays:
     Type: Number
     Description: CloudWatch log retention period in days
     Default: 30
-
   AgentCoreMemoryId:
     Type: String
     Description: AgentCore Memory ID for global rate limiting
-
   AgentCoreMemoryArn:
     Type: String
     Description: AgentCore Memory ARN for global rate limiting
-
 Resources:
-  # ============================================================================
-  # IAM Role - Lambda Execution
-  # ============================================================================
   LambdaRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: "2012-10-17"
+        Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
@@ -75,7 +58,7 @@ Resources:
       Policies:
         - PolicyName: ComprehensiveAgentAccess
           PolicyDocument:
-            Version: "2012-10-17"
+            Version: '2012-10-17'
             Statement:
               - Sid: BedrockModelAccess
                 Effect: Allow
@@ -85,15 +68,15 @@ Resources:
                   - bedrock:GetInferenceProfile
                   - bedrock:GetFoundationModel
                 Resource:
-                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:*::foundation-model/${BedrockModel}"
+                  - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}
+                  - !Sub arn:aws:bedrock:*::foundation-model/${BedrockModel}
               - Sid: BedrockGeneralAccess
                 Effect: Allow
                 Action:
                   - bedrock:GetInferenceProfile
                   - bedrock:GetFoundationModel
-                Resource: "*"
+                Resource: '*'
               - Sid: CloudWatchLogsAccess
                 Effect: Allow
                 Action:
@@ -101,14 +84,14 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/autoninja-*"
-                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/autoninja-*:*"
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/autoninja-*
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/autoninja-*:*
               - Sid: XRayAccess
                 Effect: Allow
                 Action:
                   - xray:PutTraceSegments
                   - xray:PutTelemetryRecords
-                Resource: "*"
+                Resource: '*'
               - Sid: DynamoDBInferenceRecordsAccess
                 Effect: Allow
                 Action:
@@ -118,7 +101,7 @@ Resources:
                   - dynamodb:UpdateItem
                 Resource:
                   - !Ref InferenceRecordsTableArn
-                  - !Sub "${InferenceRecordsTableArn}/index/*"
+                  - !Sub ${InferenceRecordsTableArn}/index/*
               - Sid: S3ArtifactsAccess
                 Effect: Allow
                 Action:
@@ -128,19 +111,19 @@ Resources:
                   - s3:ListBucket
                 Resource:
                   - !Ref ArtifactsBucketArn
-                  - !Sub "${ArtifactsBucketArn}/*"
+                  - !Sub ${ArtifactsBucketArn}/*
               - Sid: S3DeploymentAccess
                 Effect: Allow
                 Action:
                   - s3:GetObject
                 Resource:
-                  - !Sub "arn:aws:s3:::${DeploymentBucket}/lambda/*"
+                  - !Sub arn:aws:s3:::${DeploymentBucket}/lambda/*
               - Sid: S3SchemasAccess
                 Effect: Allow
                 Action:
                   - s3:GetObject
                 Resource:
-                  - !Sub "arn:aws:s3:::${DeploymentBucket}/schemas/*"
+                  - !Sub arn:aws:s3:::${DeploymentBucket}/schemas/*
               - Sid: AgentCoreMemoryAccess
                 Effect: Allow
                 Action:
@@ -154,55 +137,21 @@ Resources:
                 Action:
                   - cloudformation:DescribeStacks
                 Resource:
-                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/autoninja-collaborators-*/*"
+                  - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/autoninja-collaborators-*/*
               - Sid: BedrockAgentInvocation
                 Effect: Allow
                 Action:
                   - bedrock:InvokeAgent
                 Resource:
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*"
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*
       Tags:
         - Key: Application
           Value: AutoNinja
-
-  # ============================================================================
-  # Lambda Function
-  # ============================================================================
-  # LambdaFunction:
-  #   Type: AWS::Lambda::Function
-  #   Properties:
-  #     FunctionName: !Sub "autoninja-solution-architect-${Environment}"
-  #     Description: Solution Architect Lambda function for AutoNinja
-  #     Runtime: python3.12
-  #     Handler: handler.lambda_handler
-  #     Code:
-  #       S3Bucket: !Ref DeploymentBucket
-  #       S3Key: lambda/solution-architect.zip
-  #     Role: !GetAtt LambdaRole.Arn
-  #     Timeout: 300
-  #     MemorySize: 512
-  #     Environment:
-  #       Variables:
-  #         LOG_LEVEL: INFO
-  #         MEMORY_ID: !Ref AgentCoreMemoryId
-  #         DYNAMODB_TABLE_NAME: !Ref InferenceRecordsTableName
-  #         S3_BUCKET_NAME: !Ref ArtifactsBucketName
-  #     Layers:
-  #       - !Ref LambdaLayerArn
-  #     TracingConfig:
-  #       Mode: Active
-  #     Tags:
-  #       - Key: Application
-  #         Value: AutoNinja
-
-  # ============================================================================
-  # IAM Role - Bedrock Agent
-  # ============================================================================
   AgentRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: "2012-10-17"
+        Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
@@ -210,38 +159,38 @@ Resources:
             Action: sts:AssumeRole
             Condition:
               StringEquals:
-                "aws:SourceAccount": !Ref AWS::AccountId
+                aws:SourceAccount: !Ref AWS::AccountId
               ArnLike:
-                "aws:SourceArn": !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*"
+                aws:SourceArn: !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*
       Policies:
         - PolicyName: BedrockAgentPermissions
           PolicyDocument:
-            Version: "2012-10-17"
+            Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
                   - bedrock:InvokeModel
                   - bedrock:InvokeModelWithResponseStream
                 Resource:
-                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:*::foundation-model/*"
-                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*"
+                  - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}
+                  - !Sub arn:aws:bedrock:*::foundation-model/*
+                  - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*
               - Effect: Allow
                 Action:
                   - bedrock:GetInferenceProfile
                   - bedrock:GetFoundationModel
-                Resource: "*"
+                Resource: '*'
               - Effect: Allow
                 Action:
                   - s3:GetObject
                 Resource:
-                  - !Sub "arn:aws:s3:::${DeploymentBucket}/schemas/*"
+                  - !Sub arn:aws:s3:::${DeploymentBucket}/schemas/*
               - Effect: Allow
                 Action:
                   - s3:ListBucket
                 Resource:
-                  - !Sub "arn:aws:s3:::${DeploymentBucket}"
+                  - !Sub arn:aws:s3:::${DeploymentBucket}
               - Sid: AgentCoreMemoryAccess
                 Effect: Allow
                 Action:
@@ -250,18 +199,13 @@ Resources:
                   - bedrock-agentcore:BatchCreateMemoryRecords
                 Resource:
                   - !Ref AgentCoreMemoryArn
-              
       Tags:
         - Key: Application
           Value: AutoNinja
-
-  # ============================================================================
-  # Bedrock Agent
-  # ============================================================================
   Agent:
     Type: AWS::Bedrock::Agent
     Properties:
-      AgentName: !Sub "autoninja-solution-architect-${Environment}"
+      AgentName: !Sub autoninja-solution-architect-${Environment}
       Description: Solution Architect agent - designs AWS architecture based on requirements
       AgentResourceRoleArn: !GetAtt AgentRole.Arn
       FoundationModel: !Ref BedrockModel
@@ -276,131 +220,32 @@ Resources:
             PromptCreationMode: OVERRIDDEN
             PromptState: ENABLED
             InferenceConfiguration:
-              Temperature: 0.2
+              MaximumLength: 30000
+              Temperature: 0
+              TopP: 0.9
               StopSequences: []
-            BasePromptTemplate: |
-                {
-                  "schemaVersion": "messages-v1",
-                  "system": [
-                    {
-                      "text": "You are a Senior AWS Solutions Architect with 10+ years of experience designing enterprise-grade, production-ready systems. You hold AWS certifications and have deep expertise in the AWS Well-Architected Framework, security best practices, and cost optimization.\n\n## YOUR ROLE\n\nDesign comprehensive AWS architectures for Bedrock Agents following Well-Architected Framework principles: Operational Excellence, Security, Reliability, Performance Efficiency, Cost Optimization, and Sustainability.\n\n## CRITICAL INSTRUCTIONS\n\n1. Return ONLY valid JSON - no conversational text, no questions, no explanations\n2. Design for production from day one - no prototypes\n3. Follow AWS best practices and reference architectures\n4. Implement comprehensive security controls\n5. Optimize for cost efficiency without sacrificing reliability\n\n## OUTPUT FORMAT\n\nMake sure your final response is a valid JSON schema follow the below Response Schema:\n\n##Response Schema:\n```json\n{\n  \"executive_summary\": {\n    \"architecture_name\": \"string\",\n    \"design_approach\": \"string\",\n    \"estimated_cost\": \"string\",\n    \"complexity_level\": \"low|medium|high\",\n    \"deployment_time\": \"string\"\n  },\n  \"for_code_generator\": {\n    \"service_specifications\": {\n      \"primary_compute\": {\n        \"service\": \"string\",\n        \"configuration\": \"string\",\n        \"integration_patterns\": [\"string\"],\n        \"api_design\": \"string\"\n      },\n      \"data_services\": {\n        \"primary_storage\": \"string\",\n        \"caching_layer\": \"string\",\n        \"data_flow\": \"string\",\n        \"backup_strategy\": \"string\"\n      },\n      \"integration_services\": {\n        \"messaging\": \"string\",\n        \"api_gateway\": \"string\",\n        \"external_apis\": \"string\",\n        \"authentication\": \"string\"\n      }\n    },\n    \"code_patterns\": {\n      \"lambda_structure\": \"string\",\n      \"error_handling\": \"string\",\n      \"logging_strategy\": \"string\",\n      \"configuration_management\": \"string\"\n    }\n  },\n  \"for_quality_validator\": {\n    \"security_architecture\": {\n      \"network_security\": {\n        \"vpc_design\": \"string\",\n        \"network_acls\": \"string\",\n        \"private_endpoints\": \"string\",\n        \"traffic_encryption\": \"string\"\n      },\n      \"access_controls\": {\n        \"iam_strategy\": \"string\",\n        \"least_privilege\": \"string\",\n        \"cross_service_access\": \"string\",\n        \"user_authentication\": \"string\"\n      },\n      \"data_protection\": {\n        \"encryption_at_rest\": \"string\",\n        \"data_classification\": \"string\",\n        \"backup_encryption\": \"string\",\n        \"audit_logging\": \"string\"\n      }\n    },\n    \"compliance_framework\": {\n      \"regulatory_alignment\": [\"string\"],\n      \"security_standards\": [\"string\"],\n      \"audit_requirements\": \"string\",\n      \"data_residency\": \"string\"\n    },\n    \"performance_targets\": {\n      \"availability_sla\": \"string\",\n      \"performance_benchmarks\": \"string\",\n      \"scalability_limits\": \"string\",\n      \"disaster_recovery\": \"string\"\n    }\n  },\n  \"for_deployment_manager\": {\n    \"infrastructure_specifications\": {\n      \"compute_resources\": {\n        \"lambda_configuration\": {\n          \"memory_allocation\": \"string\",\n          \"timeout_settings\": \"string\",\n          \"concurrency_limits\": \"string\",\n          \"environment_variables\": \"string\"\n        }\n      },\n      \"storage_resources\": {\n        \"s3_buckets\": [{\n          \"purpose\": \"string\",\n          \"configuration\": \"string\",\n          \"access_patterns\": \"string\"\n        }],\n        \"databases\": [{\n          \"type\": \"string\",\n          \"configuration\": \"string\",\n          \"access_patterns\": \"string\"\n        }]\n      },\n      \"networking_resources\": {\n        \"vpc_configuration\": {\n          \"cidr_blocks\": \"string\",\n          \"subnet_design\": \"string\",\n          \"availability_zones\": \"string\",\n          \"nat_gateway\": \"string\"\n        },\n        \"security_groups\": [{\n          \"purpose\": \"string\",\n          \"ingress_rules\": \"string\",\n          \"egress_rules\": \"string\"\n        }]\n      }\n    },\n    \"deployment_topology\": {\n      \"environment_strategy\": \"string\",\n      \"region_deployment\": \"string\",\n      \"blue_green_strategy\": \"string\",\n      \"rollback_procedures\": \"string\"\n    },\n    \"operational_requirements\": {\n      \"monitoring_stack\": {\n        \"cloudwatch_configuration\": \"string\",\n        \"log_aggregation\": \"string\",\n        \"distributed_tracing\": \"string\",\n        \"custom_metrics\": \"string\"\n      },\n      \"automation\": {\n        \"infrastructure_as_code\": \"string\",\n        \"ci_cd_pipeline\": \"string\",\n        \"configuration_management\": \"string\",\n        \"backup_automation\": \"string\"\n      }\n    }\n  },\n  \"cost_analysis\": {\n    \"monthly_estimates\": {\n      \"compute_costs\": \"string\",\n      \"storage_costs\": \"string\",\n      \"network_costs\": \"string\",\n      \"monitoring_costs\": \"string\"\n    },\n    \"optimization_opportunities\": [\"string\"],\n    \"scaling_cost_impact\": \"string\",\n    \"reserved_capacity\": \"string\"\n  }\n}\n```\n\n$prompt_session_attributes$"
-                    }
-                  ],
-                  "messages": [
-                    {
-                      "role": "user",
-                      "content": [
-                        {
-                          "text": "$question$"
-                        }
-                      ]
-                    }
-                  ],
-                  "inferenceConfig": {
-                    "temperature": 0,
-                    "maxTokens": 32000,
-                    "topP": 0.9,
-                    "stopSequences": []
-                  },
-                  "additionalModelRequestFields": {
-                    "inferenceConfig": {
-                      "outputSchema": {
-                        "type": "object",
-                        "properties": {
-                          "executive_summary": {
-                            "type": "object",
-                            "properties": {
-                              "architecture_name": {"type": "string"},
-                              "design_approach": {"type": "string"},
-                              "estimated_cost": {"type": "string"},
-                              "complexity_level": {"type": "string", "enum": ["low", "medium", "high"]},
-                              "deployment_time": {"type": "string"}
-                            },
-                            "required": ["architecture_name", "design_approach", "estimated_cost", "complexity_level", "deployment_time"]
-                          },
-                          "for_code_generator": {
-                            "type": "object",
-                            "properties": {
-                              "service_specifications": {"type": "object"},
-                              "code_patterns": {"type": "object"}
-                            }
-                          },
-                          "for_quality_validator": {
-                            "type": "object",
-                            "properties": {
-                              "security_architecture": {"type": "object"},
-                              "compliance_framework": {"type": "object"},
-                              "performance_targets": {"type": "object"}
-                            }
-                          },
-                          "for_deployment_manager": {
-                            "type": "object",
-                            "properties": {
-                              "infrastructure_specifications": {"type": "object"},
-                              "deployment_topology": {"type": "object"},
-                              "operational_requirements": {"type": "object"}
-                            }
-                          },
-                          "cost_analysis": {
-                            "type": "object",
-                            "properties": {
-                              "monthly_estimates": {"type": "object"},
-                              "optimization_opportunities": {"type": "array"},
-                              "scaling_cost_impact": {"type": "string"},
-                              "reserved_capacity": {"type": "string"}
-                            }
-                          }
-                        },
-                        "required": ["executive_summary", "for_code_generator", "for_quality_validator", "for_deployment_manager", "cost_analysis"]
-                      }
-                    }
-                  }
-                }
+            BasePromptTemplate: '{"schemaVersion":"messages-v1","system":[{"text":"You are the Solution Architect (SA) for Autoninja, responsible for designing cloud-native architectures for AI agents on AWS. You receive requirements from the Requirements Analyst and produce technical architecture designs.\r\n\r\n## Your Role\r\n\r\nDesign scalable, cost-effective, and secure AWS architectures that meet all specified requirements while following AWS Well-Architected Framework principles.\r\n\r\n## Your Input\r\n\r\nYou receive a JSON object under \"solution_architect_requirements\" containing:\r\n- agent_overview: Business context and purpose\r\n- system_architecture: Compute patterns and model specifications\r\n- performance_requirements: Load, latency, and availability needs\r\n- integration_requirements: External services and data sources\r\n- scalability_needs: Auto-scaling requirements\r\n- security_requirements: Authentication, encryption, compliance\r\n- constraints: Budget, timeline, and technical limitations\r\n\r\n## Your Tasks\r\n\r\n### 1. Architecture Design\r\n- Select appropriate AWS services based on requirements\r\n- Design for scalability, reliability, and performance\r\n- Optimize for cost within budget constraints\r\n- Ensure security best practices\r\n\r\n### 2. CloudFormation Template Generation\r\n- Create complete Infrastructure as Code\r\n- Include all required AWS resources\r\n- Configure auto-scaling and monitoring\r\n- Set up proper IAM roles and policies\r\n\r\n### 3. Integration Architecture\r\n- Design API Gateway configurations\r\n- Plan event-driven architectures if needed\r\n- Configure data flow between services\r\n- Set up authentication\/authorization\r\n\r\n## Architecture Patterns\r\n\r\n### For Conversational Agents\r\n- API Gateway \u2192 Lambda \u2192 Bedrock\r\n- DynamoDB for session management\r\n- CloudWatch for monitoring\r\n- Optional: ElastiCache for response caching\r\n\r\n### For Analytical Agents\r\n- EventBridge for scheduling\r\n- Lambda\/ECS for processing\r\n- S3 for data storage\r\n- Athena\/QuickSight for analysis\r\n- Step Functions for orchestration\r\n\r\n### For Monitoring Agents\r\n- CloudWatch Events\/EventBridge triggers\r\n- Lambda for processing\r\n- SNS\/SES for notifications\r\n- DynamoDB for state tracking\r\n\r\n### For Automation Agents\r\n- Step Functions for workflow\r\n- Lambda for task execution\r\n- SQS for queuing\r\n- Systems Manager for operations\r\n\r\n## CloudFormation Best Practices\r\n\r\n1. Use Parameters for environment-specific values\r\n2. Include Outputs for important resource ARNs\r\n3. Add Metadata for documentation\r\n4. Use Conditions for optional resources\r\n5. Implement proper tagging strategy\r\n6. Configure deletion policies for stateful resources\r\n\r\n## Security Requirements\r\n\r\n- Implement least privilege IAM policies\r\n- Enable encryption at rest and in transit\r\n- Use VPC endpoints where applicable\r\n- Configure security groups restrictively\r\n- Enable CloudTrail logging\r\n- Implement AWS Secrets Manager for credentials\r\n\r\n## Cost Optimization\r\n\r\n- Use Lambda for variable workloads\r\n- Implement auto-scaling for predictable patterns\r\n- Configure appropriate retention policies\r\n- Use Reserved Capacity where applicable\r\n- Implement cost allocation tags\r\n- Set up billing alarms\r\n\r\n## Output Requirements\r\n\r\nGenerate a comprehensive CloudFormation template with:\r\n- All required AWS resources\r\n- Proper resource dependencies\r\n- Security configurations\r\n- Monitoring and alerting setup\r\n- Cost optimization measures\r\n- Clear documentation via comments"}],"messages":[{"role":"user","content":[{"text":"$question$"}]}],"inferenceConfig":{"temperature":0.2,"maxTokens":64000,"topP":0.95,"stopSequences":[]},"additionalModelRequestFields":{"inferenceConfig":{"outputSchema":{"type":"object","properties":{"architecture_design":{"type":"object","properties":{"stack_name":{"type":"string","description":"CloudFormation stack name"},"description":{"type":"string","description":"Architecture description"},"aws_services":{"type":"array","items":{"type":"object","properties":{"service":{"type":"string"},"purpose":{"type":"string"},"configuration":{"type":"object"}}}},"estimated_monthly_cost":{"type":"number","description":"Estimated AWS costs in USD"}},"required":["stack_name","description","aws_services"]},"cloudformation_template":{"type":"string","description":"Complete CloudFormation YAML template"},"deployment_instructions":{"type":"object","properties":{"prerequisites":{"type":"array","items":{"type":"string"}},"parameters":{"type":"object","description":"CloudFormation parameter values"},"deployment_steps":{"type":"array","items":{"type":"string"}}}},"architecture_diagram":{"type":"object","properties":{"components":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"type":{"type":"string"},"connections":{"type":"array","items":{"type":"string"}}}}},"data_flow":{"type":"array","items":{"type":"object","properties":{"from":{"type":"string"},"to":{"type":"string"},"description":{"type":"string"}}}}}}},"required":["architecture_design","cloudformation_template"]}}}}'
       Tags:
         Application: AutoNinja
-
-  # ============================================================================
-  # Lambda Invoke Permission
-  # # ============================================================================
-  # LambdaInvokePermission:
-  #   Type: AWS::Lambda::Permission
-  #   Properties:
-  #     FunctionName: !Ref LambdaFunction
-  #     Action: lambda:InvokeFunction
-  #     Principal: bedrock.amazonaws.com
-  #     SourceArn: !GetAtt Agent.AgentArn
-
-  # ============================================================================
-  # Bedrock Agent Alias
-  # ============================================================================
   AgentAlias:
     Type: AWS::Bedrock::AgentAlias
     Properties:
       AgentId: !GetAtt Agent.AgentId
       AgentAliasName: production
       Description: Production alias for Solution Architect agent
-
 Outputs:
   AgentId:
     Description: Solution Architect Agent ID
     Value: !GetAtt Agent.AgentId
     Export:
-      Name: !Sub "${AWS::StackName}-AgentId"
-
+      Name: !Sub ${AWS::StackName}-AgentId
   AgentArn:
     Description: Solution Architect Agent ARN
     Value: !GetAtt Agent.AgentArn
     Export:
-      Name: !Sub "${AWS::StackName}-AgentArn"
-
+      Name: !Sub ${AWS::StackName}-AgentArn
   AgentAliasId:
     Description: Solution Architect Agent Alias ID
     Value: !GetAtt AgentAlias.AgentAliasId
     Export:
-      Name: !Sub "${AWS::StackName}-AgentAliasId"
-
-  # LambdaFunctionArn:
-  #   Description: Solution Architect Lambda Function ARN
-  #   Value: !GetAtt LambdaFunction.Arn
-  #   Export:
-  #     Name: !Sub "${AWS::StackName}-LambdaFunctionArn"
+      Name: !Sub ${AWS::StackName}-AgentAliasId

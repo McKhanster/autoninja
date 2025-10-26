@@ -19,7 +19,7 @@ AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 DEPLOYMENT_BUCKET="${DEPLOYMENT_BUCKET:-autoninja-deployment-artifacts-${REGION}}"
 COLLABORATORS_STACK_NAME="autoninja-collaborators-${ENVIRONMENT}"
 SUPERVISOR_STACK_NAME="autoninja-supervisor-${ENVIRONMENT}"
-
+PROMPTS_DIR="infrastructure/cloudformation/prompts"
 # Logging
 LOG_FILE="deployment-$(date +%Y%m%d-%H%M%S).log"
 exec > >(tee -a "doc/$LOG_FILE")
@@ -68,6 +68,32 @@ else
 fi
 echo ""
 
+# ============================================================================
+# Step 1.5: Upload Prompt Files
+# ============================================================================
+# echo -e "${YELLOW}Step 1.5: Uploading prompt files...${NC}"
+# for file in $PROMPTS_DIR/*.md; do
+#     if [ -f "$file" ]; then
+#         filename=$(basename "$file")
+#         s3_key="prompts/$ENVIRONMENT/$filename"
+        
+#         echo "Uploading $filename to s3://$DEPLOYMENT_BUCKET/$s3_key"
+#         aws s3 cp "$file" "s3://$DEPLOYMENT_BUCKET/$s3_key" \
+#             --content-type "text/markdown" \
+#             --metadata "environment=$ENVIRONMENT,type=prompt" \
+#             --region "$REGION" \
+#             --profile "$PROFILE"
+        
+#         if [ $? -eq 0 ]; then
+#             echo -e "    ${GREEN}✓${NC} $filename uploaded successfully"
+#         else
+#             echo -e "    ${RED}✗${NC} Failed to upload $filename"
+#             exit 1
+#         fi
+#     fi
+# done
+# echo -e "${GREEN}✓ All prompt files uploaded${NC}"
+# echo ""
 # ============================================================================
 # Step 2: Build Lambda packages
 # ============================================================================
@@ -245,26 +271,7 @@ echo ""
 
 # Get all agent IDs, ARNs, and Alias IDs
 echo "Getting collaborator agent details..."
-REQ_AGENT_ID=$(aws cloudformation describe-stacks \
-    --stack-name "$COLLABORATORS_STACK_NAME" \
-    --region "$REGION" \
-    --profile "$PROFILE" \
-    --query 'Stacks[0].Outputs[?OutputKey==`RequirementsAnalystAgentId`].OutputValue' \
-    --output text)
 
-REQ_AGENT_ARN=$(aws cloudformation describe-stacks \
-    --stack-name "$COLLABORATORS_STACK_NAME" \
-    --region "$REGION" \
-    --profile "$PROFILE" \
-    --query 'Stacks[0].Outputs[?OutputKey==`RequirementsAnalystAgentArn`].OutputValue' \
-    --output text)
-
-REQ_ALIAS_ID=$(aws cloudformation describe-stacks \
-    --stack-name "$COLLABORATORS_STACK_NAME" \
-    --region "$REGION" \
-    --profile "$PROFILE" \
-    --query 'Stacks[0].Outputs[?OutputKey==`RequirementsAnalystAliasId`].OutputValue' \
-    --output text)
 
 CODE_AGENT_ID=$(aws cloudformation describe-stacks \
     --stack-name "$COLLABORATORS_STACK_NAME" \

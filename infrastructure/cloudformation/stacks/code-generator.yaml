@@ -1,70 +1,53 @@
-AWSTemplateFormatVersion: "2010-09-09"
-Description: >
-  AutoNinja Code Generator Stack - Bedrock Agent, Lambda function, and IAM roles
-  for code generation.
-
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  AutoNinja Code Generator Stack - Bedrock Agent, Lambda function, and IAM roles for code generation.
 Parameters:
   Environment:
     Type: String
     Description: Deployment environment
     Default: production
-
   BedrockModel:
     Type: String
     Description: Foundation model ID for Bedrock Agent
     Default: us.amazon.nova-premier-v1:0
-
   DeploymentBucket:
     Type: String
     Description: S3 bucket containing Lambda deployment packages and CloudFormation templates
     Default: autoninja-deployment-artifacts-us-east-2
-
   InferenceRecordsTableName:
     Type: String
     Description: DynamoDB inference records table name
-
   InferenceRecordsTableArn:
     Type: String
     Description: DynamoDB inference records table ARN
-
   ArtifactsBucketName:
     Type: String
     Description: S3 artifacts bucket name
-
   ArtifactsBucketArn:
     Type: String
     Description: S3 artifacts bucket ARN
-
   LambdaBasePolicyArn:
     Type: String
     Description: ARN of the base Lambda policy
-
   LambdaLayerArn:
     Type: String
     Description: ARN of the shared Lambda layer
-
   LogRetentionDays:
     Type: Number
     Description: CloudWatch log retention period in days
     Default: 30
-
   AgentCoreMemoryId:
     Type: String
     Description: AgentCore Memory ID for global rate limiting
-
   AgentCoreMemoryArn:
     Type: String
     Description: AgentCore Memory ARN for global rate limiting
-
 Resources:
-  # ============================================================================
-  # IAM Role - Lambda Execution
-  # ============================================================================
   LambdaRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: "2012-10-17"
+        Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
@@ -75,7 +58,7 @@ Resources:
       Policies:
         - PolicyName: ComprehensiveAgentAccess
           PolicyDocument:
-            Version: "2012-10-17"
+            Version: '2012-10-17'
             Statement:
               - Sid: BedrockModelAccess
                 Effect: Allow
@@ -85,15 +68,15 @@ Resources:
                   - bedrock:GetInferenceProfile
                   - bedrock:GetFoundationModel
                 Resource:
-                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:*::foundation-model/${BedrockModel}"
+                  - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}
+                  - !Sub arn:aws:bedrock:*::foundation-model/${BedrockModel}
               - Sid: BedrockGeneralAccess
                 Effect: Allow
                 Action:
                   - bedrock:GetInferenceProfile
                   - bedrock:GetFoundationModel
-                Resource: "*"
+                Resource: '*'
               - Sid: CloudWatchLogsAccess
                 Effect: Allow
                 Action:
@@ -101,14 +84,14 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/autoninja-*"
-                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/autoninja-*:*"
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/autoninja-*
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/autoninja-*:*
               - Sid: XRayAccess
                 Effect: Allow
                 Action:
                   - xray:PutTraceSegments
                   - xray:PutTelemetryRecords
-                Resource: "*"
+                Resource: '*'
               - Sid: DynamoDBInferenceRecordsAccess
                 Effect: Allow
                 Action:
@@ -118,7 +101,7 @@ Resources:
                   - dynamodb:UpdateItem
                 Resource:
                   - !Ref InferenceRecordsTableArn
-                  - !Sub "${InferenceRecordsTableArn}/index/*"
+                  - !Sub ${InferenceRecordsTableArn}/index/*
               - Sid: S3ArtifactsAccess
                 Effect: Allow
                 Action:
@@ -128,19 +111,19 @@ Resources:
                   - s3:ListBucket
                 Resource:
                   - !Ref ArtifactsBucketArn
-                  - !Sub "${ArtifactsBucketArn}/*"
+                  - !Sub ${ArtifactsBucketArn}/*
               - Sid: S3DeploymentAccess
                 Effect: Allow
                 Action:
                   - s3:GetObject
                 Resource:
-                  - !Sub "arn:aws:s3:::${DeploymentBucket}/lambda/*"
+                  - !Sub arn:aws:s3:::${DeploymentBucket}/lambda/*
               - Sid: S3SchemasAccess
                 Effect: Allow
                 Action:
                   - s3:GetObject
                 Resource:
-                  - !Sub "arn:aws:s3:::${DeploymentBucket}/schemas/*"
+                  - !Sub arn:aws:s3:::${DeploymentBucket}/schemas/*
               - Sid: AgentCoreMemoryAccess
                 Effect: Allow
                 Action:
@@ -154,55 +137,21 @@ Resources:
                 Action:
                   - cloudformation:DescribeStacks
                 Resource:
-                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/autoninja-collaborators-*/*"
+                  - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/autoninja-collaborators-*/*
               - Sid: BedrockAgentInvocation
                 Effect: Allow
                 Action:
                   - bedrock:InvokeAgent
                 Resource:
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*"
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*
       Tags:
         - Key: Application
           Value: AutoNinja
-
-  # ============================================================================
-  # Lambda Function
-  # ============================================================================
-  # LambdaFunction:
-  #   Type: AWS::Lambda::Function
-  #   Properties:
-  #     FunctionName: !Sub "autoninja-code-generator-${Environment}"
-  #     Description: Code Generator Lambda function for AutoNinja
-  #     Runtime: python3.12
-  #     Handler: handler.lambda_handler
-  #     Code:
-  #       S3Bucket: !Ref DeploymentBucket
-  #       S3Key: lambda/code-generator.zip
-  #     Role: !GetAtt LambdaRole.Arn
-  #     Timeout: 300
-  #     MemorySize: 512
-  #     Environment:
-  #       Variables:
-  #         LOG_LEVEL: INFO
-  #         MEMORY_ID: !Ref AgentCoreMemoryId
-  #         DYNAMODB_TABLE_NAME: !Ref InferenceRecordsTableName
-  #         S3_BUCKET_NAME: !Ref ArtifactsBucketName
-  #     Layers:
-  #       - !Ref LambdaLayerArn
-  #     TracingConfig:
-  #       Mode: Active
-  #     Tags:
-  #       - Key: Application
-  #         Value: AutoNinja
-
-  # ============================================================================
-  # IAM Role - Bedrock Agent
-  # ============================================================================
   AgentRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: "2012-10-17"
+        Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
@@ -210,38 +159,38 @@ Resources:
             Action: sts:AssumeRole
             Condition:
               StringEquals:
-                "aws:SourceAccount": !Ref AWS::AccountId
+                aws:SourceAccount: !Ref AWS::AccountId
               ArnLike:
-                "aws:SourceArn": !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*"
+                aws:SourceArn: !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*
       Policies:
         - PolicyName: BedrockAgentPermissions
           PolicyDocument:
-            Version: "2012-10-17"
+            Version: '2012-10-17'
             Statement:
               - Effect: Allow
                 Action:
                   - bedrock:InvokeModel
                   - bedrock:InvokeModelWithResponseStream
                 Resource:
-                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:*::foundation-model/*"
-                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*"
+                  - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}
+                  - !Sub arn:aws:bedrock:*::foundation-model/*
+                  - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*
               - Effect: Allow
                 Action:
                   - bedrock:GetInferenceProfile
                   - bedrock:GetFoundationModel
-                Resource: "*"
+                Resource: '*'
               - Effect: Allow
                 Action:
                   - s3:GetObject
                 Resource:
-                  - !Sub "arn:aws:s3:::${DeploymentBucket}/schemas/*"
+                  - !Sub arn:aws:s3:::${DeploymentBucket}/schemas/*
               - Effect: Allow
                 Action:
                   - s3:ListBucket
                 Resource:
-                  - !Sub "arn:aws:s3:::${DeploymentBucket}"
+                  - !Sub arn:aws:s3:::${DeploymentBucket}
               - Sid: AgentCoreMemoryAccess
                 Effect: Allow
                 Action:
@@ -250,18 +199,13 @@ Resources:
                   - bedrock-agentcore:BatchCreateMemoryRecords
                 Resource:
                   - !Ref AgentCoreMemoryArn
-
       Tags:
         - Key: Application
           Value: AutoNinja
-
-  # ============================================================================
-  # Bedrock Agent
-  # ============================================================================
   Agent:
     Type: AWS::Bedrock::Agent
     Properties:
-      AgentName: !Sub "autoninja-code-generator-${Environment}"
+      AgentName: !Sub autoninja-code-generator-${Environment}
       Description: Code Generator agent - generates Lambda code, agent configs, and OpenAPI schemas
       AgentResourceRoleArn: !GetAtt AgentRole.Arn
       FoundationModel: !Ref BedrockModel
@@ -276,140 +220,32 @@ Resources:
             PromptCreationMode: OVERRIDDEN
             PromptState: ENABLED
             InferenceConfiguration:
-              Temperature: 0.1
+              MaximumLength: 30000
+              Temperature: 0
+              TopP: 0.9
               StopSequences: []
-            BasePromptTemplate: |
-              {
-                "schemaVersion": "messages-v1",
-                "system": [
-                  {
-                    "text": "You are a Senior Software Engineer and AI Systems Developer with 12+ years of experience building production-grade applications. You specialize in AWS Lambda, Bedrock Agents, and enterprise software development with expertise in Python, security, performance optimization, and maintainable code architecture.\n\n## YOUR ROLE\n\nGenerate production-ready code packages for Bedrock Agents including Lambda handlers, business logic, OpenAPI schemas, agent configurations, and documentation.\n\n## CODE QUALITY STANDARDS\n\n- Write code that can handle production traffic from day one\n- Implement comprehensive error handling and graceful degradation\n- Include structured logging and observability hooks\n- Follow security best practices and input validation\n- Design for testability and maintainability\n- Follow PEP 8 and industry coding standards\n\n## OUTPUT FORMAT\n\nMake sure your final response is a valid JSON schema follow the below Response Schema:\n\n##Response Schema:\n```json\n{\n  \"lambda_code\": {\n    \"handler.py\": \"string\",\n    \"business_logic.py\": \"string\",\n    \"utils.py\": \"string\",\n    \"validators.py\": \"string\",\n    \"exceptions.py\": \"string\",\n    \"config.py\": \"string\",\n    \"requirements.txt\": \"string\"\n  },\n  \"agent_configuration\": {\n    \"name\": \"string\",\n    \"description\": \"string\",\n    \"instruction\": \"string\",\n    \"foundation_model\": \"string\",\n    \"idle_session_ttl\": \"number\",\n    \"action_groups\": [\"object\"]\n  },\n  \"openapi_schema\": {\n    \"openapi\": \"string\",\n    \"info\": \"object\",\n    \"paths\": \"object\",\n    \"components\": \"object\"\n  },\n  \"testing_framework\": {\n    \"unit_tests\": \"string\",\n    \"integration_tests\": \"string\",\n    \"test_data\": \"object\"\n  },\n  \"documentation\": {\n    \"readme.md\": \"string\",\n    \"api_docs.md\": \"string\",\n    \"deployment_guide.md\": \"string\"\n  }\n}\n```\n\n$prompt_session_attributes$"
-                  }
-                ],
-                "messages": [
-                  {
-                    "role": "user",
-                    "content": [
-                      {
-                        "text": "$question$"
-                      }
-                    ]
-                  }
-                ],
-                "inferenceConfig": {
-                  "temperature": 0,
-                  "maxTokens": 64000,
-                  "topP": 0.9,
-                  "stopSequences": []
-                },
-                "additionalModelRequestFields": {
-                  "inferenceConfig": {
-                    "outputSchema": {
-                      "type": "object",
-                      "properties": {
-                        "lambda_code": {
-                          "type": "object",
-                          "description": "Python code files for Lambda function",
-                          "properties": {
-                            "handler.py": {"type": "string"},
-                            "business_logic.py": {"type": "string"},
-                            "utils.py": {"type": "string"},
-                            "validators.py": {"type": "string"},
-                            "exceptions.py": {"type": "string"},
-                            "config.py": {"type": "string"},
-                            "requirements.txt": {"type": "string"}
-                          },
-                          "required": ["handler.py", "requirements.txt"]
-                        },
-                        "agent_configuration": {
-                          "type": "object",
-                          "properties": {
-                            "name": {"type": "string"},
-                            "description": {"type": "string"},
-                            "instruction": {"type": "string"},
-                            "foundation_model": {"type": "string"},
-                            "idle_session_ttl": {"type": "number"},
-                            "action_groups": {"type": "array"}
-                          },
-                          "required": ["name", "description", "instruction"]
-                        },
-                        "openapi_schema": {
-                          "type": "object",
-                          "properties": {
-                            "openapi": {"type": "string"},
-                            "info": {"type": "object"},
-                            "paths": {"type": "object"},
-                            "components": {"type": "object"}
-                          },
-                          "required": ["openapi", "info", "paths"]
-                        },
-                        "testing_framework": {
-                          "type": "object",
-                          "properties": {
-                            "unit_tests": {"type": "string"},
-                            "integration_tests": {"type": "string"},
-                            "test_data": {"type": "object"}
-                          }
-                        },
-                        "documentation": {
-                          "type": "object",
-                          "properties": {
-                            "readme.md": {"type": "string"},
-                            "api_docs.md": {"type": "string"},
-                            "deployment_guide.md": {"type": "string"}
-                          }
-                        }
-                      },
-                      "required": ["lambda_code", "agent_configuration", "openapi_schema"]
-                    }
-                  }
-                }
-              }
+            BasePromptTemplate: '{"schemaVersion":"messages-v1","system":[{"text":"You are the Code Generator (CG) for Autoninja, responsible for generating production-ready code for AI agents. You receive requirements from the Requirements Analyst and produce Lambda functions, system prompts, and integration code.\r\n\r\n## Your Role\r\n\r\nGenerate high-quality, maintainable, and efficient code that implements all specified functionality while following best practices for AWS Lambda and AI agent development.\r\n\r\n## Your Input\r\n\r\nYou receive a JSON object under \"code_generator_requirements\" containing:\r\n- agent_configuration: Agent name, model selection, environment\r\n- system_prompt_specification: Persona, capabilities, guidelines\r\n- functions_to_implement: Detailed function specifications\r\n- data_schemas: Input\/output\/state schemas\r\n- integration_code: API clients and connections\r\n- code_quality_requirements: Standards and patterns\r\n\r\n## Code Generation Guidelines\r\n\r\n### Lambda Function Structure\r\n\r\n````python\r\nimport json\r\nimport boto3\r\nimport logging\r\nfrom typing import Dict, Any, Optional\r\nfrom dataclasses import dataclass\r\nimport os\r\n\r\n# Configure logging\r\nlogger = logging.getLogger()\r\nlogger.setLevel(os.environ.get(\"LOG_LEVEL\", \"INFO\"))\r\n\r\n# Initialize AWS clients\r\nbedrock_runtime = boto3.client(\"bedrock-runtime\")\r\ndynamodb = boto3.resource(\"dynamodb\")\r\n\r\nclass AgentError(Exception):\r\n    \"\"\"Custom exception for agent errors\"\"\"\r\n    pass\r\n\r\ndef lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:\r\n    \"\"\"Main Lambda handler\"\"\"\r\n    try:\r\n        # Input validation\r\n        validated_input = validate_input(event)\r\n        \r\n        # Process request\r\n        result = process_agent_request(validated_input)\r\n        \r\n        # Return success response\r\n        return {\r\n            \"statusCode\": 200,\r\n            \"body\": json.dumps(result)\r\n        }\r\n    except AgentError as e:\r\n        logger.error(f\"Agent error: {str(e)}\")\r\n        return {\r\n            \"statusCode\": 400,\r\n            \"body\": json.dumps({\"error\": str(e)})\r\n        }\r\n    except Exception as e:\r\n        logger.error(f\"Unexpected error: {str(e)}\")\r\n        return {\r\n            \"statusCode\": 500,\r\n            \"body\": json.dumps({\"error\": \"Internal server error\"})\r\n        }\r\n````\r\n\r\n### System Prompt Best Practices\r\n\r\n1. Clear role definition\r\n2. Specific capabilities and limitations\r\n3. Output format specifications\r\n4. Safety guidelines\r\n5. Example interactions\r\n6. Error handling instructions\r\n\r\n### Bedrock Integration Pattern\r\n\r\n````python\r\ndef invoke_bedrock_model(prompt: str, model_id: str) -> str:\r\n    \"\"\"Invoke Bedrock model with proper error handling\"\"\"\r\n    try:\r\n        response = bedrock_runtime.invoke_model(\r\n            modelId=model_id,\r\n            body=json.dumps({\r\n                \"messages\": [{\"role\": \"user\", \"content\": prompt}],\r\n                \"max_tokens\": 4096,\r\n                \"temperature\": 0.7,\r\n                \"anthropic_version\": \"bedrock-2023-05-31\"\r\n            }),\r\n            contentType=\"application\/json\"\r\n        )\r\n        \r\n        response_body = json.loads(response[\"body\"].read())\r\n        return response_body[\"content\"][0][\"text\"]\r\n    except Exception as e:\r\n        logger.error(f\"Bedrock invocation failed: {str(e)}\")\r\n        raise AgentError(f\"Failed to get AI response: {str(e)}\")\r\n````\r\n\r\n### State Management Pattern\r\n\r\n````python\r\ndef manage_conversation_state(session_id: str, message: str) -> Dict:\r\n    \"\"\"Manage conversation state in DynamoDB\"\"\"\r\n    table = dynamodb.Table(os.environ[\"STATE_TABLE\"])\r\n    \r\n    # Retrieve existing state\r\n    response = table.get_item(Key={\"session_id\": session_id})\r\n    state = response.get(\"Item\", {\"session_id\": session_id, \"messages\": []})\r\n    \r\n    # Update state\r\n    state[\"messages\"].append(message)\r\n    state[\"last_updated\"] = datetime.now().isoformat()\r\n    \r\n    # Save state with TTL\r\n    state[\"ttl\"] = int(time.time()) + 3600  # 1 hour TTL\r\n    table.put_item(Item=state)\r\n    \r\n    return state\r\n````\r\n\r\n## Error Handling Requirements\r\n\r\n1. Validate all inputs\r\n2. Implement retry logic with exponential backoff\r\n3. Log errors with appropriate detail levels\r\n4. Return user-friendly error messages\r\n5. Implement circuit breaker pattern for external services\r\n\r\n## Testing Requirements\r\n\r\n1. Unit tests for all functions\r\n2. Integration tests for AWS service interactions\r\n3. Mock external dependencies\r\n4. Test error scenarios\r\n5. Validate schema compliance\r\n\r\n## Security Requirements\r\n\r\n1. Never log sensitive data\r\n2. Validate and sanitize all inputs\r\n3. Use environment variables for configuration\r\n4. Implement rate limiting\r\n5. Follow OWASP guidelines\r\n\r\n## Performance Optimization\r\n\r\n1. Minimize cold starts\r\n2. Reuse connections\r\n3. Implement caching where appropriate\r\n4. Optimize memory allocation\r\n5. Use async operations when possible"}],"messages":[{"role":"user","content":[{"text":"$question$"}]}],"inferenceConfig":{"temperature":0.1,"maxTokens":64000,"topP":0.95,"stopSequences":[]},"additionalModelRequestFields":{"inferenceConfig":{"outputSchema":{"type":"object","properties":{"lambda_code":{"type":"object","properties":{"handler":{"type":"string","description":"Main Lambda handler code in Python"},"utils":{"type":"string","description":"Utility functions code"},"requirements":{"type":"string","description":"requirements.txt content"},"environment_variables":{"type":"object","description":"Required environment variables"}},"required":["handler","requirements"]},"system_prompt":{"type":"string","description":"Complete system prompt for the AI agent"},"test_code":{"type":"object","properties":{"unit_tests":{"type":"string","description":"Unit test code"},"integration_tests":{"type":"string","description":"Integration test code"},"test_data":{"type":"object","description":"Sample test data"}}},"api_schema":{"type":"object","properties":{"openapi_spec":{"type":"object","description":"OpenAPI 3.0 specification"},"example_requests":{"type":"array","items":{"type":"object","properties":{"description":{"type":"string"},"request":{"type":"object"},"response":{"type":"object"}}}}}},"documentation":{"type":"object","properties":{"readme":{"type":"string","description":"README.md content"},"api_documentation":{"type":"string","description":"API usage documentation"},"deployment_guide":{"type":"string","description":"Deployment instructions"}}}},"required":["lambda_code","system_prompt","test_code"]}}}}'
       Tags:
         Application: AutoNinja
-
-  # ============================================================================
-  # Lambda Invoke Permission
-  # ============================================================================
-  # LambdaInvokePermission:
-  # Type: AWS::Lambda::Permission
-  # Properties:
-  #   FunctionName: !Ref LambdaFunction
-  #   Action: lambda:InvokeFunction
-  #   Principal: bedrock.amazonaws.com
-  #   SourceArn: !GetAtt Agent.AgentArn
-
-  # ============================================================================
-  # Bedrock Agent Alias
-  # ============================================================================
   AgentAlias:
     Type: AWS::Bedrock::AgentAlias
     Properties:
       AgentId: !GetAtt Agent.AgentId
       AgentAliasName: production
       Description: Production alias for Code Generator agent
-
 Outputs:
   AgentId:
     Description: Code Generator Agent ID
     Value: !GetAtt Agent.AgentId
     Export:
-      Name: !Sub "${AWS::StackName}-AgentId"
-
+      Name: !Sub ${AWS::StackName}-AgentId
   AgentArn:
     Description: Code Generator Agent ARN
     Value: !GetAtt Agent.AgentArn
     Export:
-      Name: !Sub "${AWS::StackName}-AgentArn"
-
+      Name: !Sub ${AWS::StackName}-AgentArn
   AgentAliasId:
     Description: Code Generator Agent Alias ID
     Value: !GetAtt AgentAlias.AgentAliasId
     Export:
-      Name: !Sub "${AWS::StackName}-AgentAliasId"
-
-  # LambdaFunctionArn:
-  #   Description: Code Generator Lambda Function ARN
-  #   Value: !GetAtt LambdaFunction.Arn
-  #   Export:
-  #     Name: !Sub "${AWS::StackName}-LambdaFunctionArn"
+      Name: !Sub ${AWS::StackName}-AgentAliasId

@@ -1,0 +1,12 @@
+1) Use 4 back ticks ``` .  Change ' to ", 
+
+Escape strings using;
+https://www.freeformatter.com/json-escape.html#before-output
+
+Copy and paste escaped string into json, 
+
+Validate and compress json. 
+https://jsonlint.com/
+
+Paste in yaml between single quotes/
+

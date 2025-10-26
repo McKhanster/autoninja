@@ -172,8 +172,25 @@ done
 echo -e "${GREEN}✓ All schemas uploaded${NC}"
 echo ""
 
+# Upload prompt files
+echo -e "${YELLOW}Step 6: Uploading prompt files...${NC}"
+for prompt in infrastructure/cloudformation/prompts/*.md; do
+    if [ -f "$prompt" ]; then
+        filename=$(basename "$prompt")
+        aws s3 cp "$prompt" \
+            "s3://${DEPLOYMENT_BUCKET}/prompts/${ENVIRONMENT}/$filename" \
+            --sse aws:kms \
+            --region "$REGION" \
+            --profile "$PROFILE" \
+            --quiet
+        echo -e "    ${GREEN}✓${NC} $filename"
+    fi
+done
+echo -e "${GREEN}✓ All prompt files uploaded${NC}"
+echo ""
+
 # Configure Bedrock model invocation logging (optional but recommended)
-echo -e "${YELLOW}Step 6: Configuring Bedrock model invocation logging...${NC}"
+echo -e "${YELLOW}Step 7: Configuring Bedrock model invocation logging...${NC}"
 LOG_GROUP_NAME="/aws/bedrock/modelinvocations"
 
 # Check if log group exists
@@ -210,7 +227,7 @@ echo -e "${GREEN}✓ Bedrock logging configuration attempted${NC}"
 echo ""
 
 # Verify collaborators-only CloudFormation template exists
-echo -e "${YELLOW}Step 7: Verifying collaborators template exists...${NC}"
+echo -e "${YELLOW}Step 8: Verifying collaborators template exists...${NC}"
 if [ ! -f "infrastructure/cloudformation/autoninja-collaborators.yaml" ]; then
     echo -e "${RED}Error: infrastructure/cloudformation/autoninja-collaborators.yaml not found${NC}"
     exit 1

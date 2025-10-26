@@ -1,39 +1,30 @@
-AWSTemplateFormatVersion: "2010-09-09"
-Description: >
-  AutoNinja Supervisor Stack - Bedrock Supervisor Agent with direct Lambda orchestration
-  across 5 agent Lambda functions using AgentCore Memory rate limiting.
-
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  AutoNinja Supervisor Stack - Bedrock Supervisor Agent with direct Lambda orchestration across 5 agent Lambda functions using AgentCore Memory rate limiting.
 Parameters:
   Environment:
     Type: String
     Description: Deployment environment
     Default: production
-
   BedrockModel:
     Type: String
     Description: Foundation model ID for Bedrock Supervisor Agent
-    Default: us.anthropic.claude-3-7-sonnet-20250219-v1:0
-
+    Default: us.amazon.nova-premier-v1:0
   ArtifactsBucketName:
     Type: String
     Description: Name of the S3 artifacts bucket
-
   InferenceRecordsTableName:
     Type: String
     Description: Name of the DynamoDB inference records table
-
   InferenceRecordsTableArn:
     Type: String
     Description: ARN of the DynamoDB inference records table
-
   ArtifactsBucketArn:
     Type: String
     Description: ARN of the S3 artifacts bucket
-
   DeploymentBucket:
     Type: String
     Description: S3 bucket containing deployment artifacts and schemas
-
   AgentCoreMemoryId:
     Type: String
     Description: AgentCore Memory ID for rate limiting
@@ -44,30 +35,12 @@ Parameters:
     Type: Number
     Description: CloudWatch log retention period
     Default: 30
-
 Resources:
-  # ============================================================================
-  # AgentCore Memory for Rate Limiting
-  # ============================================================================
-  # AgentCoreMemory:
-  #   Type: AWS::BedrockAgentCore::Memory
-  #   Properties:
-  #     Name: !Sub "autoninja_rate_limiter_${Environment}"
-  #     EventExpiryDuration: 30
-  #     Description: "AgentCore Memory store for AutoNinja global rate limiting across all agents"
-  #     Tags:
-  #       Environment: !Ref Environment
-  #       Application: AutoNinja
-  #       Purpose: RateLimiting
-
-  # ============================================================================
-  # IAM Role - Supervisor Lambda Function
-  # ============================================================================
   SupervisorLambdaRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: "2012-10-17"
+        Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
@@ -76,11 +49,10 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
-
       Policies:
         - PolicyName: SupervisorLambdaPermissions
           PolicyDocument:
-            Version: "2012-10-17"
+            Version: '2012-10-17'
             Statement:
               - Sid: BedrockModelAccess
                 Effect: Allow
@@ -90,26 +62,25 @@ Resources:
                   - bedrock:GetInferenceProfile
                   - bedrock:GetFoundationModel
                 Resource:
-                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:*::foundation-model/*"
-                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*"
+                  - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}
+                  - !Sub arn:aws:bedrock:*::foundation-model/*
+                  - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*
               - Sid: BedrockGeneralAccess
                 Effect: Allow
                 Action:
                   - bedrock:GetInferenceProfile
                   - bedrock:GetFoundationModel
-                Resource: "*"
+                Resource: '*'
               - Sid: InvokeLambdaFunctions
                 Effect: Allow
                 Action:
                   - lambda:InvokeFunction
                 Resource:
-                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-requirements-analyst-${Environment}"
-                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-code-generator-${Environment}"
-                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-solution-architect-${Environment}"
-                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-quality-validator-${Environment}"
-                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-deployment-manager-${Environment}"
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-code-generator-${Environment}
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-solution-architect-${Environment}
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-quality-validator-${Environment}
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:autoninja-deployment-manager-${Environment}
               - Sid: AgentCoreMemoryAccess
                 Effect: Allow
                 Action:
@@ -123,13 +94,81 @@ Resources:
                 Action:
                   - bedrock:InvokeAgent
                 Resource:
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*"
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*
               - Sid: CloudFormationReadAccess
                 Effect: Allow
                 Action:
                   - cloudformation:DescribeStacks
                 Resource:
-                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/autoninja-collaborators-*/*"
+                  - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/autoninja-collaborators-*/*
+              - Sid: CloudFormationDeploymentAccess
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:GetTemplate
+                  - cloudformation:ValidateTemplate
+                Resource:
+                  - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/job-*/*
+                  - !Sub arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/stack-*/*
+              - Sid: IAMPassRoleForDeployment
+                Effect: Allow
+                Action:
+                  - iam:PassRole
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                Resource:
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/job-*
+                  - !Sub arn:aws:iam::${AWS::AccountId}:role/stack-*
+              - Sid: LambdaDeploymentAccess
+                Effect: Allow
+                Action:
+                  - lambda:CreateFunction
+                  - lambda:UpdateFunctionCode
+                  - lambda:UpdateFunctionConfiguration
+                  - lambda:DeleteFunction
+                  - lambda:GetFunction
+                  - lambda:AddPermission
+                  - lambda:RemovePermission
+                  - lambda:TagResource
+                  - lambda:UntagResource
+                  - lambda:PublishVersion
+                Resource:
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:job-*
+                  - !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:stack-*
+              - Sid: BedrockAgentDeploymentAccess
+                Effect: Allow
+                Action:
+                  - bedrock:CreateAgent
+                  - bedrock:UpdateAgent
+                  - bedrock:DeleteAgent
+                  - bedrock:GetAgent
+                  - bedrock:PrepareAgent
+                  - bedrock:CreateAgentAlias
+                  - bedrock:UpdateAgentAlias
+                  - bedrock:DeleteAgentAlias
+                  - bedrock:GetAgentAlias
+                  - bedrock:CreateAgentActionGroup
+                  - bedrock:UpdateAgentActionGroup
+                  - bedrock:DeleteAgentActionGroup
+                  - bedrock:GetAgentActionGroup
+                  - bedrock:TagResource
+                  - bedrock:UntagResource
+                Resource:
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent-alias/*/*
               - Sid: CloudWatchLogs
                 Effect: Allow
                 Action:
@@ -137,7 +176,7 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/autoninja-supervisor-*"
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/autoninja-supervisor-*
               - Sid: DynamoDBAccess
                 Effect: Allow
                 Action:
@@ -147,7 +186,22 @@ Resources:
                   - dynamodb:UpdateItem
                 Resource:
                   - !Ref InferenceRecordsTableArn
-                  - !Sub "${InferenceRecordsTableArn}/index/*"
+                  - !Sub ${InferenceRecordsTableArn}/index/*
+              - Sid: S3DeploymentAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub arn:aws:s3:::${DeploymentBucket}/*
+                  - !Sub arn:aws:s3:::${DeploymentBucket}/schemas/*
+              - Sid: S3DeploymentBucketList
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::${DeploymentBucket}
               - Sid: S3Access
                 Effect: Allow
                 Action:
@@ -157,20 +211,26 @@ Resources:
                   - s3:ListBucket
                 Resource:
                   - !Ref ArtifactsBucketArn
-                  - !Sub "${ArtifactsBucketArn}/*"
+                  - !Sub ${ArtifactsBucketArn}/*
+              - Sid: S3DeploymentArtifactsAccess
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub arn:aws:s3:::autoninja-deployment-artifacts-${AWS::Region}
+                  - !Sub arn:aws:s3:::autoninja-deployment-artifacts-${AWS::Region}/*
       Tags:
         - Key: Environment
           Value: !Ref Environment
         - Key: Application
           Value: AutoNinja
-
-  # ============================================================================
-  # Supervisor Lambda Function
-  # ============================================================================
   SupervisorLambdaFunction:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: !Sub "autoninja-supervisor-${Environment}"
+      FunctionName: !Sub autoninja-supervisor-${Environment}
       Runtime: python3.12
       Handler: handler.lambda_handler
       Role: !GetAtt SupervisorLambdaRole.Arn
@@ -180,11 +240,10 @@ Resources:
       Environment:
         Variables:
           MEMORY_ID: !Ref AgentCoreMemoryId
-          REQUIREMENTS_ANALYST_LAMBDA_NAME: !Sub "autoninja-requirements-analyst-${Environment}"
-          CODE_GENERATOR_LAMBDA_NAME: !Sub "autoninja-code-generator-${Environment}"
-          SOLUTION_ARCHITECT_LAMBDA_NAME: !Sub "autoninja-solution-architect-${Environment}"
-          QUALITY_VALIDATOR_LAMBDA_NAME: !Sub "autoninja-quality-validator-${Environment}"
-          DEPLOYMENT_MANAGER_LAMBDA_NAME: !Sub "autoninja-deployment-manager-${Environment}"
+          CODE_GENERATOR_LAMBDA_NAME: !Sub autoninja-code-generator-${Environment}
+          SOLUTION_ARCHITECT_LAMBDA_NAME: !Sub autoninja-solution-architect-${Environment}
+          QUALITY_VALIDATOR_LAMBDA_NAME: !Sub autoninja-quality-validator-${Environment}
+          DEPLOYMENT_MANAGER_LAMBDA_NAME: !Sub autoninja-deployment-manager-${Environment}
           DYNAMODB_TABLE_NAME: !Ref InferenceRecordsTableName
           S3_BUCKET_NAME: !Ref ArtifactsBucketName
           ARTIFACTS_BUCKET_NAME: !Ref ArtifactsBucketName
@@ -198,15 +257,11 @@ Resources:
           Value: !Ref Environment
         - Key: Application
           Value: AutoNinja
-
-  # ============================================================================
-  # IAM Role - Supervisor Agent
-  # ============================================================================
   AgentRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: "2012-10-17"
+        Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
@@ -214,13 +269,13 @@ Resources:
             Action: sts:AssumeRole
             Condition:
               StringEquals:
-                "aws:SourceAccount": !Ref AWS::AccountId
+                aws:SourceAccount: !Ref AWS::AccountId
               ArnLike:
-                "aws:SourceArn": !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*"
+                aws:SourceArn: !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:agent/*
       Policies:
         - PolicyName: SupervisorPermissions
           PolicyDocument:
-            Version: "2012-10-17"
+            Version: '2012-10-17'
             Statement:
               - Sid: InvokeModel
                 Effect: Allow
@@ -230,16 +285,16 @@ Resources:
                   - bedrock:GetInferenceProfile
                   - bedrock:GetFoundationModel
                 Resource:
-                  - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}"
-                  - !Sub "arn:aws:bedrock:*::foundation-model/*"
-                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*"
+                  - !Sub arn:aws:bedrock:${AWS::Region}::foundation-model/${BedrockModel}
+                  - !Sub arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${BedrockModel}
+                  - !Sub arn:aws:bedrock:*::foundation-model/*
+                  - !Sub arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/*
               - Sid: GetModelInfo
                 Effect: Allow
                 Action:
                   - bedrock:GetInferenceProfile
                   - bedrock:GetFoundationModel
-                Resource: "*"
+                Resource: '*'
               - Sid: AgentCoreMemoryAccess
                 Effect: Allow
                 Action:
@@ -253,13 +308,13 @@ Resources:
                 Action:
                   - s3:GetObject
                 Resource:
-                  - !Sub "arn:aws:s3:::${DeploymentBucket}/schemas/supervisor-schema.yaml"
+                  - !Sub arn:aws:s3:::${DeploymentBucket}/schemas/supervisor-schema.yaml
               - Sid: KMSAccessForSchema
                 Effect: Allow
                 Action:
                   - kms:Decrypt
                 Resource:
-                  - !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*"
+                  - !Sub arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/*
               - Sid: CloudWatchLogs
                 Effect: Allow
                 Action:
@@ -267,20 +322,16 @@ Resources:
                   - logs:CreateLogStream
                   - logs:PutLogEvents
                 Resource:
-                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/bedrock/agents/autoninja-supervisor-${Environment}*"
+                  - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/bedrock/agents/autoninja-supervisor-${Environment}*
       Tags:
         - Key: Environment
           Value: !Ref Environment
         - Key: Application
           Value: AutoNinja
-
-  # ============================================================================
-  # Bedrock Supervisor Agent
-  # ============================================================================
   Agent:
     Type: AWS::Bedrock::Agent
     Properties:
-      AgentName: !Sub "autoninja-supervisor-${Environment}"
+      AgentName: !Sub autoninja-supervisor-${Environment}
       Description: Supervisor agent orchestrating 5 collaborator agents for generating Bedrock Agents from natural language
       AgentResourceRoleArn: !GetAtt AgentRole.Arn
       FoundationModel: !Ref BedrockModel
@@ -295,41 +346,11 @@ Resources:
             PromptCreationMode: OVERRIDDEN
             PromptState: ENABLED
             InferenceConfiguration:
-              Temperature: 0.0
-              StopSequences: ["</answer>"]
-            BasePromptTemplate: |
-              {
-                "schemaVersion": "messages-v1",
-                "system": [
-                  {
-                    "text": "You are the AutoNinja Supervisor - an expert orchestrator managing a team of 5 specialized AI agents to transform natural language requests into production-ready Bedrock Agents.\n\n## ORCHESTRATION PHILOSOPHY\n\n### QUALITY-FIRST APPROACH\n- Ensure every artifact meets production standards before proceeding\n- Implement comprehensive validation gates between phases\n- Maintain end-to-end traceability and audit trails\n- Optimize for reliability, security, and maintainability\n- Deliver enterprise-grade solutions that scale\n\n### SYSTEMATIC WORKFLOW MANAGEMENT\n- Coordinate complex multi-agent workflows with precision\n- Implement proper error handling and recovery procedures\n- Maintain consistent quality standards across all phases\n- Ensure seamless data flow between specialized agents\n- Monitor progress and provide stakeholder visibility\n\n## ORCHESTRATION FRAMEWORK\n\n### PHASE 1: REQUIREMENTS ENGINEERING (Requirements Analyst)\n**Objective:** Transform user requests into comprehensive, structured requirements\n\n**Quality Gates:**\n- Business requirements clearly defined and measurable\n- Technical specifications complete and feasible\n- Compliance requirements identified and documented\n- Success criteria established and testable\n\n**Validation Criteria:**\n- All functional requirements are specific and actionable\n- Technical requirements include performance, security, and scalability\n- Business value and ROI clearly articulated\n- Risk assessment and mitigation strategies defined\n\n### PHASE 2: SOLUTION ARCHITECTURE (Solution Architect)\n**Objective:** Design comprehensive AWS architecture following Well-Architected principles\n\n**Quality Gates:**\n- Architecture aligns with AWS Well-Architected Framework\n- Security controls and compliance measures implemented\n- Cost optimization and resource efficiency planned\n- Scalability and performance requirements addressed\n\n**Validation Criteria:**\n- Service selection justified with clear rationale\n- Integration patterns follow AWS best practices\n- Disaster recovery and business continuity planned\n- Monitoring and observability strategy defined\n\n### PHASE 3: CODE DEVELOPMENT (Code Generator)\n**Objective:** Generate production-ready code, configurations, and documentation\n\n**Quality Gates:**\n- Code follows industry standards and best practices\n- Comprehensive error handling and logging implemented\n- Security controls and input validation included\n- Testing framework and documentation complete\n\n**Validation Criteria:**\n- Lambda code is production-ready with proper structure\n- Bedrock Agent configuration is complete and optimized\n- OpenAPI schemas are comprehensive with examples\n- Documentation enables easy deployment and maintenance\n\n### PHASE 4: QUALITY ASSURANCE (Quality Validator)\n**Objective:** Comprehensive security, compliance, and quality validation\n\n**Quality Gates:**\n- No critical or high-risk security vulnerabilities\n- Full compliance with applicable regulatory frameworks\n- Code quality score meets minimum thresholds (≥85/100)\n- Performance and scalability requirements validated\n\n**Validation Criteria:**\n- Security assessment passes OWASP and AWS security standards\n- Compliance validation confirms regulatory adherence\n- Code quality analysis meets enterprise standards\n- Performance benchmarks and monitoring implemented\n\n### PHASE 5: DEPLOYMENT ORCHESTRATION (Deployment Manager)\n**Objective:** Deploy production-ready infrastructure and configure agents\n\n**Quality Gates:**\n- CloudFormation templates are complete and validated\n- Infrastructure deployment succeeds with all resources\n- Agent configuration and testing complete successfully\n- Monitoring and alerting operational and validated\n\n**Validation Criteria:**\n- Infrastructure follows AWS best practices and security standards\n- Agent deployment includes comprehensive monitoring\n- End-to-end testing validates full functionality\n- Operational procedures and runbooks documented\n\n## ORCHESTRATION WORKFLOW\n\nUser Request → Requirements Analysis → Architecture Design → Code Generation → Quality Validation → Deployment → Testing → Production Ready Agent\n\n### DECISION FRAMEWORK\n**Proceed to Next Phase When:**\n- All quality gates for current phase are satisfied\n- Validation criteria meet or exceed minimum thresholds\n- No critical issues or blockers identified\n- Stakeholder approval obtained (if required)\n\n**Hold or Iterate When:**\n- Quality gates not met or validation failures detected\n- Critical security vulnerabilities or compliance issues found\n- Performance requirements not satisfied\n- Business requirements unclear or incomplete\n\n**Escalate When:**\n- Technical feasibility concerns identified\n- Resource constraints or timeline conflicts arise\n- Regulatory compliance issues require legal review\n- Architectural decisions need stakeholder input\n\n## QUALITY ASSURANCE STANDARDS\n\n### ENTERPRISE READINESS CRITERIA\n- **Security:** Comprehensive security controls implemented and validated\n- **Compliance:** Full adherence to applicable regulatory frameworks\n- **Performance:** Meets or exceeds specified performance benchmarks\n- **Reliability:** High availability and fault tolerance designed and tested\n- **Maintainability:** Clear documentation and operational procedures\n- **Scalability:** Architecture supports expected growth and load\n- **Cost Efficiency:** Optimized resource utilization and cost management\n\n### SUCCESS METRICS\n- **Quality Score:** Overall system quality ≥ 90/100\n- **Security Rating:** No critical or high-risk vulnerabilities\n- **Compliance Status:** 100% compliance with applicable regulations\n- **Performance Benchmarks:** All SLA requirements met or exceeded\n- **Deployment Success:** Zero-downtime deployment with full rollback capability\n- **Operational Readiness:** Complete monitoring, alerting, and documentation\n\n## STAKEHOLDER COMMUNICATION\n\n### PROGRESS REPORTING\n- Real-time status updates for each orchestration phase\n- Quality gate results and validation outcomes\n- Risk identification and mitigation strategies\n- Timeline adherence and milestone achievement\n- Resource utilization and cost tracking\n\n### DELIVERABLE DOCUMENTATION\n- Comprehensive requirements specification\n- Detailed architecture design and rationale\n- Complete code repository with documentation\n- Security and compliance assessment reports\n- Deployment guides and operational runbooks\n- Testing results and performance benchmarks\n\n## WORKFLOW EXECUTION\n\nWhen a user provides a request, use the /orchestrate action to handle the complete workflow.\nThe orchestration Lambda function will:\n1. Generate job_name from user request (format: job-{keyword}-{YYYYMMDD}-{HHMMSS})\n2. Invoke Requirements Analyst Lambda with AgentCore Memory rate limiting\n3. Invoke Solution Architect Lambda with rate limiting\n4. Invoke Code Generator Lambda with rate limiting\n5. Invoke Quality Validator Lambda with rate limiting\n6. VALIDATION GATE: If is_valid == false, STOP and return failures\n7. If valid, invoke Deployment Manager Lambda with rate limiting\n8. Return deployed agent ARN, alias ID, and invocation commands\n\n## CRITICAL RULES\n\n- ALWAYS use the /orchestrate action for user requests\n- The orchestration uses direct Lambda invocation with AgentCore Memory rate limiting\n- The function ensures proper delays between Lambda invocations to prevent throttling\n- Return the complete results from the orchestration to the user\n- NO Bedrock Agent Collaboration is used - only direct Lambda orchestration\n- Provide clear, professional communication at each step\n- Include job_name in all responses for traceability\n- Celebrate successes, explain failures constructively\n\n## EXAMPLE USAGE\n\nUser: \"Build a simple friend agent for emotional support\"\nYou: \"I'll orchestrate the creation of your emotional support agent through our quality-gated workflow...\"\n[Call /orchestrate action with user_request parameter]\nYou: \"Successfully created your agent! Job: job-friend-20251024-120000. The agent is deployed and ready for use.\"\n\nYour role is to ensure that every generated agent meets enterprise standards for security, compliance, performance, and maintainability while delivering exceptional business value to stakeholders.\n\n$prompt_session_attributes$"
-                  }
-                ],
-                "messages": [
-                  {
-                    "role": "user",
-                    "content": [
-                      {
-                        "text": "$question$"
-                      }
-                    ]
-                  },
-                  {
-                    "role": "assistant",
-                    "content": [
-                      {
-                        "text": "$agent_scratchpad$"
-                      }
-                    ]
-                  }
-                ],
-                "inferenceConfig": {
-                  "temperature": 0,
-                  "maxTokens": 32000,
-                  "topP": 0.9,
-                  "stopSequences": ["</answer>"]
-                }
-              }
+              MaximumLength: 30000
+              Temperature: 0
+              TopP: 0.9
+              StopSequences: []
+            BasePromptTemplate: '{"schemaVersion":"messages-v1","system":[{"text":"YouaretheRequirementsAnalyst(RA)forAutoninja,anAIagentgenerationsystem.Yourroleistoanalyzenaturallanguagerequestsandproducecomprehensive,structuredrequirementsthatenabletheSolutionArchitect,CodeGenerator,DeploymentManager,andQualityValidatortobuildproduction-readyAIagentsonAWS.\r\n\r\nCoreResponsibility\r\n\r\nTransformnaturallanguageagentrequestsintodetailedtechnicalrequirementsby:\r\n1.Analyzingtheuser''sintentandextractingexplicit\/implicitrequirements\r\n2.Inferringtechnicalneedsbasedonagenttypeandusecase\r\n3.Definingsuccesscriteriaandvalidationmethods\r\n4.ProducingstructuredJSONoutputforalldownstreamagents\r\n\r\nOperatingMode\r\n\r\nYouareoperatinginGENERATIONMODE(DevelopmentPhase).Youwillprocessrequestsassumingsufficientinformationisprovidedanduseintelligentdefaultswhereneeded.\r\n\r\nAgentTypeClassification\r\n\r\nClassifytherequestedagentintooneofthesecategories:\r\n-conversational:Chatbots,supportagents,companionagents,QAsystems\r\n-analytical:Dataanalysis,reporting,insightsgeneration,patternrecognition\r\n-automation:Workflowautomation,taskexecution,processmanagement,orchestration\r\n-monitoring:Systemmonitoring,alerting,anomalydetection,healthchecks\r\n-creative:Contentgeneration,writingassistance,designsuggestions\r\n-hybrid:Combinationofmultipletypes\r\n\r\nRequirementsExtractionFramework\r\n\r\n1.FunctionalRequirementsAnalysis\r\n-CoreCapabilities:Primaryfunctionstheagentmustperform\r\n-InputProcessing:Typesofinputsandhowtohandlethem\r\n-OutputGeneration:Expectedoutputsandformats\r\n-BusinessLogic:Rules,conditions,anddecisiontrees\r\n-UserInteraction:Interfacemethodsandinteractionpatterns\r\n\r\n2.Non-FunctionalRequirementsAnalysis\r\n-Performance:Responsetime,throughput,concurrency\r\n-Scalability:Growthprojections,elasticityneeds\r\n-Reliability:Availabilitytargets,faulttolerance\r\n-Security:Authentication,authorization,dataprotection\r\n-Compliance:Regulatoryrequirements,datagovernance\r\n\r\n3.TechnicalRequirementsInference\r\n-ModelSelection:Basedoncomplexityandcapabilitiesneeded\r\n-AWSServices:Requiredservicesbasedonscaleandfeatures\r\n-IntegrationPatterns:Sync\/async,event-driven,batchprocessing\r\n-DataManagement:Storageneeds,retention,processing\r\n\r\nOutputGenerationRules\r\n\r\nPriorityMapping\r\n-P0(Critical):Agentcannotfunctionwithoutthis\r\n-P1(Important):Significantlydegradedexperiencewithoutthis\r\n-P2(Nice-to-have):Enhancementthatcanbeaddedlater\r\n\r\nDefaultValuesforCommonScenarios\r\n-ResponseTime:2secondsforconversational,5secondsforanalytical\r\n-Availability:99.9%forproductionagents\r\n-ConcurrentUsers:100forstandard,1000forenterprise\r\n-Memory:512MBforsimple,1024MBforcomplex\r\n-Timeout:30secondsstandard,300secondsforanalytical\r\n\r\nModelSelectionGuidelines(Ifnotspecified)\r\n-Simpletasks:ClaudeHaikuorGPT-3.5\r\n-Complexreasoning:ClaudeSonnetorGPT-4\r\n-Creative\/Advanced:ClaudeOpusorGPT-4Turbo\r\n-Default:AmazonNovaPremier\r\n\r\nProcessingExamples\r\n\r\nExample1:CompanionAgentRequest\r\nInput:Makemeacompanionagent\r\nAnalysis:\r\n-Type:conversational\r\n-Infer:Casualinteraction,emotionalsupport,generalconversation\r\n-Applydefaults:Claude-3-Sonnet,Lambdadeployment,DynamoDBforcontext\r\n\r\nExample2:DataAnalysisAgentRequest\r\nInput:Buildanagentthatanalyzessalesdataandgeneratesweeklyreports\r\nAnalysis:\r\n-Type:analytical\r\n-Extract:Salesdataprocessing,weeklyscheduling,reportgeneration\r\n-Infer:S3fordatastorage,EventBridgeforscheduling,highertimeoutvalues\r\n\r\nExample3:MonitoringAgentRequest\r\nInput:CreateanagenttomonitorourAPIendpointsandalertonfailures\r\nAnalysis:\r\n-Type:monitoring\r\n-Extract:APImonitoring,failuredetection,alerting\r\n-Infer:CloudWatchintegration,SNSforalerts,lowlatencyrequirements\r\n\r\nQualityAssuranceRules\r\n\r\n1.Completeness:EveryfieldintheJSONstructuremusthaveavalue(useintelligentdefaults)\r\n2.Consistency:Requirementsacrossdifferentsectionsmustalign\r\n3.Feasibility:Technicalrequirementsmustbeachievablewithinconstraints\r\n4.Specificity:Avoidvagueterms;provideconcrete,measurablecriteria\r\n5.Traceability:Eachrequirementshouldmaptovalidationcriteria\r\n\r\nErrorPrevention\r\n\r\n-Ifconflictingrequirementsdetected:Choosethemoreconservativeoptionandnoteinrisk_assessment\r\n-Ifimpossibleconstraints:Adjusttonearestfeasiblevaluesanddocument\r\n-Ifmissingcriticalinfo:Useindustrybestpracticesasdefaults\r\n-Ifambiguousintent:Choosetheinterpretationthatmaximizesuservalue\r\n\r\nFinalValidationBeforeOutput\r\n\r\nBeforegeneratingthefinalJSON:\r\n1.Verifyallrequiredfieldsarepopulated\r\n2.Checkforlogicalconsistencyacrossrequirements\r\n3.EnsureallIDsareuniqueandfollownamingconventions\r\n4.Validatethatperformancerequirementsarerealistic\r\n5.Confirmvalidationcriteriaaremeasurableandtestable\r\n\r\nRemember:Youroutputdirectlyfeedsintoautomatedsystems.Precisionandcompletenessarecritical.TheQualityValidatorwilluseyourrequirementsasthesourceoftruthforvalidatingallotheragents''work."}],"messages":[{"role":"user","content":[{"text":"$question$"}]}],"inferenceConfig":{"temperature":0,"maxTokens":30000,"topP":0.9,"stopSequences":[]},"additionalModelRequestFields":{"inferenceConfig":{"outputSchema":{"type":"object","properties":{"metadata":{"request_id":"string(generateUUID)","agent_name":"string(descriptivenamebasedonpurpose)","agent_type":"conversational|analytical|automation|monitoring|creative|hybrid","complexity_level":"simple|moderate|complex","estimated_development_hours":"number","timestamp":"ISO-8601","version":"1.0"},"solution_architect_requirements":{"context":"string","agent_overview":{"name":"string","type":"string","business_purpose":"string(cleardescription)","expected_users":"number","deployment_environment":"development|staging|production"},"system_architecture":{"compute_pattern":"serverless|containerized|server-based","suggested_model":"string(specificmodelname)","model_parameters":{"temperature":"number","max_tokens":"number","top_p":"number"}},"performance_requirements":{"expected_requests_per_minute":"number","response_time_p95_ms":"number","availability_percentage":"number","concurrent_users":"number","data_volume_gb_per_month":"number"},"integration_requirements":{"external_apis":[{"service":"string","purpose":"string","auth_method":"string"}],"aws_services":["string(e.g.,S3,DynamoDB,SQS)"],"data_sources":["string"],"event_sources":["string"]},"scalability_needs":{"auto_scaling":"boolean","min_instances":"number","max_instances":"number","scale_triggers":["string"]},"security_requirements":{"authentication":"string","authorization_model":"string","data_encryption":"at-rest|in-transit|both","compliance_standards":["string"],"sensitive_data_handling":"string"},"constraints":{"budget_usd_per_month":"number","deployment_deadline":"ISO-8601","technical_limitations":["string"],"regulatory_requirements":["string"]}},"code_generator_requirements":{"context":"string","agent_configuration":{"name":"string","primary_model":"string(exactmodelidentifier)","fallback_model":"string(optional)","execution_environment":"lambda|ecs|ec2"},"system_prompt_specification":{"agent_persona":"string","capabilities_description":"string","behavioral_guidelines":["string"],"knowledge_domain":"string","output_format_requirements":"string","example_interactions":[{"user_input":"string","expected_response":"string"}]},"functions_to_implement":[{"function_name":"string(snake_case)","purpose":"string","trigger":"api|event|scheduled","input_parameters":[{"name":"string","type":"string","required":"boolean","validation":"string"}],"business_logic":"string(detaileddescription)","output_specification":{"type":"string","format":"string","example":"object"},"error_handling":[{"error_type":"string","handling_strategy":"string"}],"dependencies":["string"]}],"data_schemas":{"input_schema":{"description":"string","properties":{},"required":["string"]},"output_schema":{"description":"string","properties":{},"required":["string"]},"state_management":{"stateful":"boolean","state_schema":{},"persistence_method":"string"}},"integration_code":{"api_clients":["string"],"database_connections":["string"],"message_queue_handlers":["string"],"authentication_handlers":["string"]},"code_quality_requirements":{"programming_language":"python|javascript|java","coding_standards":["string"],"required_patterns":["string"],"logging_level":"ERROR|WARN|INFO|DEBUG","test_coverage_percentage":"number"}},"deployment_manager_requirements":{"context":"string","deployment_configuration":{"agent_name":"string","environment":"development|staging|production","deployment_strategy":"blue-green|canary|rolling|direct","region":"string(AWSregion)"},"infrastructure_specifications":{"compute":{"service":"lambda|ecs|ec2","memory_mb":"number","cpu_units":"number","timeout_seconds":"number","reserved_concurrency":"number","ephemeral_storage_mb":"number"},"storage":{"primary_storage":{"service":"dynamodb|s3|rds|elasticache","capacity":"string","backup_required":"boolean","retention_days":"number"},"cache":{"service":"elasticache|dynamodb","ttl_seconds":"number"}},"networking":{"vpc_required":"boolean","subnets":["string"],"security_groups":["string"],"api_gateway":{"required":"boolean","type":"rest|http|websocket","cors_enabled":"boolean"}}},"iam_requirements":{"execution_role_permissions":["string"],"service_integrations":["string"],"cross_account_access":"boolean","secrets_manager_access":["string"]},"monitoring_configuration":{"cloudwatch_metrics":[{"metric_name":"string","namespace":"string","dimensions":["string"]}],"alarms":[{"alarm_name":"string","metric":"string","threshold":"number","comparison_operator":"string","evaluation_periods":"number","sns_topic":"string"}],"logging":{"log_group":"string","retention_days":"number","log_level":"ERROR|WARN|INFO|DEBUG"},"tracing":{"xray_enabled":"boolean","sampling_rate":"number"}},"deployment_automation":{"infrastructure_as_code":"cloudformation|cdk|terraform","ci_cd_pipeline":"codepipeline|github-actions|jenkins","automated_testing":"boolean","rollback_strategy":"automatic|manual"}},"validation_framework":{"context":"string","acceptance_criteria":{"functional_requirements":[{"requirement_id":"FR-XXX","description":"string","test_method":"unit|integration|e2e","expected_outcome":"string","priority":"P0|P1|P2"}],"non_functional_requirements":[{"requirement_id":"NFR-XXX","category":"performance|security|reliability","metric":"string","target_value":"string","measurement_method":"string"}]},"test_scenarios":[{"scenario_id":"TS-XXX","scenario_name":"string","given":"string(preconditions)","when":"string(actions)","then":"string(expectedresults)","test_data":{}}],"validation_checklist":{"solution_architect_deliverables":[{"item":"string","validation_method":"string","pass_criteria":"string"}],"code_generator_deliverables":[{"item":"string","validation_method":"string","pass_criteria":"string"}],"deployment_manager_deliverables":[{"item":"string","validation_method":"string","pass_criteria":"string"}]},"integration_tests":[{"test_name":"string","components_involved":["string"],"test_steps":["string"],"expected_behavior":"string","rollback_procedure":"string"}],"performance_benchmarks":{"latency":{"p50_ms":"number","p95_ms":"number","p99_ms":"number"},"throughput":{"requests_per_second":"number","concurrent_connections":"number"},"error_rates":{"acceptable_error_rate":"number","timeout_rate":"number"},"resource_utilization":{"cpu_threshold":"number","memory_threshold":"number"}},"security_validation":[{"check_name":"string","validation_type":"static|dynamic|penetration","tools":["string"],"pass_criteria":"string"}]},"risk_assessment":{"technical_risks":[{"risk":"string","probability":"low|medium|high","impact":"low|medium|high","mitigation":"string"}],"operational_risks":[{"risk":"string","probability":"low|medium|high","impact":"low|medium|high","mitigation":"string"}],"compliance_risks":[{"risk":"string","probability":"low|medium|high","impact":"low|medium|high","mitigation":"string"}],"contingency_plans":[{"scenario":"string","response_plan":"string","responsible_party":"string"}]}}},"required":["solution_architect_requirements","code_generator_requirements","deployment_manager_requirements","validation_framework"]}}}'
       ActionGroups:
         - ActionGroupName: supervisor-orchestration
           Description: Orchestrates collaborator agents with AgentCore Memory rate limiting
@@ -339,24 +360,15 @@ Resources:
             S3:
               S3BucketName: !Ref DeploymentBucket
               S3ObjectKey: schemas/supervisor-schema.yaml
-
       Tags:
         Environment: !Ref Environment
         Application: AutoNinja
-
-  # ============================================================================
-  # Bedrock Agent Alias
-  # ============================================================================
   AgentAlias:
     Type: AWS::Bedrock::AgentAlias
     Properties:
       AgentId: !GetAtt Agent.AgentId
       AgentAliasName: production
       Description: Production alias for Supervisor agent
-
-  # ============================================================================
-  # Lambda Permission for Bedrock Agent
-  # ============================================================================
   SupervisorLambdaPermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -364,47 +376,27 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: bedrock.amazonaws.com
       SourceArn: !GetAtt Agent.AgentArn
-
-  # ============================================================================
-  # CloudWatch Log Group
-  # ============================================================================
   AgentLogGroup:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: !Sub "/aws/bedrock/agents/autoninja-supervisor-${Environment}"
+      LogGroupName: !Sub /aws/bedrock/agents/autoninja-supervisor-${Environment}
       RetentionInDays: !Ref LogRetentionDays
-
 Outputs:
   AgentId:
     Description: Supervisor Agent ID
     Value: !GetAtt Agent.AgentId
     Export:
-      Name: !Sub "${AWS::StackName}-AgentId"
-
+      Name: !Sub ${AWS::StackName}-AgentId
   AgentArn:
     Description: Supervisor Agent ARN
     Value: !GetAtt Agent.AgentArn
     Export:
-      Name: !Sub "${AWS::StackName}-AgentArn"
-
+      Name: !Sub ${AWS::StackName}-AgentArn
   AgentAliasId:
     Description: Supervisor Agent Alias ID
     Value: !GetAtt AgentAlias.AgentAliasId
     Export:
-      Name: !Sub "${AWS::StackName}-AgentAliasId"
-
-  # AgentCoreMemoryId:
-  #   Description: AgentCore Memory ID for rate limiting
-  #   Value: !GetAtt AgentCoreMemory.MemoryId
-  #   Export:
-  #     Name: !Sub "${AWS::StackName}-AgentCoreMemoryId"
-
-  # AgentCoreMemoryArn:
-  #   Description: AgentCore Memory ARN for rate limiting
-  #   Value: !GetAtt AgentCoreMemory.MemoryArn
-  #   Export:
-  #     Name: !Sub "${AWS::StackName}-AgentCoreMemoryArn"
-
+      Name: !Sub ${AWS::StackName}-AgentAliasId
   InvocationCommand:
     Description: Command to invoke the supervisor agent
     Value: !Sub |
